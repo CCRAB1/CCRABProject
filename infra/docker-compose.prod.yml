@@ -1,0 +1,278 @@
+name: ccrabdashboard_production
+
+x-prod-env: &prod_env
+  env_file:
+    - prod.env
+
+x-airflow-common: &airflow_common
+  <<: *prod_env
+  build:
+    context: ..
+    dockerfile: infra/docker/airflow/Dockerfile
+  entrypoint: /usr/local/bin/ccrab-airflow-entrypoint
+  init: true
+  environment:
+    AIRFLOW_HOME: /opt/airflow
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__PLUGINS_FOLDER: /opt/airflow/plugins
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "False"
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: admin:admin
+    AIRFLOW__API__BASE_URL: http://airflow-apiserver:8080
+    AIRFLOW_VAR_BASE_WORKING_DIRECTORY: /opt/airflow/working_directory
+    AIRFLOW_VAR_CCRAB_DJANGO_PROJECT_PATH: /opt/ccrab/dashboard
+    CCRAB_DJANGO_PROJECT_PATH: /opt/ccrab/dashboard
+  volumes:
+    - ../apps/DataIngestion/airflow/dags:/opt/airflow/dags:ro
+    - airflow_logs:/opt/airflow/logs
+    - airflow_working_directory:/opt/airflow/working_directory
+    - ./docker/airflow/variables:/opt/airflow/variables:ro
+  depends_on:
+    db:
+      condition: service_healthy
+  networks:
+    - backend
+
+services:
+  db:
+    <<: *prod_env
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        : "$${DATABASE_NAME:?Set DATABASE_NAME in prod.env}"
+        : "$${DATABASE_USER:?Set DATABASE_USER in prod.env}"
+        : "$${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in prod.env}"
+        export POSTGRES_DB="$${POSTGRES_DB:-$${DATABASE_NAME}}"
+        export POSTGRES_USER="$${POSTGRES_USER:-$${DATABASE_USER}}"
+        export POSTGRES_PASSWORD="$${POSTGRES_PASSWORD:-$${DATABASE_PASSWORD}}"
+        exec docker-entrypoint.sh postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${DATABASE_USER}\" -d \"$${DATABASE_NAME}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - backend
+
+  web:
+    <<: *prod_env
+    build:
+      context: ..
+      dockerfile: infra/docker/dashboard/Dockerfile
+    restart: unless-stopped
+    init: true
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DJANGO_IN_DOCKER: "True"
+      DJANGO_DEBUG: "False"
+      DJANGO_TRUST_X_FORWARDED_PROTO: "True"
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+      DJANGO_WAIT_FOR_DB: "1"
+      DJANGO_RUN_MIGRATIONS: "1"
+      DJANGO_COLLECTSTATIC: "1"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        : "$${DJANGO_ALLOWED_HOSTS:?Set DJANGO_ALLOWED_HOSTS in prod.env}"
+        : "$${DJANGO_CSRF_TRUSTED_ORIGINS:?Set DJANGO_CSRF_TRUSTED_ORIGINS in prod.env}"
+        : "$${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in prod.env}"
+        : "$${DATABASE_NAME:?Set DATABASE_NAME in prod.env}"
+        : "$${DATABASE_USER:?Set DATABASE_USER in prod.env}"
+        : "$${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in prod.env}"
+        exec gunicorn --workers "$${GUNICORN_WORKERS:-3}" --bind 0.0.0.0:8000 CCRABDashboard.wsgi:application
+    volumes:
+      - static_data:/app/staticfiles:rw
+      - media_data:/app/media:rw
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 5).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - backend
+
+  nginx:
+    <<: *prod_env
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - /var/log/ccrab/nginx:/var/log/nginx
+      - static_data:/app/staticfiles:ro
+      - media_data:/app/media:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_etc:/etc/letsencrypt:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - backend
+
+  airflow-init:
+    <<: *airflow_common
+    restart: "no"
+    command:
+      - bash
+      - -ec
+      - |
+        airflow db migrate
+        if [ -f /opt/airflow/variables/production.json ]; then
+          airflow variables import -a overwrite /opt/airflow/variables/production.json
+        fi
+
+  airflow-apiserver:
+    <<: *airflow_common
+    restart: unless-stopped
+    command:
+      - airflow
+      - api-server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --proxy-headers
+    expose:
+      - "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8080), 5).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  airflow-scheduler:
+    <<: *airflow_common
+    restart: unless-stopped
+    command:
+      - airflow
+      - scheduler
+    depends_on:
+      db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow_common
+    restart: unless-stopped
+    command:
+      - airflow
+      - dag-processor
+    depends_on:
+      db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow_common
+    restart: unless-stopped
+    profiles:
+      - airflow-triggerer
+    command:
+      - airflow
+      - triggerer
+    depends_on:
+      db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  certbot:
+    <<: *prod_env
+    image: certbot/certbot
+    profiles:
+      - certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_etc:/etc/letsencrypt
+    depends_on:
+      nginx:
+        condition: service_started
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - >
+        : "$${CERTBOT_EMAIL:?Set CERTBOT_EMAIL in prod.env}" &&
+        : "$${CERTBOT_DOMAIN:?Set CERTBOT_DOMAIN in prod.env}" &&
+        certbot certonly --webroot --webroot-path=/var/www/certbot
+        --email "$${CERTBOT_EMAIL}"
+        --agree-tos --no-eff-email --non-interactive --keep-until-expiring
+        --cert-name "$${CERTBOT_DOMAIN}"
+        -d "$${CERTBOT_DOMAIN}"
+        $${CERTBOT_EXTRA_DOMAINS:-}
+        $${CERTBOT_EXTRA_ARGS:-}
+    networks:
+      - backend
+
+  certbot-standalone:
+    <<: *prod_env
+    image: certbot/certbot
+    profiles:
+      - certbot-standalone
+    ports:
+      - "80:80"
+    volumes:
+      - certbot_etc:/etc/letsencrypt
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - >
+        : "$${CERTBOT_EMAIL:?Set CERTBOT_EMAIL in prod.env}" &&
+        : "$${CERTBOT_DOMAIN:?Set CERTBOT_DOMAIN in prod.env}" &&
+        certbot certonly --standalone --preferred-challenges http
+        --email "$${CERTBOT_EMAIL}"
+        --agree-tos --no-eff-email --non-interactive --keep-until-expiring
+        --cert-name "$${CERTBOT_DOMAIN}"
+        -d "$${CERTBOT_DOMAIN}"
+        $${CERTBOT_EXTRA_DOMAINS:-}
+        $${CERTBOT_EXTRA_ARGS:-}
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+  static_data:
+  media_data:
+  airflow_logs:
+  airflow_working_directory:
+  certbot_www:
+  certbot_etc:
+
+networks:
+  backend:
