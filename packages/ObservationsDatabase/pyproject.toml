@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "observationsdatabase"
+version = "0.2.9"
+description = ""
+authors = ["DANRAMAGE <ChiefDan@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+sqlalchemy = "^2.0.43"
+geoalchemy2 = "^0.18.0"
+alembic = "^1.16.5"
+psycopg2-binary = "^2.9.10"
+pydantic = "^2.12.5"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.14.1"
+pre-commit = "^4.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+fix = true
+select = ["E", "F", "I"]
+ignore = ["E501"]  # Ignore line-length since Black handles it
+exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "migrations",
+    "__pycache__",
+    "alembic"
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["my_project"]
+combine-as-imports = true

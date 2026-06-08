@@ -1,0 +1,12 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0  # use a stable tag you pinned in pyproject.toml or update to latest
+    hooks:
+      - id: ruff          # lint checks
+      - id: ruff-format   # auto-format imports / style fixes
+
+  - repo: https://github.com/psf/black
+    rev: 25.9.0
+    hooks:
+      - id: black
+        language_version: python3.11
