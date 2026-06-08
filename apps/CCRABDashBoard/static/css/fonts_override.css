@@ -1,0 +1,44 @@
+/* fonts-override.css
+   Overrides Bulma's font stacks to use the locally hosted fonts.
+   This file must be loaded after Bulma.
+*/
+
+/* CSS variables (optional, convenient) */
+:root{
+  --site-font-sans: "Montserrat", Arial, sans-serif;
+  --site-font-heading: "Roboto Slab", Georgia, serif;
+}
+
+/* make body use Montserrat (replaces Bulma's default) */
+html, body {
+  font-family: var(--site-font-sans) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* headings use Roboto Slab */
+h1, h2, h3, h4, h5, h6, .title, .subtitle {
+  font-family: var(--site-font-heading) !important;
+  font-weight: 700; /* adjust if needed */
+}
+
+/* make Bulma's .is-family-primary / .is-family-secondary work if used */
+.is-family-primary { font-family: var(--site-font-sans) !important; }
+.is-family-secondary { font-family: var(--site-font-heading) !important; }
+
+/* adjust Bulma controls if you want headings/subtitles to look right on small screens */
+.title { line-height: 1.15; }
+.subtitle { line-height: 1.2; }
+
+/* ensure utility classes and nav items inherit */
+button, input, select, textarea, .button, .navbar, .dropdown, .menu {
+  font-family: var(--site-font-sans) !important;
+}
+
+/* Optional: limit long unbroken strings from overflowing containers */
+* { word-wrap: break-word; overflow-wrap: break-word; }
+
+/* Apply to elements commonly sized with is-size-* utilities so they inherit the correct family */
+.is-size-1, .is-size-2, .is-size-3, .is-size-4, .is-size-5, .is-size-6, .is-size-7 {
+  font-family: inherit; /* ensure they inherit from body or a parent heading */
+}

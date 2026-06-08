@@ -1,0 +1,49 @@
+{% load static %}
+{% load custom_filters %}
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+    </head>
+    <link rel="stylesheet" href="{% static 'css/bulma/css/versions/bulma-no-dark-mode.css' %}">
+    <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+    <link rel="stylesheet" href="{% static 'platforms_app/css/platforms_map.css' %}">
+    <link rel="stylesheet" href="{% static 'platforms_app/js/leaflet/dist/leaflet.css' %}"
+          crossorigin="">
+
+    <script src="{% static 'platforms_app/js/leaflet/dist/leaflet.js' %}"></script>
+    <body>
+    {% include "top_navbar_template.html" %}
+
+    <section class="section">
+        <div class="container">
+            <h1 class="title">CCRAB Platforms</h1>
+
+            <div class="columns is-variable is-6">
+                <div class="column is-one-third">
+                    <div class="box">
+                        <p class="subtitle">Controls / Info</p>
+                        <p>Put form inputs, legend, or text here. Resize the window to see the map adapt.</p>
+                        <!-- Example control that changes column width to demonstrate responsiveness -->
+                        <button id="toggle-width" class="button is-small is-info mt-3">Toggle wide</button>
+                    </div>
+                </div>
+
+                <!-- Map column -->
+                <div id="map-col" class="column map-column page-fullheight">
+                    <!-- You can have other content above/below map in this column if desired -->
+                    <div
+                        id="map"
+                        class="leaflet-map"
+                        data-platforms-url="{% url 'platform-list-web-data' %}"
+                        data-api-token="{{ api_access_token|default:'' }}"
+                    ></div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="{% static 'platforms_app/js/platform_map.js' %}"></script>
+    </body>
+</html>

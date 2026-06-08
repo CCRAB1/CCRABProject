@@ -1,0 +1,70 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- preload fonts -->
+    <link rel="preload" href="{% static 'fonts/montserrat/Montserrat-Regular.woff2' %}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{% static 'fonts/roboto-slab/RobotoSlab-Regular.woff2' %}" as="font" type="font/woff2" crossorigin>
+
+    <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+    <link rel="stylesheet" href="{% static 'css/bulma/css/versions/bulma-no-dark-mode.css' %}">
+    <!-- override to make Bulma use our fonts -->
+    <link rel="stylesheet" href="{% static 'css/fonts_override.css' %}">
+
+    <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+    <link rel="stylesheet" href="{% static 'platforms_app/css/platform_page.css' %}">
+    <link rel="stylesheet" href="{% static 'platforms_app/js/leaflet/dist/leaflet.css' %}"
+          crossorigin="">
+    <link rel="stylesheet" href="{% static 'platforms_app/css/image_carousel.css' %}">
+    <script defer src="{% static 'platforms_app/js/image_carousel.js' %}"></script>
+
+    <title>{% block title %}Platform {% endblock %}</title>
+    <style>
+        .page-montserrat {
+            font-family: "Montserrat", Arial, sans-serif;
+        }
+        .page-robotoslab {
+            font-family: "Roboto Slab", Arial, sans-serif;
+        }
+    </style>
+</head>
+<body class="page-montserrat">
+
+    {% include "top_navbar_template.html" %}
+
+    <main class="section">
+        <div class="container">
+
+            <div class="columns m-0 p-0">
+                <div class="column is-12 m-0 p-0">
+                    {% block platform_name %}{% endblock %}
+                </div>
+            </div>
+
+            <div class="columns">
+                <div class="column is-12-mobile is-4-tablet is-3-desktop">
+                    <div class="columns is-mobile is-multiline">
+                        <div class="column is-12">
+                            {% block platform_picture %}{% endblock %}
+                        </div>
+
+                        <div class="column is-12">
+                            {% block platform_map %}{% endblock %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-12-mobile is-8-tablet is-9-desktop">
+                    {% block platform_information %}{% endblock %}
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    {% block extra_scripts %}{% endblock %}
+
+</body>
+</html>

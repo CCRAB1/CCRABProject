@@ -1,0 +1,75 @@
+/* Responsive platform_page.css - replacement for the original fixed 250px sizes.
+   NOTE: This replaces fixed 250x250 with fluid widths and breakpoint-aware heights.
+   This file intentionally preserves the semantics of your layout while improving responsiveness.
+*/
+
+/* Small utility fallbacks — safe if your project doesn't already define them */
+.p-0 { padding: 0 !important; }
+.m-0 { margin: 0 !important; }
+.is-paddingless { padding: 0 !important; }
+.is-marginless { margin: 0 !important; }
+
+/* Prevent horizontal overflow on narrow screens */
+html, body { overflow-x: hidden; }
+
+/* Make images fluid */
+.platform_pic {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+/* Map responsiveness: width 100%, height varies by breakpoint */
+#map {
+  width: 100%;
+  height: 260px;      /* mobile default */
+  min-height: 200px;
+  box-sizing: border-box;
+}
+
+/* Also support .platform_map if used elsewhere */
+.platform_map {
+  width: 100%;
+  height: 260px;
+  min-height: 200px;
+}
+
+/* Leaflet container should fill its parent */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Larger heights at tablet/desktop breakpoints */
+@media (min-width: 769px) {
+  #map, .platform_map { height: 360px; min-height: 300px; }
+}
+@media (min-width: 1024px) {
+  #map, .platform_map { height: 480px; min-height: 420px; }
+}
+
+/* Keep full-page/equal height helpers flexible */
+.full-page-row { min-height: 100vh; display: block; }
+.equal-height-row { min-height: 100vh; display: flex; flex-direction: column; }
+.equal-height-row .columns { height: auto; }
+
+/* On larger screens allow equal-height rows to align horizontally */
+@media (min-width: 769px) {
+  .equal-height-row { flex-direction: row; align-items: stretch; }
+  .equal-height-row .columns { flex-direction: row; height: 100%; width: 100%; }
+  .equal-height-row .column { display: flex; flex-direction: column; }
+}
+
+/* Headline safety: prevent overflow */
+.title.responsive-title { word-break: break-word; line-height: 1.15; margin-bottom: 0.5rem; }
+@media (max-width: 480px) {
+  .title.responsive-title { font-size: 1.25rem; }
+}
+
+/* Content lists readability */
+.content ul, .content ol { padding-left: 1.15rem; margin-top: 0.25rem; margin-bottom: 0.25rem; }
+
+/* If your project relied on explicit 250px blocks elsewhere, remove or adapt them.
+   This file intentionally avoids fixed pixel widths so the layout remains responsive. */

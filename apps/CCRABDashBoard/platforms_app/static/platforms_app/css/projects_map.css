@@ -1,0 +1,32 @@
+#map {
+    height: 500px;
+    width: 500px
+}
+
+/* Make the column a vertical flex container so the map can fill remaining space */
+.map-column {
+    display: flex;
+    flex-direction: column;
+    /* Optional: ensure column has at least reasonable height on small screens */
+    min-height: 40vh;
+}
+
+/* The map element will expand to fill the column */
+.leaflet-map {
+    flex: 1 1 auto; /* grow & shrink */
+    min-height: 200px; /* fallback */
+    width: 100%;
+    /* remove margins/padding to avoid scrollbars */
+    margin: 0;
+    padding: 0;
+}
+
+/* Example: if you want full viewport height layout */
+.page-fullheight {
+    min-height: 80vh; /* or use 100vh */
+}
+
+/* Optional: make sure body/html don't add extra spacing issues */
+html, body {
+    height: 100%;
+}

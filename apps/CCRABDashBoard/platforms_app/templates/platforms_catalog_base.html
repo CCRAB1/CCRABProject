@@ -1,0 +1,83 @@
+{% load static %}
+{% load custom_filters %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="{% static 'css/bulma/css/versions/bulma-no-dark-mode.css' %}">
+    <link rel="stylesheet" href="{% static 'projects_catalog/css/platform_catalog.css' %}">
+    <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+
+    <title>{% block title %}Platform{% endblock %}</title>
+</head>
+<body>
+{% include "top_navbar_template.html" %}
+
+<section class="section">
+    <div class="container">
+
+        <!-- CSS Grid wrapper -->
+        <div class="platform-columns">
+            {% for platform_rec in platform_recs.features %}
+                <a href="{% url 'platform_info' platform_rec.properties.short_name %}" class="card-link">
+                    <div class="column is-flex">
+
+                        <div class="card is-flex is-flex-direction-column is-fullwidth">
+
+                            <div class="card-image">
+                                <figure class="image is-4by3">
+                                    <img src="{% static 'images/purple_air_basic.jpg' %}"
+                                         class="card_platform_pic"
+                                         alt="{{ platform_rec.properties.short_name }}">
+                                </figure>
+                            </div>
+
+                            <div class="card-content is-flex-grow-1">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <img src="{% static 'images/purple_air_basic.jpg' %}"
+                                                 class="platform_pic"
+                                                 alt="{{ platform_rec.properties.short_name }}">
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-4">
+                                            {{ platform_rec.properties.short_name }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="content">
+                                    <p>
+                                    {{ platform_rec.properties.long_name }}<br>
+                                    {% if platform_rec.properties.description is not None %}
+                                    {{ platform_rec.properties.description }}
+                                    {% endif %}
+                                    </p>
+                                    <p>
+                                        {% if platform_rec.properties.begin_date is not None %}
+                                            {{ my_datetime|format_datetime }}
+                                        Deployed: {{ platform_rec.properties.begin_date|format_datetime:"%Y-%m-%d" }}
+                                        {% endif %}
+                                        {% if platform_rec.properties.end_date is not None %}
+                                        Decomissioned: {{ platform_rec.properties.end_date|format_datetime:"%Y-%m-%d" }}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+
+    </div>
+</section>
+
+</body>
+</html>

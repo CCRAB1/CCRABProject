@@ -1,0 +1,43 @@
+{% extends "project_catalog_page_base.html" %}
+{% load static %}
+
+{% block title %}Projects Map{% endblock %}
+
+{% block content %}
+    <div
+        id="projects-page"
+        data-api-base="{% url 'projects-index' %}"
+        data-api-token="{{ api_access_token|default:'' }}"
+    >
+        <div class="columns is-vcentered">
+            <div class="column">
+                <h1 class="title is-2">Projects (Map View)</h1>
+            </div>
+            <div class="column is-narrow">
+                <a class="button is-link is-light" href="{% url 'projects-index' %}">
+                    Switch to list view &raquo;
+                </a>
+            </div>
+        </div>
+
+        <div id="error-box" class="notification is-danger is-light" hidden></div>
+
+        {# Reuse the same filter bar #}
+        {% include "_projects_header_bar.html" %}
+
+        <div class="notification is-info is-light">
+            <div id="map-col" class="column map-column page-fullheight">
+                <!-- You can have other content above/below map in this column if desired -->
+                <div
+                    id="map"
+                    class="leaflet-map"
+                    data-platforms-url="{% url 'platform-list-web-data' %}"
+                    data-api-token="{{ api_access_token|default:'' }}"
+                ></div>
+            </div>
+        </div>
+
+        {# If you want the map view to also load data via the same JS, you can include a map-specific JS file #}
+        {# <script src="{% static 'js/projects_map.js' %}" defer></script> #}
+    </div>
+{% endblock %}

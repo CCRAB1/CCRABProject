@@ -1,0 +1,56 @@
+{% extends "project_catalog_page_base.html" %}
+{% load static %}
+
+{% block title %}Projects{% endblock %}
+
+{% block content %}
+<div
+  id="projects-page"
+  data-api-base="{% url 'project-list-web-data' %}"
+  data-api-token="{{ api_access_token|default:'' }}"
+>
+  <div class="columns is-vcentered">
+    <div class="column">
+      <h1 class="title is-2">Projects</h1>
+    </div>
+    <div class="column is-narrow">
+      {# Matches “Switch to map view »” placement/functionality #}
+      <a class="button is-link is-light" href="{% url 'projects-map' %}">
+        Switch to map view &raquo;
+      </a>
+    </div>
+  </div>
+
+  <div id="error-box" class="notification is-danger is-light" hidden></div>
+
+  {% include "_projects_header_bar.html" %}
+
+  <div class="columns is-variable is-6">
+
+    {# Results #}
+    <div class="column is-8">
+      <div class="level mb-3">
+        <div class="level-left">
+          <p id="results-summary" class="has-text-grey">Loading…</p>
+        </div>
+      </div>
+
+      <div id="empty-state" class="notification is-warning is-light" hidden>
+        No projects found for those filters.
+      </div>
+
+      <div class="columns is-multiline" id="projects-grid">
+        {# JS renders cards here #}
+      </div>
+
+      <nav class="pagination is-centered mt-5" role="navigation" aria-label="pagination" id="pagination" hidden>
+        <a class="pagination-previous" href="#" id="page-prev">Previous</a>
+        <a class="pagination-next" href="#" id="page-next">Next page</a>
+        <ul class="pagination-list" id="pagination-list"></ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'projects_catalog/js/project_index.js' %}" defer></script>
+{% endblock %}

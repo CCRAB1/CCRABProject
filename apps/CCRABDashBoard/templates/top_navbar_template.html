@@ -1,0 +1,52 @@
+{% load static %}
+<nav class="navbar" role="navigation" aria-label="main navigation">
+    <div class="navbar-brand">
+        <a href="https://www.ccrabsc.org/">
+            <img src="{% static 'images/ccrab_logo.png' %}"
+                 class="u-max-full-width logo"
+                 alt="Logo">
+        </a>
+    </div>
+    {% with current_name=request.resolver_match.url_name|default:'' %}
+    <div class="navbar-end">
+        {% if current_name == "projects-index" or current_name == "projects-map" or current_name == "project-detail" or current_name == "project-resource-detail" %}
+            <div class="navbar-item navbar-breadcrumb-item">
+                <nav class="breadcrumb is-small navbar-breadcrumb" aria-label="breadcrumbs">
+                    <ul>
+                        <li><a href="{% url 'platform_catalog' %}">Home</a></li>
+                        {% if current_name == "projects-index" %}
+                            <li class="is-active"><a href="#" aria-current="page">Projects</a></li>
+                        {% else %}
+                            <li><a href="{% url 'projects-index' %}">Projects</a></li>
+                            {% if current_name == "projects-map" %}
+                                <li class="is-active"><a href="#" aria-current="page">Map View</a></li>
+                            {% elif current_name == "project-detail" %}
+                                <li class="is-active"><a href="#" aria-current="page" id="crumb-title">Loading…</a></li>
+                            {% elif current_name == "project-resource-detail" %}
+                                <li><a href="{{ project_detail_url|default:'#' }}">{{ project_title|default:"Project" }}</a></li>
+                                <li class="is-active"><a href="#" aria-current="page">Resource Details</a></li>
+                            {% endif %}
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        {% else %}
+            <div class="navbar-item">
+                Home
+            </div>
+            <div class="navbar-item">
+                About us
+            </div>
+            <div class="navbar-item">
+                Our research
+            </div>
+            <div class="navbar-item">
+                Join us!
+            </div>
+            <div class="navbar-item">
+                Contact us
+            </div>
+        {% endif %}
+    </div>
+    {% endwith %}
+</nav>

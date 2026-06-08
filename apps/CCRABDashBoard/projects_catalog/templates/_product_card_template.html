@@ -1,0 +1,39 @@
+<template id="product-card-template">
+  <div class="column is-12-mobile is-6-tablet is-6-desktop">
+    <article class="card product-card">
+      <div class="card-content">
+        <div class="is-flex is-align-items-center mb-3">
+          <span class="product-icon-badge" data-role="product-icon" aria-hidden="true"></span>
+          <div class="ml-3">
+            <p class="has-text-weight-semibold has-text-grey mb-1" data-role="product-category">Type</p>
+          </div>
+        </div>
+        <div class="content">
+          <ul data-role="product-links"></ul>
+        </div>
+      </div>
+    </article>
+  </div>
+</template>
+
+<template id="product-link-template">
+  <li>
+    <a data-role="product-link"></a>
+  </li>
+</template>
+
+<template id="product-links-empty-template">
+  <li class="is-size-7 has-text-grey">No links available.</li>
+</template>
+
+<template id="products-empty-template">
+  <div class="column is-12">
+    <p class="has-text-grey">No products listed.</p>
+  </div>
+</template>
+
+<template id="products-template-missing-template">
+  <div class="column is-12">
+    <p class="has-text-grey">Product card template is missing.</p>
+  </div>
+</template>

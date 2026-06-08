@@ -1,0 +1,138 @@
+/* Responsive navbar.css
+   - Keeps visual style but makes layout responsive and touch-friendly
+   - Uses flexible layout for nav links and a compact mobile arrangement
+   - Keeps the original color scheme / border styling
+*/
+
+/* Base navbar */
+.navbar {
+  border-bottom: 1px solid #ddd;
+  padding: 0.75rem 1rem;  /* slightly reduced vertical padding for small screens */
+  background-color: #111111;
+  color: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Logo: responsive constraints */
+.logo {
+  display: inline-block;
+  max-height: 56px;
+  max-width: 225px;
+  padding: 6px 6px 6px 8px;
+  vertical-align: middle;
+}
+
+/* Adjust logo on small screens */
+@media (max-width: 480px) {
+  .logo {
+    max-height: 40px;
+    max-width: 160px;
+    padding-left: 6px;
+  }
+}
+
+/* Nav links container: use flex so links wrap on small screens */
+.nav-links {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  text-align: right;
+}
+
+/* Individual link styles */
+.nav-links a {
+  margin-left: 0; /* spacing handled by gap */
+  text-decoration: none;
+  font-weight: 600;
+  color: #ffffff;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* Hover/focus states */
+.nav-links a:hover,
+.nav-links a:focus {
+  background: rgba(255,255,255,0.06);
+  color: #ffffff;
+  text-decoration: none;
+  outline: none;
+}
+
+/* Provide a compact stacked arrangement for narrow screens:
+   logo on left, nav-links can wrap below the logo when necessary */
+.navbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+}
+
+/* If you want a hamburger/menu, template should include toggle behavior.
+   This CSS provides the layout only; JS toggling is required to hide/show links. */
+@media (max-width: 640px) {
+  .nav-links {
+    justify-content: center;
+    width: 100%;
+    padding-top: 0.5rem;
+    padding-bottom: 0.25rem;
+  }
+}
+
+/* Small accessibility improvement: focus ring */
+.nav-links a:focus {
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+}
+
+/* Ensure nav doesn't cause horizontal scroll */
+.navbar, .navbar-inner, .nav-links { max-width: 100%; overflow: visible; }
+
+/* Breadcrumbs embedded inside navbar for projects pages */
+.navbar-breadcrumb-item {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.navbar-breadcrumb {
+  margin: 0;
+  font-size: 2.00rem;
+}
+
+.navbar-breadcrumb ul {
+  align-items: center;
+}
+
+.navbar-breadcrumb a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.navbar-breadcrumb a:hover,
+.navbar-breadcrumb a:focus {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.navbar-breadcrumb li + li::before {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.navbar-breadcrumb .is-active a {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 640px) {
+  .navbar-breadcrumb-item {
+    width: 100%;
+  }
+
+  .navbar-breadcrumb {
+    width: 100%;
+  }
+}

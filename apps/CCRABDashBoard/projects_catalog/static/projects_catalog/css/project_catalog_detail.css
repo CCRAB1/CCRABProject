@@ -1,0 +1,73 @@
+#project-products-wrap .product-card {
+    height: 100%;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+#project-products-wrap .card-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.product-icon-badge {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: #eef2f6;
+    color: #35516b;
+}
+
+.product-icon-badge svg {
+    width: 2.0rem;
+    height: 2.0rem;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.product-icon-badge[data-kind="data"] {
+    background: #e6f0ff;
+    color: #1f5eaa;
+}
+
+.product-icon-badge[data-kind="document"] {
+    background: #fff1dc;
+    color: #986100;
+}
+
+.product-icon-badge[data-kind="map"] {
+    background: #e3f8ef;
+    color: #117a4a;
+}
+
+.product-icon-badge[data-kind="media"] {
+    background: #f6eaff;
+    color: #6f34a3;
+}
+
+.product-icon-badge[data-kind="link"] {
+    background: #edf1f4;
+    color: #425466;
+}
+#project-products-wrap [data-role="product-category"] {
+  font-size: 1.5rem;
+
+}
+/* This turns off the bullets on the product cards url list */
+#project-products-wrap [data-role="product-links"] {
+  list-style: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+#project-products-wrap [data-role="product-links"] li {
+  margin-left: 0;
+}
+#project-products-wrap [data-role="product-links"] li a {
+  font-size: 1.0rem;
+}

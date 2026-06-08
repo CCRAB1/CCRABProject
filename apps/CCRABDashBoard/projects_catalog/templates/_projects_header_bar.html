@@ -1,0 +1,97 @@
+{# Reusable horizontal filters bar. Keeps the same IDs used by projects_index.js #}
+
+<form id="filters-form" class="box mb-5" aria-label="Project filters">
+  <div class="columns is-multiline is-variable is-3">
+
+    <div class="column is-12-mobile is-6-tablet is-3-desktop">
+      <div class="field">
+        <label class="label">Keyword(s)</label>
+        <div class="control">
+          <input id="f-q" class="input" type="text" placeholder="Search…">
+        </div>
+      </div>
+    </div>
+
+    <div class="column is-12-mobile is-6-tablet is-3-desktop">
+      <div class="field">
+        <label class="label">Project Type</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="f-project-type">
+              <option value="">Any</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="column is-12-mobile is-6-tablet is-3-desktop">
+      <div class="field">
+        <label class="label">Neighborhood</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="f-neighborhood">
+              <option value="">Any</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="column is-12-mobile is-6-tablet is-3-desktop">
+      <div class="field">
+        <label class="label">Region</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="f-region">
+              <option value="">Any</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!---
+    <div class="column is-12-mobile is-6-tablet is-3-desktop">
+      <div class="field">
+        <label class="label">Focus Area</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="f-focus-area">
+              <option value="">Any</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="column is-12-mobile is-6-tablet is-3-desktop">
+      <div class="field">
+        <label class="label">Number of Reserves</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="f-num-reserves">
+              <option value="">Any</option>
+              <option value="multi">Multi-reserve (3+)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    --->
+    {# Buttons row #}
+    <div class="column is-12">
+      <div class="field is-grouped is-grouped-right">
+        <div class="control">
+          <button class="button is-link" type="submit">Apply</button>
+        </div>
+        <div class="control">
+          <button class="button is-light" type="button" id="reset-btn">Reset</button>
+        </div>
+      </div>
+      <p class="help">
+        Filters and results are loaded via REST.
+      </p>
+    </div>
+
+  </div>
+</form>

@@ -1,0 +1,84 @@
+{% load static %}
+
+<div
+  id="{{ carousel_id }}"
+  class="bc-carousel box"
+  data-bulma-carousel
+  data-autoplay="{% if autoplay %}true{% else %}false{% endif %}"
+  data-interval="{{ interval }}"
+  data-loop="{% if loop %}true{% else %}false{% endif %}"
+  data-pause-on-hover="{% if pause_on_hover %}true{% else %}false{% endif %}"
+  aria-label="{{ aria_label }}"
+  style="
+    --bc-carousel-items-mobile: {{ items_mobile }};
+    --bc-carousel-items-tablet: {{ items_tablet }};
+    --bc-carousel-items-desktop: {{ items_desktop }};
+    --bc-carousel-gap: {{ gap }};
+  "
+>
+
+  {% if show_nav %}
+    <div class="bc-carousel__nav" aria-hidden="false">
+      <button
+        type="button"
+        class="button is-light is-small"
+        data-carousel-prev
+        aria-label="Previous"
+      >
+        <span aria-hidden="true">‹</span>
+      </button>
+
+      <button
+        type="button"
+        class="button is-light is-small"
+        data-carousel-next
+        aria-label="Next"
+      >
+        <span aria-hidden="true">›</span>
+      </button>
+    </div>
+  {% endif %}
+
+  <div
+    class="bc-carousel__viewport"
+    data-carousel-viewport
+    tabindex="0"
+    role="group"
+    aria-roledescription="carousel"
+  >
+    {% for img in images %}
+      <div class="bc-carousel__slide" data-carousel-slide data-index="{{ forloop.counter0 }}">
+        <figure class="image is-{{ aspect_ratio }}">
+          {% if img.href %}<a href="{{ img.href }}">{% endif %}
+            <img
+              src="{{ img.filepath }}"
+              alt="{{ img.description|default:'' }}"
+              {% if img.srcset %}srcset="{{ img.srcset }}"{% endif %}
+              {% if img.sizes %}sizes="{{ img.sizes }}"{% endif %}
+              loading="{{ img.loading|default:'lazy' }}"
+              decoding="async"
+            >
+          {% if img.href %}</a>{% endif %}
+        </figure>
+
+        {% if img.caption %}
+          <p class="has-text-centered is-size-7 mt-2">{{ img.caption }}</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if show_dots %}
+    <div class="bc-carousel__dots buttons is-centered mt-3" data-carousel-dots aria-label="Slide navigation">
+      {% for _ in images %}
+        <button
+          type="button"
+          class="button is-light is-small bc-carousel__dot"
+          data-carousel-dot
+          data-carousel-dot-index="{{ forloop.counter0 }}"
+          aria-label="Go to slide {{ forloop.counter }}"
+        ></button>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

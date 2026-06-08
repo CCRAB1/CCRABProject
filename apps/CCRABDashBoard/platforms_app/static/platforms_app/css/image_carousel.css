@@ -1,0 +1,91 @@
+/* Component variables (overridable per instance via inline style) */
+.bc-carousel {
+  position: relative;
+  --bc-carousel-gap: 0.75rem;
+  --bc-carousel-items-mobile: 1;
+  --bc-carousel-items-tablet: 2;
+  --bc-carousel-items-desktop: 3;
+
+  /* current effective items per view */
+  --bc-carousel-items: var(--bc-carousel-items-mobile);
+}
+
+/* Match Bulma breakpoints */
+@media (min-width: 769px) {
+  .bc-carousel { --bc-carousel-items: var(--bc-carousel-items-tablet); }
+}
+
+@media (min-width: 1024px) {
+  .bc-carousel { --bc-carousel-items: var(--bc-carousel-items-desktop); }
+}
+
+.bc-carousel__viewport {
+  display: flex;
+  gap: var(--bc-carousel-gap);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.25rem; /* small breathing room for focus outline */
+}
+
+/* Hide scrollbar (optional) */
+.bc-carousel__viewport {
+  scrollbar-width: none; /* Firefox */
+}
+.bc-carousel__viewport::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.bc-carousel__slide {
+  scroll-snap-align: start;
+
+  /* width per slide based on items per view + gap */
+  flex: 0 0 calc(
+    (100% - (var(--bc-carousel-items) - 1) * var(--bc-carousel-gap)) / var(--bc-carousel-items)
+  );
+}
+
+.bc-carousel__slide .image {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Ensure images cover the aspect-ratio box */
+.bc-carousel__slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Nav buttons overlay */
+.bc-carousel__nav {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+  pointer-events: none; /* lets swipes/scroll through except buttons */
+  z-index: 2;
+}
+.bc-carousel__nav .button {
+  pointer-events: auto;
+}
+
+/* Dots */
+.bc-carousel__dot.button {
+  width: 0.75rem;
+  height: 0.75rem;
+  padding: 0;
+  border-radius: 9999px;
+}
+
+/* Optional: make the focused viewport obvious */
+.bc-carousel__viewport:focus {
+  outline: 2px solid rgba(72, 95, 199, 0.35); /* Bulma-ish primary hint */
+  outline-offset: 2px;
+}

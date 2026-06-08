@@ -1,0 +1,22 @@
+{% load static %}
+
+<div id="map"
+    data-latitude="{{ platform_info.properties.fixed_latitude }}"
+    data-longitude="{{ platform_info.properties.fixed_longitude }}">
+</div>
+
+<script>
+  (function () {
+      const el = document.getElementById("map");
+
+      var latitude = el.dataset.latitude;
+      var longitude = el.dataset.longitude;
+      var map = L.map('map').setView([latitude, longitude], 13);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+      var marker = L.marker([latitude, longitude]).addTo(map);
+  })();
+
+</script>

@@ -1,0 +1,206 @@
+{% extends "project_catalog_page_base.html" %}
+{% load static %}
+
+{% block title %}Project {{ project_code }}{% endblock %}
+
+{% block extra_head %}
+        <link rel="stylesheet" href="{% static 'projects_catalog/css/project_catalog_detail.css' %}">
+
+{% endblock %}
+
+{% block content %}
+<div id="project-page"
+     data-project-code="{{ project_code|escape }}"
+     data-project-api-base="{% url 'project-list-web-data' %}"
+     data-api-token="{{ api_access_token|default:'' }}">
+  {# Error placeholder #}
+  <div id="error-box" class="notification is-danger is-light" hidden></div>
+
+  <div class="columns is-variable is-6">
+    {# Main column #}
+    <div class="column is-8">
+      <h1 class="title is-2" id="project-full-title">Loading…</h1>
+
+      {# Meta strip: database-backed project fields #}
+      <div class="columns is-multiline is-mobile my-2">
+        <div class="column is-12-mobile is-4-tablet">
+          <div class="meta-tile">
+            <p class="heading">Neighborhood</p>
+            <p class="title is-6 mb-0" id="neighborhood">—</p>
+          </div>
+        </div>
+        <div class="column is-12-mobile is-4-tablet">
+          <div class="meta-tile">
+            <p class="heading">Start Date</p>
+            <p class="title is-6 mb-0" id="start-date">—</p>
+          </div>
+        </div>
+        <div class="column is-12-mobile is-4-tablet">
+          <div class="meta-tile">
+            <p class="heading">End Date</p>
+            <p class="title is-6 mb-0" id="end-date">—</p>
+          </div>
+        </div>
+      </div>
+
+      {# Featured image #}
+      <div class="project-hero mb-4" id="featured-wrap" hidden>
+        <figure class="image is-16by9">
+          <img id="featured-img" alt="">
+        </figure>
+      </div>
+
+      {# Short summary / dek #}
+      <p class="subtitle is-5" id="project-description-summary"></p>
+
+      <hr>
+
+      {# Sections #}
+      <div class="content">
+        <h2 class="title is-4 mb-2">The Project</h2>
+        <div id="project-description">
+          <p class="has-text-grey">Loading project description…</p>
+        </div>
+
+        <h2 class="title is-4 mt-6 mb-2">The Impact</h2>
+        <ul id="project-impact">
+          <li class="has-text-grey">Loading impact…</li>
+        </ul>
+      </div>
+
+      <div class="mt-6" id="project-products-wrap">
+        <h2 class="title is-4 mb-3">Project products</h2>
+        <div class="notification is-info is-light mb-4" id="products-callout" hidden></div>
+        <div class="columns is-multiline" id="products-block">
+          <div class="column is-12">
+            <p class="has-text-grey">Loading products…</p>
+          </div>
+        </div>
+      </div>
+
+      {# Gallery #}
+      <div class="mt-6" id="gallery-wrap" hidden>
+        <h2 class="title is-4">Photos</h2>
+        <div class="columns is-multiline" id="gallery"></div>
+      </div>
+
+      {# Prev / Next #}
+      <nav class="level mt-6" id="prev-next" hidden>
+        <div class="level-left" id="prev-slot"></div>
+        <div class="level-right" id="next-slot"></div>
+      </nav>
+    </div>
+
+    {# Sidebar #}
+    <div class="column is-4">
+      {# Team card #}
+      <div class="card mb-5">
+        <header class="card-header">
+          <p class="card-header-title">Project team</p>
+        </header>
+        <div class="card-content content">
+          <p class="mb-2"><strong>Project Lead</strong></p>
+          <ul id="project-lead"><li class="has-text-grey">Loading…</li></ul>
+
+          <p class="mt-4 mb-2"><strong>Partners</strong></p>
+          <ul id="partners"><li class="has-text-grey">Loading…</li></ul>
+        </div>
+      </div>
+
+      {# Details card: type, focus areas, keywords, neighborhood, etc. #}
+      <div class="card">
+        <header class="card-header">
+          <p class="card-header-title">Details</p>
+        </header>
+        <div class="card-content content">
+          <p><strong>Project URL</strong><br><span id="project-url"><span class="has-text-grey">—</span></span></p>
+
+          <p class="mt-4"><strong>Product Types</strong></p>
+          <div id="product-types" class="tags"></div>
+
+          <p class="mt-4"><strong>Keywords</strong></p>
+          <div id="keywords" class="tags"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  {% include "_product_card_template.html" %}
+
+  <template id="the-project-paragraph-template">
+    <p data-role="the-project-paragraph"></p>
+  </template>
+
+  <template id="the-project-empty-template">
+    <p class="has-text-grey">No description available.</p>
+  </template>
+
+  <template id="impact-item-template">
+    <li data-role="impact-item"></li>
+  </template>
+
+  <template id="impact-empty-template">
+    <li class="has-text-grey">No impact statements available.</li>
+  </template>
+
+  <template id="tag-template">
+    <span class="tag is-light" data-role="tag"></span>
+  </template>
+
+  <template id="tag-empty-template">
+    <span class="tag is-light">—</span>
+  </template>
+
+  <template id="person-template">
+    <li>
+      <a data-role="person-link" hidden></a>
+      <span data-role="person-text"></span>
+    </li>
+  </template>
+
+  <template id="person-empty-template">
+    <li class="has-text-grey">—</li>
+  </template>
+
+  <template id="project-url-link-template">
+    <a data-role="project-url-link" target="_blank" rel="noopener noreferrer">Open project link</a>
+  </template>
+
+  <template id="project-url-empty-template">
+    <span class="has-text-grey">—</span>
+  </template>
+
+  <template id="gallery-card-template">
+    <div class="column is-6">
+      <div class="card gallery-card">
+        <div class="card-image">
+          <figure class="image is-4by3">
+            <img data-role="gallery-image" alt="">
+          </figure>
+        </div>
+        <div class="card-content">
+          <p class="is-size-7 has-text-grey" data-role="gallery-caption"></p>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="previous-project-link-template">
+    <a class="button is-link is-light" data-role="prev-next-link">
+      <span aria-hidden="true">←</span>
+      <span data-role="prev-next-label"></span>
+    </a>
+  </template>
+
+  <template id="next-project-link-template">
+    <a class="button is-link is-light" data-role="prev-next-link">
+      <span data-role="prev-next-label"></span>
+      <span aria-hidden="true">→</span>
+    </a>
+  </template>
+</div>
+
+<script src="{% static 'projects_catalog/js/project_products.js' %}" defer></script>
+<script src="{% static 'projects_catalog/js/project_detail.js' %}" defer></script>
+{% endblock %}

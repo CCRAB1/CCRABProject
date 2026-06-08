@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title></title>
+{% block title %}My Django Site{% endblock %}
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/site.css' %}">
+</head>
+<body>
+
+<header>
+    <h1>{% block header %}My Django Site{% endblock %}</h1>
+</header>
+
+<main>
+    {% block content %}
+        <p>Default content</p>
+    {% endblock %}
+</main>
+
+<footer>
+    <p>&copy; {{ now|date:"Y" }}</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,49 @@
+[project]
+name = "ccrabdashboard"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "django>=5.2.10",
+    "django-environ>=0.12.0",
+    "django-filter==25.2",
+    "djangorestframework==3.16.1",
+    "djangorestframework-gis==1.2.0",
+    "ruff==0.15.0",
+    "nodeenv==1.10.0",
+    "python-dateutil>=2.9.0.post0",
+    "djangorestframework-stubs>=3.16.8",
+    "requests>=2.34.2",
+    "psycopg2-binary>=2.9.12",
+    "rest-framework-simplejwt>=0.0.2",
+    "djangorestframework-simplejwt>=5.5.1",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+    "ruff>=0.15.0",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+fix = true
+select = ["E", "F", "I"]
+ignore = ["E501"]  # Ignore line-length since Black handles it
+exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "migrations",
+    "__pycache__",
+    "alembic",
+    "vue"
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E203", "E266"]
+
+[tool.ruff.format]
+quote-style = "double"

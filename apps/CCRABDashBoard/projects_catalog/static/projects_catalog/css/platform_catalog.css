@@ -1,0 +1,108 @@
+
+/* ---------- Grid container ---------- */
+.platform-columns {
+  display: grid;
+  gap: 0.5rem;                    /* controls spacing between cards */
+  grid-template-columns: repeat(4, 1fr); /* desktop: 4 columns */
+  align-items: stretch;
+}
+
+/* ---------- Responsive breakpoints ---------- */
+
+/* Tablet: 3 columns */
+@media (max-width: 1023px) {
+  .platform-columns {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Mobile: 2 columns */
+@media (max-width: 768px) {
+  .platform-columns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+
+/* Small mobile: 1 column */
+@media (max-width: 420px) {
+  .platform-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Grid items ---------- */
+.platform-columns > .column {
+  display: flex;                  /* allows card to stretch */
+}
+
+/* ---------- Card sizing & equal-height behavior ---------- */
+.card.is-flex {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+/* Allow content to expand evenly */
+.card-content.is-flex-grow-1 {
+  flex: 1 1 auto;
+}
+
+/* ---------- Card image handling ---------- */
+.card .card-image {
+  flex: 0 0 auto;
+  overflow: hidden;               /* ensures clean cropping */
+}
+
+/* Make all main card images uniform */
+.card .card-image img.card_platform_pic {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;              /* crop instead of distort */
+  object-position: center;
+}
+
+/* ---------- Media-left avatar image ---------- */
+.media-left .image img.platform_pic {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 4px;             /* optional */
+}
+
+/* ---------- Optional content spacing tweaks ---------- */
+.card .card-content .content {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ---------- Safety: predictable box sizing ---------- */
+.platform-columns,
+.platform-columns * {
+  box-sizing: border-box;
+}
+
+/* Make anchor behave like a block card */
+.card-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Hover & focus styles */
+.card-link:hover .card,
+.card-link:focus-visible .card {
+  box-shadow: 0 0.75em 1.5em rgba(10, 10, 10, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Smooth transition */
+.card {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}

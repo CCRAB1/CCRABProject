@@ -1,0 +1,11 @@
+.resource-detail-page .resource-section {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    padding: 1.25rem;
+    background: #ffffff;
+}
+
+.resource-detail-page .resource-metadata {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    padding-top: 1rem;
+}

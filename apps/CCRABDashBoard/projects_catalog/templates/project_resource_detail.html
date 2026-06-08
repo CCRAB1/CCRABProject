@@ -1,0 +1,68 @@
+{% extends "project_catalog_page_base.html" %}
+{% load static %}
+
+{% block title %}{{ resource_title }}{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'projects_catalog/css/project_resource_detail.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="project-resource-page" class="resource-detail-page" data-payload-script-id="project-resource-payload">
+    <div id="resource-error-box" class="notification is-danger is-light" hidden></div>
+
+    <div class="columns is-variable is-6">
+        <div class="column is-8">
+            <h1 class="title is-2" id="resource-title">Loading…</h1>
+
+            <section class="resource-section">
+                <h2 class="title is-4 mb-3">About the Project</h2>
+                <div class="content" id="about-project-content">
+                    <p class="has-text-grey">Loading project details…</p>
+                </div>
+            </section>
+
+            <section class="resource-section mt-5">
+                <h2 class="title is-4 mb-3">About this Resource</h2>
+                <div class="content" id="about-resource-content">
+                    <p class="has-text-grey">Loading resource details…</p>
+                </div>
+
+                <div class="resource-metadata">
+                    <p><strong>Category:</strong> <span id="resource-category">—</span></p>
+                    <p id="resource-types-wrap" hidden><strong>Types:</strong> <span id="resource-types">—</span></p>
+                    <p class="mt-4" id="resource-link-wrap" hidden>
+                        <a id="resource-link" class="button is-link is-light" href="#" target="_blank" rel="noopener noreferrer">
+                            Open Resource Link
+                        </a>
+                    </p>
+                </div>
+            </section>
+        </div>
+
+        <aside class="column is-4">
+            <div class="card">
+                <header class="card-header">
+                    <p class="card-header-title">Resource Tags</p>
+                </header>
+                <div class="card-content content">
+                    <p><strong>Focus Areas</strong></p>
+                    <div id="focus-areas-tags" class="tags">
+                        <span class="tag is-light">—</span>
+                    </div>
+
+                    <p class="mt-4"><strong>Keywords</strong></p>
+                    <div id="keywords-tags" class="tags">
+                        <span class="tag is-light">—</span>
+                    </div>
+
+                    <p class="mt-4"><strong>Neighborhoods</strong></p>
+                    <p id="neighborhoods-text" class="has-text-grey">—</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+{{ resource_payload|json_script:"project-resource-payload" }}
+<script src="{% static 'projects_catalog/js/project_resources_detail.js' %}" defer></script>
+{% endblock %}

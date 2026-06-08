@@ -1,0 +1,111 @@
+/* fonts.css
+   Self-hosted Montserrat + Roboto Slab
+   Both licensed under SIL Open Font License
+*/
+
+/* ============================
+   MONTSERRAT
+   ============================ */
+
+/* Regular 400 */
+@font-face {
+  font-family: "Montserrat";
+  src: url("../fonts/montserrat/Montserrat-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Medium 500 */
+@font-face {
+  font-family: "Montserrat";
+  src: url("../fonts/montserrat/Montserrat-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* SemiBold 600 */
+@font-face {
+  font-family: "Montserrat";
+  src: url("../fonts/montserrat/Montserrat-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Bold 700 */
+@font-face {
+  font-family: "Montserrat";
+  src: url("../fonts/montserrat/Montserrat-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+
+/* ============================
+   ROBOTO SLAB
+   ============================ */
+
+/* Regular 400 */
+@font-face {
+  font-family: "Roboto Slab";
+  src: url("../fonts/roboto-slab/RobotoSlab-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Medium 500 */
+@font-face {
+  font-family: "Roboto Slab";
+  src: url("../fonts/roboto-slab/RobotoSlab-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Bold 700 */
+@font-face {
+  font-family: "Roboto Slab";
+  src: url("../fonts/roboto-slab/RobotoSlab-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+
+/* ============================
+   GLOBAL FONT VARIABLES
+   ============================ */
+
+:root {
+  --font-body: "Montserrat", Arial, sans-serif;
+  --font-heading: "Roboto Slab", Georgia, serif;
+}
+
+/* ============================
+   GLOBAL APPLICATION
+   ============================ */
+
+body {
+  font-family: var(--font-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  line-height: 1.2;
+}
+
+/* Optional utility classes */
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+}

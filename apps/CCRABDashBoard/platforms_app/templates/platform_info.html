@@ -1,0 +1,111 @@
+{% extends 'base_platform.html' %}
+{% load static %}
+{% load custom_filters %}
+{% load ui_components %}
+
+{% block title %}
+    {{ platform_info.properties.short_name }}
+{% endblock %}
+
+{% block platform_name %}
+    <div class="columns m-0 p-0">
+        <div class="column is-12 m-0 p-0">
+            <h1 class="is-size-1 page-montserrat">Platform: {{ platform_info.properties.long_name }}</h1>
+        </div>
+    </div>
+{% endblock %}
+
+{% block platform_picture %}
+    {% image_carousel platform_info.properties.images autoplay=True interval=4000 aspect_ratio="16by9" items_mobile=1 items_tablet=1 items_desktop=1 %}
+{% endblock %}
+
+{% block platform_map %}
+    <div id="map" class="platform_map" aria-label="Platform location map"></div>
+
+    <script src="{% static 'platforms_app/js/leaflet/dist/leaflet.js' %}"></script>
+    <script>
+    (function () {
+        if (typeof L === 'undefined') return;
+        try {
+            var lat = {{ platform_info.properties.fixed_latitude|default:"0" }};
+            var lon = {{ platform_info.properties.fixed_longitude|default:"0" }};
+            var map = L.map('map', { scrollWheelZoom: false }).setView([lat, lon], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                zoom: 4,
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors',
+                referrerPolicy: 'strict-origin-when-cross-origin'
+            }).addTo(map);
+
+            {% if platform_info.properties.fixed_latitude and platform_info.properties.fixed_longitude %}
+            L.marker([{{ platform_info.properties.fixed_latitude }}, {{ platform_info.properties.fixed_longitude }}]).addTo(map);
+            {% endif %}
+
+            // Allow Leaflet to properly size itself inside responsive containers.
+            // Invalidate after a short delay and on window resize.
+            setTimeout(function () { if (map && map.invalidateSize) map.invalidateSize(); }, 250);
+            window.addEventListener('resize', function () { if (map && map.invalidateSize) map.invalidateSize(); });
+        } catch (e) {
+            console.warn('Leaflet map init error', e);
+        }
+    })();
+    </script>
+{% endblock %}
+
+{% block platform_information %}
+    <div class="columns is-multiline is-mobile">
+
+        <div class="column is-12">
+            <div class="is-size-2 mb-2">
+                Description:
+                {% if platform_info.properties.description %}
+                    {{ platform_info.properties.description }}
+                {% else %}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="column is-12 mb-1 pt-1 pb-1">
+            <div class="is-size-5">
+                <b>Type:</b> {{ platform_info.properties.type_id.type_name }}
+            </div>
+        </div>
+
+        <div class="column is-12-mobile is-6-tablet is-size-5 mb-1 pt-1 pb-1">
+            {% if platform_info.properties.begin_date is not None %}
+                {{ my_datetime|format_datetime }}
+                <b>Active Dates:</b> {{ platform_info.properties.begin_date|format_datetime:"%Y-%m-%d" }} to
+                {% if platform_info.properties.end_date is not None %}
+                    {{ platform_info.properties.end_date|format_datetime:"%Y-%m-%d" }}
+                {% else %}
+                    Currently Active
+                {% endif %}
+
+            {% endif %}
+        </div>
+
+        <div class="column is-12 is-size-5 mb-1 pt-1 pb-1">
+            <b>Neighborhood:</b> {{ platform_info.properties.neighborhood }}
+        </div>
+
+        <div class="column is-12-mobile is-6-tablet is-size-5 mb-1 pt-1 pb-1">
+            <b>Latitude:</b> {{ platform_info.properties.fixed_latitude }}
+        </div>
+
+        <div class="column is-12-mobile is-6-tablet is-size-5 pt-0 mb-1">
+            <b>Longitude:</b> {{ platform_info.properties.fixed_longitude }}
+        </div>
+
+    </div>
+
+    <!----Area where we list out what sensors/obs the platform has.---->
+    <p>
+        <h5 class="is-size-5"><b>Observations collected</b></h5>
+        <div class="content">
+        {% for sensor_rec in platform_info.properties.sensors %}
+            {{ sensor_rec.obs_standard_name }} {% if sensor_rec.s_order == 1 %}A{% else %}B{% endif %}<br>
+        {% endfor %}
+        </div>
+    </p>
+{% endblock %}
