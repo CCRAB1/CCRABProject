@@ -9,15 +9,16 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 import json
 from datetime import datetime, timedelta
+from django.db import IntegrityError, transaction
 from datautilities.purple_air_api.PurpleAPIWrapper import (
     PurpleAirClient,
 )
-from observationsdatabase.xenia_alchemy import xenia_alchemy
+
+from datautilities.ccrab_api.client import CCRABRestClient
 
 from packages.database_utilities import connect_to_database, validate_organization
 from observationsdatabase.xenia_obs_map import Organization, Platform
-from observationsdatabase.XeniaTables import multi_obs
-from sqlalchemy import exc
+
 from ioos_qc.config import QcConfig
 from ioos_qc.streams import PandasStream
 from ioos_qc.results import CollectedResult, collect_results
@@ -67,20 +68,27 @@ def load_dag_config(config_name: str) -> Dict[str, Any]:
 )
 def purple_air_processing():
 
-    # Load at module level
-    CONFIG = load_dag_config('purple_air_config')
+    @task()
+    def get_configuration() -> str:
+        config_file_path = None
+        try:
+            logger.info("Retrieving configuration")
+            base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / 'configs'
+            #Make sure out destination directory exists.
+            base_directory.mkdir(parents=True, exist_ok=True)
+            config_file_path = base_directory / "tsi_config.json"
+            ccrab_base_url = Variable.get("CCRAB_API_URL", None)
+            ccrab_api = CCRABRestClient(base_url=ccrab_base_url)
+            ccrab_user = Variable.get("CCRAB_API_USERNAME", None)
+            ccrab_pwd = Variable.get("CCRAB_API_USER_PASSWORD", None)
+            #Get the access token to use for the API calls.
+            ccrab_token = ccrab_api.obtain_token(username=ccrab_user, password=ccrab_pwd)
+            organizations_setup = ccrab_api.platform_configuration(data_source='tsi_blue_sky')
+            json.dump(organizations_setup, open(config_file_path, "w"))
+        except Exception as e:
+            logger.exception(e)
+        return str(config_file_path)
 
-
-    def build_mappings(config) -> []:
-        organizations = config.get("organizations", [])
-
-        organizations_setup = []
-        for organization in organizations:
-            logger.info(f"Processing organization {organization.get('short_name', None)}")
-            organization_setup = Organization().from_dict(organization)
-            organizations_setup.append(organization_setup)
-        logger.info(f"Organizations setup: {len(organizations_setup)}")
-        return organizations_setup
 
     @task()
     def decide_mode(mode: str | None = None) -> Dict:
@@ -149,7 +157,7 @@ def purple_air_processing():
         return [str(file_path) for file_path in local_csv_list]
 
     @task(task_id="fetch_rest")
-    def fetch_data_task(config: {}) -> []:
+    def fetch_data_task(config_file_name: Path) -> []:
         """
         #### fetch_data_task task
         Using the Purple Air API, this task retrieves the data for the platforms setup in the JSON config.
@@ -157,6 +165,15 @@ def purple_air_processing():
         **Inputs:** config
         **Outputs:** list[]
         """
+        configuration_data = json.load(open(config_file_name))
+        org_list = []
+        #Build our org and platform objects.
+        for organization in configuration_data['organizations']:
+            org_list.append(Organization().from_dict(organization))
+
+        base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
+        data_directory = base_directory / Variable.get("TSI_RAW_DATA_DIRECTORY", "tsi/unprocessed")
+
         data_directory = config.get("raw_data_directory", None)
         if data_directory is not None:
             data_directory = Path(data_directory)
@@ -164,7 +181,6 @@ def purple_air_processing():
         last_retrieved_record_date = Variable.get("last_retrieved_record_date", "1900-01-01 00:00:00")
         purple_api_key = Variable.get('PURPLE_AIR_API_KEY', None)
         purple_api = PurpleAirClient(api_key=purple_api_key)
-        organizations_setup = build_mappings(config)
         saved_data_files = []
 
         try:

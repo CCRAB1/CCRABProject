@@ -16,13 +16,8 @@ from django.db import IntegrityError, transaction
 from datautilities.ccrab_api.client import CCRABRestClient
 from datautilities.tsi_api.client import TSIExternalAPIClient, CSV_ACCEPT, JSON_ACCEPT, FLAT_TELEMETRY_FIELDS
 
-#from observationsdatabase.xenia_alchemy import xenia_alchemy
-
-from packages.database_utilities import connect_to_database, validate_organization
 from packages.django_setup import setup_django
 from observationsdatabase.xenia_obs_map import Organization, Platform
-from observationsdatabase.XeniaTables import multi_obs
-from sqlalchemy import exc
 from ioos_qc.config import QcConfig
 from ioos_qc.streams import PandasStream
 from ioos_qc.results import CollectedResult, collect_results

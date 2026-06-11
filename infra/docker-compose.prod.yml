@@ -2,7 +2,7 @@ name: ccrabdashboard_production
 
 x-prod-env: &prod_env
   env_file:
-    - prod.env
+    - ${CCRAB_ENV_FILE:-prod.env}
 
 x-airflow-common: &airflow_common
   <<: *prod_env
@@ -41,15 +41,16 @@ services:
   db:
     <<: *prod_env
     image: postgis/postgis:16-3.4
+    platform: ${CCRAB_DB_PLATFORM:-linux/amd64}
     restart: unless-stopped
     environment:
       POSTGRES_INITDB_ARGS: "--data-checksums"
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
-        : "$${DATABASE_NAME:?Set DATABASE_NAME in prod.env}"
-        : "$${DATABASE_USER:?Set DATABASE_USER in prod.env}"
-        : "$${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in prod.env}"
+        : "$${DATABASE_NAME:?Set DATABASE_NAME in the selected env file}"
+        : "$${DATABASE_USER:?Set DATABASE_USER in the selected env file}"
+        : "$${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in the selected env file}"
         export POSTGRES_DB="$${POSTGRES_DB:-$${DATABASE_NAME}}"
         export POSTGRES_USER="$${POSTGRES_USER:-$${DATABASE_USER}}"
         export POSTGRES_PASSWORD="$${POSTGRES_PASSWORD:-$${DATABASE_PASSWORD}}"
@@ -83,23 +84,16 @@ services:
       - no-new-privileges:true
     environment:
       DJANGO_IN_DOCKER: "True"
-      DJANGO_DEBUG: "False"
-      DJANGO_TRUST_X_FORWARDED_PROTO: "True"
-      DATABASE_HOST: db
-      DATABASE_PORT: "5432"
-      DJANGO_WAIT_FOR_DB: "1"
-      DJANGO_RUN_MIGRATIONS: "1"
-      DJANGO_COLLECTSTATIC: "1"
     command:
       - /bin/sh
       - -ec
       - |
-        : "$${DJANGO_ALLOWED_HOSTS:?Set DJANGO_ALLOWED_HOSTS in prod.env}"
-        : "$${DJANGO_CSRF_TRUSTED_ORIGINS:?Set DJANGO_CSRF_TRUSTED_ORIGINS in prod.env}"
-        : "$${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in prod.env}"
-        : "$${DATABASE_NAME:?Set DATABASE_NAME in prod.env}"
-        : "$${DATABASE_USER:?Set DATABASE_USER in prod.env}"
-        : "$${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in prod.env}"
+        : "$${DJANGO_ALLOWED_HOSTS:?Set DJANGO_ALLOWED_HOSTS in the selected env file}"
+        : "$${DJANGO_CSRF_TRUSTED_ORIGINS:?Set DJANGO_CSRF_TRUSTED_ORIGINS in the selected env file}"
+        : "$${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in the selected env file}"
+        : "$${DATABASE_NAME:?Set DATABASE_NAME in the selected env file}"
+        : "$${DATABASE_USER:?Set DATABASE_USER in the selected env file}"
+        : "$${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in the selected env file}"
         exec gunicorn --workers "$${GUNICORN_WORKERS:-3}" --bind 0.0.0.0:8000 CCRABDashboard.wsgi:application
     volumes:
       - static_data:/app/staticfiles:rw
@@ -130,8 +124,8 @@ services:
       - /var/log/ccrab/nginx:/var/log/nginx
       - static_data:/app/staticfiles:ro
       - media_data:/app/media:ro
-      - certbot_www:/var/www/certbot:ro
-      - certbot_etc:/etc/letsencrypt:ro
+      - ${CERTBOT_WWW_MOUNT:-certbot_www}:/var/www/certbot:ro
+      - ${CERTBOT_ETC_MOUNT:-certbot_etc}:/etc/letsencrypt:ro
     depends_on:
       web:
         condition: service_healthy
@@ -219,8 +213,8 @@ services:
     profiles:
       - certbot
     volumes:
-      - certbot_www:/var/www/certbot
-      - certbot_etc:/etc/letsencrypt
+      - ${CERTBOT_WWW_MOUNT:-certbot_www}:/var/www/certbot
+      - ${CERTBOT_ETC_MOUNT:-certbot_etc}:/etc/letsencrypt
     depends_on:
       nginx:
         condition: service_started
@@ -228,8 +222,8 @@ services:
     command:
       - -c
       - >
-        : "$${CERTBOT_EMAIL:?Set CERTBOT_EMAIL in prod.env}" &&
-        : "$${CERTBOT_DOMAIN:?Set CERTBOT_DOMAIN in prod.env}" &&
+        : "$${CERTBOT_EMAIL:?Set CERTBOT_EMAIL in the selected env file}" &&
+        : "$${CERTBOT_DOMAIN:?Set CERTBOT_DOMAIN in the selected env file}" &&
         certbot certonly --webroot --webroot-path=/var/www/certbot
         --email "$${CERTBOT_EMAIL}"
         --agree-tos --no-eff-email --non-interactive --keep-until-expiring
@@ -248,13 +242,13 @@ services:
     ports:
       - "80:80"
     volumes:
-      - certbot_etc:/etc/letsencrypt
+      - ${CERTBOT_ETC_MOUNT:-certbot_etc}:/etc/letsencrypt
     entrypoint: /bin/sh
     command:
       - -c
       - >
-        : "$${CERTBOT_EMAIL:?Set CERTBOT_EMAIL in prod.env}" &&
-        : "$${CERTBOT_DOMAIN:?Set CERTBOT_DOMAIN in prod.env}" &&
+        : "$${CERTBOT_EMAIL:?Set CERTBOT_EMAIL in the selected env file}" &&
+        : "$${CERTBOT_DOMAIN:?Set CERTBOT_DOMAIN in the selected env file}" &&
         certbot certonly --standalone --preferred-challenges http
         --email "$${CERTBOT_EMAIL}"
         --agree-tos --no-eff-email --non-interactive --keep-until-expiring
