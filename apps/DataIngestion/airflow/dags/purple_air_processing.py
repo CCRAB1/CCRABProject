@@ -15,8 +15,6 @@ from datautilities.purple_air_api.PurpleAPIWrapper import (
 )
 
 from datautilities.ccrab_api.client import CCRABRestClient
-
-from packages.database_utilities import connect_to_database, validate_organization
 from observationsdatabase.xenia_obs_map import Organization, Platform
 
 from ioos_qc.config import QcConfig
@@ -33,31 +31,6 @@ if REMOTE_DEBUG:
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
-
-def load_dag_config(config_name: str) -> Dict[str, Any]:
-    """Load DAG-specific configuration from JSON file."""
-    try:
-        dag_dir = Path(__file__).parent
-        config_path = dag_dir / 'configs' / f'{config_name}.json'
-
-        if not config_path.exists():
-            raise FileNotFoundError(f"Config file not found: {config_path}")
-
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-
-        logger.info(f"Loaded config from {config_path}")
-        return config
-
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in config file: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Error loading config: {e}")
-        raise
-
-
-
 
 @dag(
     dag_id="purple_air_processing",
@@ -76,14 +49,14 @@ def purple_air_processing():
             base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / 'configs'
             #Make sure out destination directory exists.
             base_directory.mkdir(parents=True, exist_ok=True)
-            config_file_path = base_directory / "tsi_config.json"
+            config_file_path = base_directory / "purple_air_config.json"
             ccrab_base_url = Variable.get("CCRAB_API_URL", None)
             ccrab_api = CCRABRestClient(base_url=ccrab_base_url)
             ccrab_user = Variable.get("CCRAB_API_USERNAME", None)
             ccrab_pwd = Variable.get("CCRAB_API_USER_PASSWORD", None)
             #Get the access token to use for the API calls.
             ccrab_token = ccrab_api.obtain_token(username=ccrab_user, password=ccrab_pwd)
-            organizations_setup = ccrab_api.platform_configuration(data_source='tsi_blue_sky')
+            organizations_setup = ccrab_api.platform_configuration(data_source='purple_air')
             json.dump(organizations_setup, open(config_file_path, "w"))
         except Exception as e:
             logger.exception(e)
@@ -91,7 +64,7 @@ def purple_air_processing():
 
 
     @task()
-    def decide_mode(mode: str | None = None) -> Dict:
+    def decide_mode(mode: str) -> Dict:
         """
         #### decide_mode task
 
@@ -99,14 +72,15 @@ def purple_air_processing():
         mode can be provided as DAG conf, Airflow Variable, or left None to run 'auto' detection.
         Returns a small config dict with resolved_mode and useful paths.
 
-        **Inputs:** config
+        **Inputs:** mode
         **Outputs:** dict
         """
         # precedence: dagrun.conf -> supplied arg -> Variable -> auto
-        dag_conf_mode = None
-        local_path = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / Variable.get("TSI_RAW_DATA_DIRECTORY", "tsi/unprocessed")
+        #dag_conf_mode =
+        base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
+        local_path = base_dir / Path(Variable.get("TSI_RAW_DATA_DIRECTORY", "tsi/unprocessed"))
         # If user passes a conf via dag run, Airflow will pass it; we handle via Variable for now.
-        if mode:
+        if mode is not None:
             requested = mode.lower()
         else:
             requested = Variable.get("TSI_PIPELINE_MODE", "auto").lower()
@@ -134,12 +108,25 @@ def purple_air_processing():
         **Inputs:** cfg
         **Outputs:** string
         """
-        mode = cfg["mode"]
         if mode == "local":
             return "list_local"     # task_id of the local-listing task
         else:
             return "fetch_rest"     # task_id of the REST-fetching task
 
+    @task(task_id="list_local")
+    def list_local_files(local_directory: str) -> []:
+        """
+        #### list_local_files task
+
+        Search the local_directory for all CSV files in the local directory.
+        Input is the local directory, the output is a list of CSV files in that directory.
+
+        **Inputs:** local_directory
+        **Outputs:** list[dict]
+        """
+        data_directory = Path(local_directory)
+        local_csv_list = list(data_directory.glob("*.csv"))
+        return [str(file_path) for file_path in local_csv_list]
 
     @task(task_id="list_local")
     def list_local_files(local_directory: str) -> []:
@@ -160,7 +147,7 @@ def purple_air_processing():
     def fetch_data_task(config_file_name: Path) -> []:
         """
         #### fetch_data_task task
-        Using the Purple Air API, this task retrieves the data for the platforms setup in the JSON config.
+        Using the Purple AIr API, this task retrieves the data for the platforms setup in the JSON config.
 
         **Inputs:** config
         **Outputs:** list[]
@@ -172,32 +159,32 @@ def purple_air_processing():
             org_list.append(Organization().from_dict(organization))
 
         base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-        data_directory = base_directory / Variable.get("TSI_RAW_DATA_DIRECTORY", "tsi/unprocessed")
-
-        data_directory = config.get("raw_data_directory", None)
+        data_directory = base_directory / Variable.get("PURPLE_AIR_RAW_DATA_DIRECTORY", "tsi/unprocessed")
         if data_directory is not None:
             data_directory = Path(data_directory)
             data_directory.mkdir(parents=True, exist_ok=True)
+
         last_retrieved_record_date = Variable.get("last_retrieved_record_date", "1900-01-01 00:00:00")
-        purple_api_key = Variable.get('PURPLE_AIR_API_KEY', None)
-        purple_api = PurpleAirClient(api_key=purple_api_key)
+        purple_air_base_url = Variable.get("PURPLE_AIR_API_BASE_URL", None)
+        purple_air_api_key = Variable.get('PURPLE_AIR_API_KEY', None)
+        purple_api = PurpleAirClient(api_key=purple_air_api_key)
+
         saved_data_files = []
 
         try:
-            for organization in organizations_setup:
+            for organization in org_list:
                 platform_handles = organization.list_platform_handles()
+                #organization = configuration_data['organizations'][organization_id]
+                #platform_handles = [platform['platform_handle'] for platform in organization['platforms']]
                 for platform_handle in platform_handles:
-                    platform_nfo = organization.get_platform(platform_handle)
-                    sensor_index = None
-                    if platform_nfo is not None:
-                        properties = platform_nfo.properties
-                        sensor_index = properties.get("purple_sensor_index", None)
-
-                    if sensor_index is not None:
-                        end_date = datetime.now()
-                        start_date = end_date - timedelta(hours=24)
+                    platform = organization.get_platform(platform_handle)
+                    external_indentifier = platform.properties['external_identifier']
+                    end_date = datetime.now()
+                    start_date = end_date - timedelta(hours=1)
+                    try:
                         #These are the sensors we want to retrieve from PUrple Air API.
                         fields = [rec['source_obs'] for rec in platform_nfo.observations]
+
                         logger.info(f"Getting sensor history for sensor_index {sensor_index} Start: {start_date}"
                                     f" End: {end_date} Fields: {fields}")
                         results = purple_api.get_sensor_history(sensor_index=sensor_index,
@@ -208,17 +195,24 @@ def purple_air_processing():
                                                                      return_format="csv",
                                                                      stream=True)
                         file_platform_handle = platform_handle.replace(".", "_")
-                        output_file = data_directory / (f"{file_platform_handle}-{sensor_index}-"
+                        output_file = data_directory / (f"{file_platform_handle}-{external_indentifier}-"
                                                               f"{start_date.strftime('%Y-%m-%dT%H%M%S')}"
-                                                              f"{end_date.strftime('%Y-%m-%dT%H%M%S')}.csv")
+                                                              f"{end_date.strftime('%Y-%m-%dT%H%M%S')}.json")
                         logger.info(f"Writing to {output_file}")
                         try:
                             with open(output_file, "w") as out_file_obj:
-                                out_file_obj.write(results)
+                                #out_file_obj.write(results)
+                                json.dump(results, out_file_obj)
                                 saved_data_files.append(str(output_file))
-                        except Exception as e:
-                            raise e
+                                logger.info(f"Finished writing to {output_file}")
 
+                        except Exception as e:
+                            logger.error(f"Error writing to {output_file}")
+                            logger.exception(e)
+                            raise e
+                    except Exception as e:
+                        logger.error(f"Unable to retrieve data for platform: {platform_handle} ({external_indentifier})")
+                        logger.exception(e)
             return saved_data_files
 
         except Exception as e:

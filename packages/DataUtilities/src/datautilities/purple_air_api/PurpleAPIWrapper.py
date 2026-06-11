@@ -149,10 +149,14 @@ class PurpleAirAPIError(Exception):
 class PurpleAirClient:
     BASE_URL = "https://api.purpleair.com/v1"
 
-    def __init__(self, api_key: str, timeout: float = 10.0):
+    def __init__(self, api_key: str, base_url: str | None, timeout: float = 10.0):
         if not api_key:
             logger.error("API key must be provided.")
             raise ValueError("API key must be provided.")
+        if base_url is not None:
+            self._base_url = base_url
+        else:
+            self._base_url = self.BASE_URL
         self.api_key = api_key
         self.headers = {
             "X-API-Key": self.api_key
@@ -169,7 +173,7 @@ class PurpleAirClient:
         json_body: Optional[Dict[str, Any]] = None,
         stream: bool = False,
     ) -> Union[Dict[str, Any], str, Iterator[str]]:
-        url = f"{self.BASE_URL}{path}"
+        url = f"{self._base_url}{path}"
         resp = requests.request(
             method,
             url,

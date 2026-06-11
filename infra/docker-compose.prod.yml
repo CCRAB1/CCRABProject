@@ -22,7 +22,7 @@ x-airflow-common: &airflow_common
     AIRFLOW__CORE__PLUGINS_FOLDER: /opt/airflow/plugins
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "False"
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: admin:admin
-    AIRFLOW__API__BASE_URL: http://airflow-apiserver:8080
+    AIRFLOW__API__BASE_URL: ${AIRFLOW_API_BASE_URL:-http://airflow-apiserver:8080}
     AIRFLOW_VAR_BASE_WORKING_DIRECTORY: /opt/airflow/working_directory
     AIRFLOW_VAR_CCRAB_DJANGO_PROJECT_PATH: /opt/ccrab/dashboard
     CCRAB_DJANGO_PROJECT_PATH: /opt/ccrab/dashboard
@@ -116,6 +116,8 @@ services:
     <<: *prod_env
     image: nginx:1.27-alpine
     restart: unless-stopped
+    environment:
+      NGINX_AIRFLOW_SERVER_NAME: ${NGINX_AIRFLOW_SERVER_NAME:-airflow.localhost}
     ports:
       - "80:80"
       - "443:443"
@@ -128,6 +130,8 @@ services:
       - ${CERTBOT_ETC_MOUNT:-certbot_etc}:/etc/letsencrypt:ro
     depends_on:
       web:
+        condition: service_healthy
+      airflow-apiserver:
         condition: service_healthy
     networks:
       - backend
