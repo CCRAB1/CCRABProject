@@ -57,6 +57,7 @@ class CCRABRestClient:
         refresh_token: str | None = None,
         api_prefix: str = "api",
         timeout: float = 30.0,
+        verify: bool | str = True,
         session: requests.Session | None = None,
     ):
         self.base_url = base_url.rstrip("/")
@@ -64,6 +65,7 @@ class CCRABRestClient:
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.timeout = timeout
+        self.verify = verify
         self.session = session or requests.Session()
 
     @classmethod
@@ -251,6 +253,7 @@ class CCRABRestClient:
         request_kwargs = dict(kwargs)
         request_kwargs["headers"] = request_headers
         request_kwargs["timeout"] = self.timeout
+        request_kwargs.setdefault("verify", self.verify)
 
         response = self.session.request(method.upper(), url, **request_kwargs)
         if (
