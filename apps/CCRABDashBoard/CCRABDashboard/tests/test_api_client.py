@@ -110,6 +110,30 @@ class CCRABRestClientTests(TestCase):
             },
         )
 
+    def test_verify_option_is_passed_to_requests(self):
+        session = FakeSession(
+            [
+                FakeResponse(
+                    200,
+                    {
+                        "access": "access-token",
+                        "refresh": "refresh-token",
+                    },
+                )
+            ]
+        )
+        client = CCRABRestClient(
+            base_url="https://localhost",
+            verify=False,
+            session=session,
+        )
+
+        client.obtain_token(username="api-user", password="secret")
+
+        request = session.requests[0]
+        self.assertEqual(request["url"], "https://localhost/api/token/")
+        self.assertIs(request["kwargs"]["verify"], False)
+
     def test_list_projects_adds_bearer_header_and_cleans_query_params(self):
         session = FakeSession([FakeResponse(200, {"results": []})])
         client = CCRABRestClient(

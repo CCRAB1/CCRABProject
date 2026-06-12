@@ -123,7 +123,7 @@ services:
       - "443:443"
     volumes:
       - ./docker/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - /var/log/ccrab/nginx:/var/log/nginx
+      - ${NGINX_LOG_MOUNT:-/var/log/ccrab/nginx}:/var/log/nginx
       - static_data:/app/staticfiles:ro
       - media_data:/app/media:ro
       - ${CERTBOT_WWW_MOUNT:-certbot_www}:/var/www/certbot:ro

@@ -183,7 +183,7 @@ def purple_air_processing():
                     start_date = end_date - timedelta(hours=1)
                     try:
                         #These are the sensors we want to retrieve from PUrple Air API.
-                        fields = [rec['source_obs'] for rec in platform_nfo.observations]
+                        fields = [obs['source_obs'] for obs in platform['observations']]
 
                         logger.info(f"Getting sensor history for sensor_index {external_indentifier} Start: {start_date}"
                                     f" End: {end_date} Fields: {fields}")
