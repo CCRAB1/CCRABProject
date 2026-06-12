@@ -40,7 +40,6 @@ RUN python /tmp/requirements_from_pyproject.py \
       --exclude apache-airflow \
       --exclude datautilities \
       --exclude observationsdatabase \
-      --exclude pydevd-pycharm \
       --exclude djangorestframework-stubs \
       --exclude rest-framework-simplejwt \
       --exclude ruff \
