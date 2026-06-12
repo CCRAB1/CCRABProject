@@ -32,9 +32,23 @@ COPY --chown=airflow:0 packages/DataUtilities /opt/ccrab/DataUtilities
 COPY --chown=airflow:0 packages/ObservationsDatabase /opt/ccrab/ObservationsDatabase
 COPY --chown=airflow:0 apps/CCRABDashBoard /opt/ccrab/dashboard
 COPY --chown=airflow:0 apps/DataIngestion/airflow/dags /opt/airflow/dags
-COPY --chown=airflow:0 infra/docker/airflow/requirements.txt /tmp/ccrab-airflow-requirements.txt
+COPY --chown=airflow:0 infra/docker/scripts/requirements_from_pyproject.py /tmp/requirements_from_pyproject.py
+COPY --chown=airflow:0 apps/DataIngestion/pyproject.toml /tmp/dataingestion-pyproject.toml
+COPY --chown=airflow:0 apps/CCRABDashBoard/pyproject.toml /tmp/ccrabdashboard-pyproject.toml
 
-RUN pip install --no-cache-dir \
+RUN python /tmp/requirements_from_pyproject.py \
+      --exclude apache-airflow \
+      --exclude datautilities \
+      --exclude observationsdatabase \
+      --exclude pydevd-pycharm \
+      --exclude djangorestframework-stubs \
+      --exclude rest-framework-simplejwt \
+      --exclude ruff \
+      --exclude nodeenv \
+      /tmp/dataingestion-pyproject.toml \
+      /tmp/ccrabdashboard-pyproject.toml \
+      > /tmp/ccrab-airflow-requirements.txt \
+    && pip install --no-cache-dir \
       --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt" \
       "apache-airflow==${AIRFLOW_VERSION}" \
       -r /tmp/ccrab-airflow-requirements.txt \

@@ -20,9 +20,13 @@ RUN apt-get update \
         libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY apps/CCRABDashBoard/requirements.txt /app/requirements.txt
+COPY infra/docker/scripts/requirements_from_pyproject.py /tmp/requirements_from_pyproject.py
+COPY apps/CCRABDashBoard/pyproject.toml /tmp/ccrabdashboard-pyproject.toml
 RUN pip install --upgrade pip \
-    && pip install -r /app/requirements.txt
+    && python /tmp/requirements_from_pyproject.py \
+        /tmp/ccrabdashboard-pyproject.toml \
+        > /tmp/ccrabdashboard-requirements.txt \
+    && pip install -r /tmp/ccrabdashboard-requirements.txt
 
 RUN groupadd --gid "${APP_GID}" django \
     && useradd --uid "${APP_UID}" --gid django --home-dir /app --shell /usr/sbin/nologin --no-create-home --no-log-init django
