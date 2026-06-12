@@ -4,7 +4,7 @@ import csv
 import time
 from io import StringIO
 from airflow.sdk import dag, task, Variable
-from airflow.utils.trigger_rule import TriggerRule
+from airflow.task.trigger_rule import TriggerRule
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import json
@@ -13,7 +13,7 @@ from django.db import IntegrityError, transaction
 from datautilities.purple_air_api.PurpleAPIWrapper import (
     PurpleAirClient,
 )
-
+from packages.django_setup import setup_django
 from datautilities.ccrab_api.client import CCRABRestClient
 from observationsdatabase.xenia_obs_map import Organization, Platform
 
@@ -144,7 +144,7 @@ def purple_air_processing():
         return [str(file_path) for file_path in local_csv_list]
 
     @task(task_id="fetch_rest")
-    def fetch_data_task(config_file_name: Path) -> []:
+    def fetch_data_task(config_file_name: Path) -> list[Any]:
         """
         #### fetch_data_task task
         Using the Purple AIr API, this task retrieves the data for the platforms setup in the JSON config.
@@ -183,7 +183,7 @@ def purple_air_processing():
                     start_date = end_date - timedelta(hours=1)
                     try:
                         #These are the sensors we want to retrieve from PUrple Air API.
-                        fields = [obs['source_obs'] for obs in platform['observations']]
+                        fields = [obs['source_obs'] for obs in platform.observations]
 
                         logger.info(f"Getting sensor history for sensor_index {external_indentifier} Start: {start_date}"
                                     f" End: {end_date} Fields: {fields}")
@@ -219,7 +219,7 @@ def purple_air_processing():
             raise e
 
     @task()
-    def normalize_headers_task(config: {}, uncorrected_csv_data_files: []) -> []:
+    def normalize_headers_task(config_file_name: Path, uncorrected_data_files: []) -> list[Any]:
         """
         #### normalize_headers_task
         Given a list of the data files, this task normalizes the header columns.
@@ -227,44 +227,51 @@ def purple_air_processing():
         **Inputs:** config, uncorrected_csv_data_files
         **Outputs:** list[]
         """
+        configuration_data = json.load(open(config_file_name))
 
-        header_corrected_directory = config.get("header_corrected_directory", None)
+        base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
+        header_corrected_directory = base_directory / Variable.get("TSI_HEADER_CORRECTED_DIRECTORY", 'tsi/header_corrected')
+
         corrected_file_list = []
-        if header_corrected_directory is not None:
-            header_corrected_directory = Path(header_corrected_directory)
-            #Let's make sure the directory exists.
-            header_corrected_directory.mkdir(parents=True, exist_ok=True)
+        header_corrected_directory = Path(header_corrected_directory)
+        #Let's make sure the directory exists.
+        header_corrected_directory.mkdir(parents=True, exist_ok=True)
 
-            organizations_setup = build_mappings(config)
+        configuration_data = json.load(open(config_file_name))
+        org_list = []
+        #Build our org and platform objects.
+        for organization in configuration_data['organizations']:
+            org_list.append(Organization().from_dict(organization))
 
-            #The file names are platform_handle-sensor_id-start_date-end_date.csv
-            for file in uncorrected_csv_data_files:
-                file_path = Path(file)
-                file_name_parts = file_path.stem.split("-")
-                # The platform handle format we need is <org>.<platform name>.<platform type>. When
-                # we create the filename, we replace the "." with "_" to avoid any OS/Filesystem issues.
-                file_platform_handle = file_name_parts[0].replace("_", ".")
-                for organization in organizations_setup:
-                    logger.info(
-                        f"Check for platform: {file_platform_handle} in organization: {organization.short_name}")
-                    platform_nfo = organization.get_platform(file_platform_handle)
-                    if platform_nfo is None:
-                        logger.error(f"Platform {file_platform_handle} not found in list.")
-                    else:
-                        break
-                corrected_file = header_corrected_directory / f"{file_path.stem}-corrected.csv"
-                logger.info(f"Reading source file: {file} Writing corrected file: {corrected_file}")
-                with open(file, "r") as csv_file_obj:
-                    csv_reader = csv.reader(csv_file_obj)
-                    with open(corrected_file, "w") as corrected_file_obj:
-                        csv_writer = csv.writer(corrected_file_obj)
-                        for row_number, row in enumerate(csv_reader):
-                            if row_number == 0:
-                                corrected_header = normalize_header(row, platform_nfo)
-                                csv_writer.writerow(corrected_header)
-                            else:
-                                csv_writer.writerow(row)
-                    corrected_file_list.append(str(corrected_file))
+
+        #The file names are platform_handle-sensor_id-start_date-end_date.csv
+        for file in uncorrected_data_files:
+            file_path = Path(file)
+            file_name_parts = file_path.stem.split("-")
+            # The platform handle format we need is <org>.<platform name>.<platform type>. When
+            # we create the filename, we replace the "." with "_" to avoid any OS/Filesystem issues.
+            file_platform_handle = file_name_parts[0].replace("_", ".")
+            for organization in org_list:
+                logger.info(
+                    f"Check for platform: {file_platform_handle} in organization: {organization.short_name}")
+                platform_nfo = organization.get_platform(file_platform_handle)
+                if platform_nfo is None:
+                    logger.error(f"Platform {file_platform_handle} not found in list.")
+                else:
+                    break
+            corrected_file = header_corrected_directory / f"{file_path.stem}-corrected.csv"
+            logger.info(f"Reading source file: {file} Writing corrected file: {corrected_file}")
+            with open(file, "r") as csv_file_obj:
+                csv_reader = csv.reader(csv_file_obj)
+                with open(corrected_file, "w") as corrected_file_obj:
+                    csv_writer = csv.writer(corrected_file_obj)
+                    for row_number, row in enumerate(csv_reader):
+                        if row_number == 0:
+                            corrected_header = normalize_header(row, platform_nfo)
+                            csv_writer.writerow(corrected_header)
+                        else:
+                            csv_writer.writerow(row)
+                corrected_file_list.append(str(corrected_file))
 
         return corrected_file_list
 
@@ -315,18 +322,20 @@ def purple_air_processing():
         return qaqcd_files
 
     @task()
-    def save_to_database_task(config: {}, file_list: []):
+    def save_to_database_task(config_file_name: Path, file_list: []):
         #Grab the database connection parameters from the Airflow variables.
-        CCRAB_DB_HOST = Variable.get("CCRAB_DB_HOST", default=None)
-        CCRAB_DB_USER = Variable.get("CCRAB_DB_USER", default=None)
-        CCRAB_DB_PASSWORD = Variable.get("CCRAB_DB_PASSWORD", default=None)
-        CCRAB_DATA_DB = Variable.get("CCRAB_DATA_DB", default=None)
-        PURPLEAIR_LOG_INSERTS = Variable.get("PURPLEAIR_TASK_LOG_INSERTS", deserialize_json=True, default=0)
+        PURPLEAIR_TASK_LOG_INSERTS = Variable.get("TSI_LOG_INSERTS", deserialize_json=True, default=0)
         PURPLEAIR_BULK_INSERT_FILE_SIZE = Variable.get("PURPLEAIR_BULK_INSERT_FILE_SIZE", deserialize_json=True, default=1000000)
-        PURPLEAIR_CHUNK_SIZE = Variable.get("PURPLEAIR_CHUNK_SIZE", deserialize_json=True, default=1000)
+        PURPLEAIR_CHUNK_SIZE = Variable.get("TSI_CHUNK_SIZE", deserialize_json=True, default=1000)
         try:
-            xenia_db = connect_to_database(CCRAB_DB_HOST, CCRAB_DB_USER, CCRAB_DB_PASSWORD, CCRAB_DATA_DB)
-            organizations_setup = build_mappings(config)
+            setup_django()
+
+            from platforms_app.models import Multi_obs
+            configuration_data = json.load(open(config_file_name))
+            organizations_setup = []
+            # Build our org and platform objects.
+            for organization in configuration_data['organizations']:
+                organizations_setup.append(Organization().from_dict(organization))
 
             for file in file_list:
                 logger.info(f"Processing file: {file} into the database")
@@ -336,10 +345,6 @@ def purple_air_processing():
                 # we create the filename, we replace the "." with "_" to avoid any OS/Filesystem issues.
                 file_platform_handle = file_name_parts[0].replace("_", ".")
 
-                #For the platform data file, we want to make sure we have the origanization and platform and observation
-                #records setup in the database.
-                validate_organization(file_platform_handle, organizations_setup, xenia_db)
-
                 for organization_nfo in organizations_setup:
                     platform_nfo = organization_nfo.get_platform(file_platform_handle)
                     if platform_nfo is not None:
@@ -347,13 +352,16 @@ def purple_air_processing():
                 #Check the file size, if it exceeds
                 if file_path.stat().st_size >= PURPLEAIR_BULK_INSERT_FILE_SIZE:
                     #csv_file: Path, db: xenia_alchemy, platform_nfo: Platform, insert_chunk_size: int
-                    bulk_insert_to_database(file_path, xenia_db, platform_nfo, PURPLEAIR_CHUNK_SIZE)
+                    bulk_insert_to_database(file_path, platform_nfo, PURPLEAIR_CHUNK_SIZE)
                 else:
 
                     with open(file_path, "r") as csv_file_obj:
                         file_start_time = time.perf_counter()
                         row_entry_date = datetime.now()
                         csv_reader = csv.DictReader(csv_file_obj)
+                        duplicate_row_count = 0
+                        insert_exception_count = 0
+
                         for row_ndx, row in enumerate(csv_reader):
                             for obs_info in platform_nfo.obs_map:
                                 #We build the name for each column we want which is >target_obs>_<s_order>. The date
@@ -367,32 +375,33 @@ def purple_air_processing():
                                         logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
                                         logger.exception(e)
                                     else:
-                                        if PURPLEAIR_LOG_INSERTS:
+                                        if PURPLEAIR_TASK_LOG_INSERTS:
                                             if row_ndx % 1000 == 0:
                                                 logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
                                                             f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
                                                             f"{obs_info.target_uom}({obs_info.m_type_id}) SOrder: {obs_info.s_order}")
                                         try:
-                                            obs_rec = multi_obs(row_entry_date=row_entry_date,
-                                                                m_date=m_date,
-                                                                m_value=val,
-                                                                sensor_id=obs_info.sensor_id,
-                                                                m_type_id=obs_info.m_type_id,
-                                                                m_lon=platform_nfo.longitude,
-                                                                m_lat=platform_nfo.latitude)
-                                            xenia_db.add_rec(obs_rec, True)
-                                        except exc.IntegrityError as e:
+                                            with transaction.atomic():
+                                                obs_rec = Multi_obs.objects.create(row_entry_date=row_entry_date,
+                                                                    platform_handle=platform_nfo.platform_handle,
+                                                                    m_date=m_date,
+                                                                    m_value=val,
+                                                                    sensor_id_id=obs_info.sensor_id,
+                                                                    m_type_id_id=obs_info.m_type_id,
+                                                                    m_lon=platform_nfo.longitude,
+                                                                    m_lat=platform_nfo.latitude)
+                                        except IntegrityError as e:
                                             logger.error(f"Record already exists: {e}")
+                                            duplicate_row_count += 1
                                         except Exception as e:
                                             logger.error(f"Error adding record: {e}")
                                             logger.exception(e)
+                                            insert_exception_count += 1
                                 except Exception as e:
                                     raise e
                     logger.info(f"Processed {row_ndx} rows from file: {file} into the database in: "
                                 f"{time.perf_counter()-file_start_time} seconds")
 
-            logger.info(f"Disconnecting from database: {CCRAB_DATA_DB}")
-            xenia_db.disconnect()
         except Exception as e:
             raise e
     # Merge / join task
@@ -408,7 +417,7 @@ def purple_air_processing():
         return chosen
 
 
-    def bulk_insert_to_database(csv_file: Path, db: xenia_alchemy, platform_nfo: Platform, insert_chunk_size: int):
+    def bulk_insert_to_database(csv_file: Path, platform_nfo: Platform, insert_chunk_size: int):
         '''
         WHen importing large csv files, for performace we want to use this bulk insert function.
         :param csv_file:
@@ -563,27 +572,33 @@ def purple_air_processing():
                 corrected_header.append(corrected_column)
         return corrected_header
 
+
+    configuration_file_path = get_configuration()
+
     #Figure out how we are running. We could be fetching new data from the Purple AIr API, or
     #we could be processing previous files.
-    run_config = decide_mode(CONFIG)
+    run_config = decide_mode(None)
 
     branch = branch_on_mode(['mode'])
 
+    configuration_file_path >> run_config >> branch
+
+    #local_file_list = []
     local_file_list = list_local_files(run_config['directory_to_process'])
-    remote_file_list = fetch_data_task(CONFIG)
+    remote_file_list = fetch_data_task(configuration_file_path)
     # Wire branch to both candidate tasks. Branch operator expects task ids returned above.
     branch >> local_file_list
     branch >> remote_file_list
-
 
     # Merge results (merge task has TriggerRule so it runs even when a branch is skipped)
     csv_files_to_process = merge_file_lists(local_files=local_file_list, rest_files=remote_file_list)
 
     #We want to correct the headers from the Purple Air fields to our normalized names.
-    normalized_header_data_files = normalize_headers_task(CONFIG, csv_files_to_process)
+    #We want to correct the headers from the Purple Air fields to our normalized names.
+    normalized_header_data_files = normalize_headers_task(configuration_file_path, csv_files_to_process)
 
-    qaqcd_data = qaqc_task(CONFIG, normalized_header_data_files)
-    save_to_database_task(CONFIG, qaqcd_data)
+    #qaqcd_data = qaqc_task(CONFIG, normalized_header_data_files)
+    save_to_database_task(configuration_file_path, normalized_header_data_files)
 
 purple_air_processing()
 

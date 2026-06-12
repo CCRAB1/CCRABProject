@@ -1,0 +1,30 @@
+[project]
+name = "airflowproject"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "apache-airflow==3.1.3",
+    "asyncpg>=0.31.0",
+    "datautilities",
+    "django>=5.2.10,<6",
+    "graphviz>=0.21",
+    "ijson>=3.5.0",
+    "ioos-qc>=2.3.0",
+    "observationsdatabase",
+    "psycopg2-binary>=2.9.11",
+    "pydevd-pycharm~=253.31033.139",
+    "django-environ>=0.12.0",
+    "django-filter==25.2",
+    "djangorestframework==3.16.1",
+    "djangorestframework-gis==1.2.0",
+    "djangorestframework-stubs>=3.16.8",
+    "psycopg2-binary>=2.9.12",
+    "rest-framework-simplejwt>=0.0.2",
+    "djangorestframework-simplejwt>=5.5.1",
+
+]
+
+[tool.uv.sources]
+datautilities = { git = "https://github.com/CCRAB1/DataUtilities.git" }
+observationsdatabase = { git = "https://github.com/CCRAB1/ObservationsDatabase.git" }
