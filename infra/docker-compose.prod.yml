@@ -23,11 +23,13 @@ x-airflow-common: &airflow_common
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "False"
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: admin:admin
     AIRFLOW__API__BASE_URL: ${AIRFLOW_API_BASE_URL:-http://airflow-apiserver:8080}
-    AIRFLOW_VAR_BASE_WORKING_DIRECTORY: /opt/airflow/working_directory
+    AIRFLOW_PROCESSING_DIRECTORY: /opt/ccrab/processing
+    AIRFLOW_VAR_BASE_WORKING_DIRECTORY: /opt/ccrab/processing
     AIRFLOW_VAR_CCRAB_DJANGO_PROJECT_PATH: /opt/ccrab/dashboard
     CCRAB_DJANGO_PROJECT_PATH: /opt/ccrab/dashboard
   volumes:
     - ../apps/DataIngestion/airflow/dags:/opt/airflow/dags:ro
+    - ${AIRFLOW_PROCESSING_MOUNT:-../processing}:/opt/ccrab/processing
     - airflow_logs:/opt/airflow/logs
     - airflow_working_directory:/opt/airflow/working_directory
     - ./docker/airflow/variables:/opt/airflow/variables:ro

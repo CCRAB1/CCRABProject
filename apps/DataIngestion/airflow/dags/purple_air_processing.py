@@ -1,3 +1,4 @@
+import os
 import logging
 import pendulum
 import csv
@@ -8,13 +9,15 @@ from airflow.task.trigger_rule import TriggerRule
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import json
+from urllib.parse import urlparse
+
 from datetime import datetime, timedelta
 from django.db import IntegrityError, transaction
 from datautilities.purple_air_api.PurpleAPIWrapper import (
     PurpleAirClient,
 )
 from packages.django_setup import setup_django
-from datautilities.ccrab_api.client import CCRABRestClient
+from datautilities.ccrab_api.client import CCRABRestClient, CCRABAuthenticationError
 from observationsdatabase.xenia_obs_map import Organization, Platform
 
 from ioos_qc.config import QcConfig
@@ -25,6 +28,20 @@ from packages.pycharm_debugging import maybe_attach_debugger
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
+
+remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG")
+if remote_debug == "True":
+    import pydevd_pycharm
+
+    logger.info("Attaching debugger")
+    pydevd_pycharm.settrace(
+        os.getenv("PYDEVD_HOST", "host.docker.internal"),
+        port=int(os.getenv("PYDEVD_PORT", "5678")),
+        stdout_to_server=True,
+        stderr_to_server=True,
+        suspend=os.getenv("PYDEVD_SUSPEND", "False").lower() in {"1", "true", "yes"},
+    )
+
 
 @dag(
     dag_id="purple_air_processing",
@@ -37,25 +54,35 @@ def purple_air_processing():
 
     @task()
     def get_configuration() -> str:
-        config_file_path = None
         try:
-            maybe_attach_debugger()
+
+            #maybe_attach_debugger()
 
             logger.info("Retrieving configuration")
-            base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / 'configs'
+            base_directory = Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / "purple_air" / "config"
+            logger.info(f"Base directory: {base_directory}")
             #Make sure out destination directory exists.
             base_directory.mkdir(parents=True, exist_ok=True)
             config_file_path = base_directory / "purple_air_config.json"
             ccrab_base_url = Variable.get("CCRAB_API_URL", None)
-            ccrab_api = CCRABRestClient(base_url=ccrab_base_url)
+            ccrab_api = CCRABRestClient(base_url=ccrab_base_url,
+                                        verify=get_requests_verify(ccrab_base_url)
+                                        )
             ccrab_user = Variable.get("CCRAB_API_USERNAME", None)
             ccrab_pwd = Variable.get("CCRAB_API_USER_PASSWORD", None)
             #Get the access token to use for the API calls.
-            ccrab_token = ccrab_api.obtain_token(username=ccrab_user, password=ccrab_pwd)
+            try:
+                ccrab_token = ccrab_api.obtain_token(username=ccrab_user, password=ccrab_pwd)
+            except CCRABAuthenticationError as e:
+                logger.error(
+                    f"Unable to authenticate with CCRAB API. Attempting to create a new token."
+                )
+                ccrab_api.register_user(username=ccrab_user, password=ccrab_pwd)
             organizations_setup = ccrab_api.platform_configuration(data_source='purple_air')
             json.dump(organizations_setup, open(config_file_path, "w"))
         except Exception as e:
             logger.exception(e)
+            raise e
         return str(config_file_path)
 
 
@@ -73,13 +100,14 @@ def purple_air_processing():
         """
         # precedence: dagrun.conf -> supplied arg -> Variable -> auto
         #dag_conf_mode =
+
         base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-        local_path = base_dir / Path(Variable.get("TSI_RAW_DATA_DIRECTORY", "tsi/unprocessed"))
+        local_path = base_dir / Path(Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
         # If user passes a conf via dag run, Airflow will pass it; we handle via Variable for now.
         if mode is not None:
             requested = mode.lower()
         else:
-            requested = Variable.get("TSI_PIPELINE_MODE", "auto").lower()
+            requested = Variable.get("purple_air_csv_pipeline_mode", "auto").lower()
 
         assert requested in ("auto", "local", "rest"), "mode must be 'auto', 'local', or 'rest'"
 
@@ -154,11 +182,10 @@ def purple_air_processing():
         for organization in configuration_data['organizations']:
             org_list.append(Organization().from_dict(organization))
 
-        base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-        data_directory = base_directory / Variable.get("PURPLE_AIR_RAW_DATA_DIRECTORY", "tsi/unprocessed")
-        if data_directory is not None:
-            data_directory = Path(data_directory)
-            data_directory.mkdir(parents=True, exist_ok=True)
+        base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
+        data_directory = base_dir / Path(Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
+        data_directory = Path(data_directory)
+        data_directory.mkdir(parents=True, exist_ok=True)
 
         last_retrieved_record_date = Variable.get("last_retrieved_record_date", "1900-01-01 00:00:00")
         purple_air_base_url = Variable.get("PURPLE_AIR_API_BASE_URL", None)
@@ -193,22 +220,22 @@ def purple_air_processing():
                         file_platform_handle = platform_handle.replace(".", "_")
                         output_file = data_directory / (f"{file_platform_handle}-{external_indentifier}-"
                                                               f"{start_date.strftime('%Y-%m-%dT%H%M%S')}"
-                                                              f"{end_date.strftime('%Y-%m-%dT%H%M%S')}.json")
+                                                              f"{end_date.strftime('%Y-%m-%dT%H%M%S')}.csv")
                         logger.info(f"Writing to {output_file}")
                         try:
                             with open(output_file, "w") as out_file_obj:
-                                #out_file_obj.write(results)
-                                json.dump(results, out_file_obj)
+                                for row in results:
+                                    out_file_obj.write(f"{row}\n")
                                 saved_data_files.append(str(output_file))
-                                logger.info(f"Finished writing to {output_file}")
-
                         except Exception as e:
-                            logger.error(f"Error writing to {output_file}")
-                            logger.exception(e)
+                            logger.error(f"Failed to write file: {output_file}")
+
                             raise e
+
                     except Exception as e:
                         logger.error(f"Unable to retrieve data for platform: {platform_handle} ({external_indentifier})")
                         logger.exception(e)
+                        raise e
             return saved_data_files
 
         except Exception as e:
@@ -568,6 +595,24 @@ def purple_air_processing():
                 corrected_header.append(corrected_column)
         return corrected_header
 
+    def get_requests_verify(ccrab_url):
+        value = os.getenv("CCRAB_API_VERIFY")
+        if value is None or value.strip() == "":
+            parsed_url = urlparse(ccrab_url)
+            if parsed_url.scheme == "https" and parsed_url.hostname in {
+                "localhost",
+                "127.0.0.1",
+                "::1",
+            }:
+                return False
+            return True
+
+        normalized = value.strip().lower()
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        return value
 
     configuration_file_path = get_configuration()
 
