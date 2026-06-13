@@ -18,12 +18,12 @@ dependencies = [
     "djangorestframework==3.16.1",
     "djangorestframework-gis==1.2.0",
     "djangorestframework-simplejwt>=5.5.1",
+    "pydevd-pycharm~=253.31033.139",
 ]
 
 [dependency-groups]
 dev = [
     "djangorestframework-stubs>=3.16.8",
-    "pydevd-pycharm~=253.31033.139",
 ]
 
 [tool.uv.sources]

@@ -1,3 +1,4 @@
+import os
 import logging
 import pendulum
 import csv
@@ -17,17 +18,18 @@ from datautilities.ccrab_api.client import CCRABRestClient
 from datautilities.tsi_api.client import TSIExternalAPIClient, CSV_ACCEPT, JSON_ACCEPT, FLAT_TELEMETRY_FIELDS
 
 from packages.django_setup import setup_django
+from packages.pycharm_debugging import maybe_attach_debugger
 from observationsdatabase.xenia_obs_map import Organization, Platform
 from ioos_qc.config import QcConfig
 from ioos_qc.streams import PandasStream
 from ioos_qc.results import CollectedResult, collect_results
 import pandas as pd
 #REMOTE_DEBUG = Variable.get("REMOTE_DEBUG", default=False)
-REMOTE_DEBUG=True
+REMOTE_DEBUG=False
 if REMOTE_DEBUG:
     import pydevd_pycharm
 
-    pydevd_pycharm.settrace('localhost', port=5678, stdout_to_server=True, stderr_to_server=True)
+    pydevd_pycharm.settrace("host.docker.internal", port=5678, stdout_to_server=True, stderr_to_server=True)
 
 
 logger = logging.getLogger(__name__)
@@ -48,6 +50,8 @@ def tsi_processing():
     def get_configuration() -> str:
         config_file_path = None
         try:
+            maybe_attach_debugger()
+
             logger.info("Retrieving configuration")
             base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / 'configs'
             #Make sure out destination directory exists.
