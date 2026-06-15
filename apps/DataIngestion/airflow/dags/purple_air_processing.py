@@ -19,7 +19,7 @@ from datautilities.purple_air_api.PurpleAPIWrapper import (
 from packages.django_setup import setup_django
 from datautilities.ccrab_api.client import CCRABRestClient, CCRABAuthenticationError
 from observationsdatabase.xenia_obs_map import Organization, Platform
-
+from packages.archiving import archive_file, zip_files
 from ioos_qc.config import QcConfig
 from ioos_qc.streams import PandasStream
 from ioos_qc.results import CollectedResult, collect_results
@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG")
+remote_debug = "False"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -176,27 +177,30 @@ def purple_air_processing():
         **Inputs:** config
         **Outputs:** list[]
         """
-        configuration_data = json.load(open(config_file_name))
-        org_list = []
-        #Build our org and platform objects.
-        for organization in configuration_data['organizations']:
-            org_list.append(Organization().from_dict(organization))
-
-        base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-        data_directory = base_dir / Path(Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
-        data_directory = Path(data_directory)
-        data_directory.mkdir(parents=True, exist_ok=True)
-
-        last_retrieved_record_date = Variable.get("last_retrieved_record_date", "1900-01-01 00:00:00")
-        purple_air_base_url = Variable.get("PURPLE_AIR_API_BASE_URL", None)
-        purple_air_api_key = Variable.get('PURPLE_AIR_API_KEY', None)
-        purple_api = PurpleAirClient(api_key=purple_air_api_key, base_url=purple_air_base_url)
-
-        saved_data_files = []
-
         try:
+            start_time = time.perf_counter()
+            logger.info(f"Starting fetch_data_task with config file: {config_file_name}")
+            configuration_data = json.load(open(config_file_name))
+            org_list = []
+            #Build our org and platform objects.
+            for organization in configuration_data['organizations']:
+                org_list.append(Organization().from_dict(organization))
+
+            base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
+            data_directory = base_dir / Path(Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
+            data_directory = Path(data_directory)
+            data_directory.mkdir(parents=True, exist_ok=True)
+
+            last_retrieved_record_date = Variable.get("last_retrieved_record_date", "1900-01-01 00:00:00")
+            purple_air_base_url = Variable.get("PURPLE_AIR_API_BASE_URL", None)
+            purple_air_api_key = Variable.get('PURPLE_AIR_API_KEY', None)
+            purple_api = PurpleAirClient(api_key=purple_air_api_key, base_url=purple_air_base_url)
+
+            saved_data_files = []
+            platform_count = 0
             for organization in org_list:
                 platform_handles = organization.list_platform_handles()
+                platform_count += len(platform_handles)
                 #organization = configuration_data['organizations'][organization_id]
                 #platform_handles = [platform['platform_handle'] for platform in organization['platforms']]
                 for platform_handle in platform_handles:
@@ -219,8 +223,8 @@ def purple_air_processing():
                                                                      stream=True)
                         file_platform_handle = platform_handle.replace(".", "_")
                         output_file = data_directory / (f"{file_platform_handle}-{external_indentifier}-"
-                                                              f"{start_date.strftime('%Y-%m-%dT%H%M%S')}"
-                                                              f"{end_date.strftime('%Y-%m-%dT%H%M%S')}.csv")
+                                                              f"{start_date.strftime('%Y%m%dT%H%M%S')}-"
+                                                              f"{end_date.strftime('%Y%m%dT%H%M%S')}.csv")
                         logger.info(f"Writing to {output_file}")
                         try:
                             with open(output_file, "w") as out_file_obj:
@@ -236,6 +240,8 @@ def purple_air_processing():
                         logger.error(f"Unable to retrieve data for platform: {platform_handle} ({external_indentifier})")
                         logger.exception(e)
                         raise e
+                    break
+            logger.info(f"Completed fetch_data_task in {time.perf_counter()-start_time} seconds for {platform_count} platforms")
             return saved_data_files
 
         except Exception as e:
@@ -250,52 +256,54 @@ def purple_air_processing():
         **Inputs:** config, uncorrected_csv_data_files
         **Outputs:** list[]
         """
-        configuration_data = json.load(open(config_file_name))
+        try:
+            start_time = time.perf_counter()
+            logger.info(f"Starting normalize_headers_task with config file: {config_file_name}")
+            configuration_data = json.load(open(config_file_name))
 
-        base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-        header_corrected_directory = base_directory / Variable.get("TSI_HEADER_CORRECTED_DIRECTORY", 'tsi/header_corrected')
+            base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
+            header_corrected_directory = base_directory / Path(Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY")) / Path(Variable.get("NORMALIZED_HEADER_DIRECTORY"))
+            #Let's make sure the directory exists.
+            header_corrected_directory.mkdir(parents=True, exist_ok=True)
 
-        corrected_file_list = []
-        header_corrected_directory = Path(header_corrected_directory)
-        #Let's make sure the directory exists.
-        header_corrected_directory.mkdir(parents=True, exist_ok=True)
-
-        configuration_data = json.load(open(config_file_name))
-        org_list = []
-        #Build our org and platform objects.
-        for organization in configuration_data['organizations']:
-            org_list.append(Organization().from_dict(organization))
+            corrected_file_list = []
+            org_list = []
+            #Build our org and platform objects.
+            for organization in configuration_data['organizations']:
+                org_list.append(Organization().from_dict(organization))
 
 
-        #The file names are platform_handle-sensor_id-start_date-end_date.csv
-        for file in uncorrected_data_files:
-            file_path = Path(file)
-            file_name_parts = file_path.stem.split("-")
-            # The platform handle format we need is <org>.<platform name>.<platform type>. When
-            # we create the filename, we replace the "." with "_" to avoid any OS/Filesystem issues.
-            file_platform_handle = file_name_parts[0].replace("_", ".")
-            for organization in org_list:
-                logger.info(
-                    f"Check for platform: {file_platform_handle} in organization: {organization.short_name}")
-                platform_nfo = organization.get_platform(file_platform_handle)
-                if platform_nfo is None:
-                    logger.error(f"Platform {file_platform_handle} not found in list.")
-                else:
-                    break
-            corrected_file = header_corrected_directory / f"{file_path.stem}-corrected.csv"
-            logger.info(f"Reading source file: {file} Writing corrected file: {corrected_file}")
-            with open(file, "r") as csv_file_obj:
-                csv_reader = csv.reader(csv_file_obj)
-                with open(corrected_file, "w") as corrected_file_obj:
-                    csv_writer = csv.writer(corrected_file_obj)
-                    for row_number, row in enumerate(csv_reader):
-                        if row_number == 0:
-                            corrected_header = normalize_header(row, platform_nfo)
-                            csv_writer.writerow(corrected_header)
-                        else:
-                            csv_writer.writerow(row)
-                corrected_file_list.append(str(corrected_file))
-
+            #The file names are platform_handle-sensor_id-start_date-end_date.csv
+            for file in uncorrected_data_files:
+                file_path = Path(file)
+                file_name_parts = file_path.stem.split("-")
+                # The platform handle format we need is <org>.<platform name>.<platform type>. When
+                # we create the filename, we replace the "." with "_" to avoid any OS/Filesystem issues.
+                file_platform_handle = file_name_parts[0].replace("_", ".")
+                for organization in org_list:
+                    logger.info(
+                        f"Check for platform: {file_platform_handle} in organization: {organization.short_name}")
+                    platform_nfo = organization.get_platform(file_platform_handle)
+                    if platform_nfo is None:
+                        logger.error(f"Platform {file_platform_handle} not found in list.")
+                    else:
+                        break
+                corrected_file = header_corrected_directory / f"{file_path.stem}-corrected.csv"
+                logger.info(f"Reading source file: {file} Writing corrected file: {corrected_file}")
+                with open(file, "r") as csv_file_obj:
+                    csv_reader = csv.reader(csv_file_obj)
+                    with open(corrected_file, "w") as corrected_file_obj:
+                        csv_writer = csv.writer(corrected_file_obj)
+                        for row_number, row in enumerate(csv_reader):
+                            if row_number == 0:
+                                corrected_header = normalize_header(row, platform_nfo)
+                                csv_writer.writerow(corrected_header)
+                            else:
+                                csv_writer.writerow(row)
+                    corrected_file_list.append(str(corrected_file))
+        except Exception as e:
+            raise e
+        logger.info(f"Completed normalize_headers_task in {time.perf_counter()-start_time} seconds")
         return corrected_file_list
 
     @task()
@@ -347,9 +355,9 @@ def purple_air_processing():
     @task()
     def save_to_database_task(config_file_name: Path, file_list: []):
         #Grab the database connection parameters from the Airflow variables.
-        PURPLEAIR_TASK_LOG_INSERTS = Variable.get("TSI_LOG_INSERTS", deserialize_json=True, default=0)
+        PURPLEAIR_TASK_LOG_INSERTS = Variable.get("PURPLEAIR_TASK_LOG_INSERTS", deserialize_json=True, default=0)
         PURPLEAIR_BULK_INSERT_FILE_SIZE = Variable.get("PURPLEAIR_BULK_INSERT_FILE_SIZE", deserialize_json=True, default=1000000)
-        PURPLEAIR_CHUNK_SIZE = Variable.get("TSI_CHUNK_SIZE", deserialize_json=True, default=1000)
+        PURPLEAIR_CHUNK_SIZE = Variable.get("PURPLEAIR_CHUNK_SIZE", deserialize_json=True, default=1000)
         try:
             setup_django()
 
@@ -439,6 +447,47 @@ def purple_air_processing():
         # make sure it's a list (not None)
         return chosen
 
+    @task()
+    def archive_task(config_file_name: Path, data_source_files: [], normalized_header_files: []) :
+        archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY", default="purple_air")
+        archive_directory.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Starting archive_task with config file.")
+        logger.info("Archiving source data files.")
+        process_run_time = datetime.now()
+        raw_data_archive_directory = archive_directory / Variable.get("RAW_DATA_DIRECTORY")
+        raw_data_archive_directory.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Archiving raw data files: {raw_data_archive_directory}")
+
+        for file in data_source_files:
+            logger.info(f"Archiving file: {file}")
+            try:
+                archive_file(Path(file), raw_data_archive_directory, process_run_time)
+            except Exception as e:
+                logger.error(f"Unable to archive file: {file}")
+        logger.info(f"Zipping directory: {archive_directory}")
+        try:
+            zip_files(raw_data_archive_directory)
+        except Exception as e:
+            logger.error(f"Unable to zip directory: {archive_directory}")
+
+        normalized_data_archive_directory = archive_directory / Variable.get("NORMALIZED_HEADER_DIRECTORY")
+        normalized_data_archive_directory.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Archiving normalized data files: {normalized_data_archive_directory}")
+
+        for file in normalized_header_files:
+            logger.info(f"Archiving file: {file}")
+            try:
+                archive_file(Path(file), normalized_data_archive_directory, process_run_time)
+            except Exception as e:
+                logger.error(f"Unable to archive file: {file}")
+        logger.info(f"Zipping directory: {archive_directory}")
+        try:
+            zip_files(normalized_data_archive_directory)
+        except Exception as e:
+            logger.error(f"Unable to zip directory: {archive_directory}")
+
+
+        return
 
     def bulk_insert_to_database(csv_file: Path, platform_nfo: Platform, insert_chunk_size: int):
         '''
@@ -640,6 +689,8 @@ def purple_air_processing():
 
     #qaqcd_data = qaqc_task(CONFIG, normalized_header_data_files)
     save_to_database_task(configuration_file_path, normalized_header_data_files)
+
+    archive_task(configuration_file_path, csv_files_to_process, normalized_header_data_files)
 
 purple_air_processing()
 

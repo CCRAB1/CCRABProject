@@ -30,6 +30,7 @@ x-airflow-common: &airflow_common
   volumes:
     - ../apps/DataIngestion/airflow/dags:/opt/airflow/dags:ro
     - ${AIRFLOW_PROCESSING_MOUNT:-../processing}:/opt/ccrab/processing
+    - ${AIRFLOW_ARCHIVE_MOUNT:-../archive}:/opt/ccrab/archive
     - airflow_logs:/opt/airflow/logs
     - airflow_working_directory:/opt/airflow/working_directory
     - ./docker/airflow/variables:/opt/airflow/variables:ro

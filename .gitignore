@@ -33,6 +33,7 @@ __pycache__/
 **/airflow/logs/
 **/airflow-old/
 **/processing/
+**/archive/
 **/working_directory/
 *.dump
 *.backup

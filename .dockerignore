@@ -36,6 +36,7 @@ __pycache__/
 **/airflow-old
 **/processing
 **/working_directory
+**/archive
 *.dump
 *.backup
 *.sql.gz
