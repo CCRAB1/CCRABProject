@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG")
-remote_debug = "False"
+#remote_debug = "False"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -180,6 +180,10 @@ def purple_air_processing():
         try:
             start_time = time.perf_counter()
             logger.info(f"Starting fetch_data_task with config file: {config_file_name}")
+
+            setup_django()
+            from platforms_app.models import Multi_obs
+
             configuration_data = json.load(open(config_file_name))
             org_list = []
             #Build our org and platform objects.
@@ -206,8 +210,21 @@ def purple_air_processing():
                 for platform_handle in platform_handles:
                     platform = organization.get_platform(platform_handle)
                     external_indentifier = platform.properties['external_identifier']
+                    #Let's the the latest date in the database then build our start/end dates for query from there.
+                    latest_m_date = (
+                        Multi_obs.objects
+                        .filter(
+                            platform_handle=platform_handle,
+                            m_date__isnull=False,
+                        )
+                        .order_by("-m_date")
+                        .values_list("m_date", flat=True)
+                        .first()
+                    )
                     end_date = datetime.now()
                     start_date = end_date - timedelta(hours=1)
+                    if latest_m_date is not None:
+                        start_date = latest_m_date
                     try:
                         #These are the sensors we want to retrieve from PUrple Air API.
                         fields = [obs['source_obs'] for obs in platform.observations]
@@ -241,6 +258,10 @@ def purple_air_processing():
                         logger.exception(e)
                         raise e
                     break
+            org_info = purple_api.get_organization()
+            logger.info(f"Purple Air API Remaining Points: {org_info['remaining_points']} Consumption Rate: {org_info['consumption_rate']} API Version: {org_info['api_version']}")
+            if org_info['remaining_points'] < 500000:
+                logger.warning(f"Purple Air API remaining points is low: {org_info['remaining_points']}")
             logger.info(f"Completed fetch_data_task in {time.perf_counter()-start_time} seconds for {platform_count} platforms")
             return saved_data_files
 
