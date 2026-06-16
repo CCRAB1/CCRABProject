@@ -46,8 +46,8 @@ if remote_debug == "True":
 
 @dag(
     dag_id="purple_air_processing",
-    schedule=None,
-    start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+    schedule="*/30 * * * *",
+    start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     catchup=False,
     tags=["purpleair","ccrab"],
 )
