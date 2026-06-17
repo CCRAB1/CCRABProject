@@ -226,7 +226,8 @@ def purple_air_processing():
                         .first()
                     )
                     if latest_m_date is not None:
-                        start_date = latest_m_date
+                        #Add a minute so we don't get the same record twice.'
+                        start_date = latest_m_date + timedelta(minutes=1)
                     try:
                         #These are the sensors we want to retrieve from PUrple Air API.
                         fields = [obs['source_obs'] for obs in platform.observations]
