@@ -257,7 +257,6 @@ def purple_air_processing():
                         logger.error(f"Unable to retrieve data for platform: {platform_handle} ({external_indentifier})")
                         logger.exception(e)
                         raise e
-                    break
             org_info = purple_api.get_organization()
             logger.info(f"Purple Air API Remaining Points: {org_info['remaining_points']} Consumption Rate: {org_info['consumption_rate']} API Version: {org_info['api_version']}")
             if org_info['remaining_points'] < 500000:
