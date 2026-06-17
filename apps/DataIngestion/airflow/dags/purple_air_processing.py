@@ -198,7 +198,7 @@ def purple_air_processing():
             last_retrieved_record_date = Variable.get("last_retrieved_record_date", "1900-01-01 00:00:00")
             purple_air_base_url = Variable.get("PURPLE_AIR_API_BASE_URL", None)
             purple_air_api_key = Variable.get('PURPLE_AIR_API_KEY', None)
-            purple_api = PurpleAirClient(api_key=purple_air_api_key, base_url=purple_air_base_url)
+            purple_api = PurpleAirClient(api_key=purple_air_api_key, base_url=purple_air_base_url, timeout=30.0)
 
             saved_data_files = []
             platform_count = 0
@@ -256,7 +256,7 @@ def purple_air_processing():
                     except Exception as e:
                         logger.error(f"Unable to retrieve data for platform: {platform_handle} ({external_indentifier})")
                         logger.exception(e)
-                        raise e
+                        #raise e
             org_info = purple_api.get_organization()
             logger.info(f"Purple Air API Remaining Points: {org_info['remaining_points']} Consumption Rate: {org_info['consumption_rate']} API Version: {org_info['api_version']}")
             if org_info['remaining_points'] < 500000:
