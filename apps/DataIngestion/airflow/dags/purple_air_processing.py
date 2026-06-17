@@ -709,11 +709,11 @@ def purple_air_processing():
     normalized_header_data_files = normalize_headers_task(configuration_file_path, csv_files_to_process)
 
     #qaqcd_data = qaqc_task(CONFIG, normalized_header_data_files)
-    save_to_database_task(configuration_file_path, normalized_header_data_files)
+    save_to_database = save_to_database_task(configuration_file_path, normalized_header_data_files)
 
-    archive_task(configuration_file_path, csv_files_to_process, normalized_header_data_files)
+    archive = archive_task(configuration_file_path, csv_files_to_process, normalized_header_data_files)
 
-    save_to_database_task >> archive_task
+    save_to_database >> archive
 
 purple_air_processing()
 
