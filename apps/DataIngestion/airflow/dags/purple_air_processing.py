@@ -29,8 +29,8 @@ from packages.pycharm_debugging import maybe_attach_debugger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
-remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG")
-#remote_debug = "False"
+#remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
+remote_debug = "False"
 if remote_debug == "True":
     import pydevd_pycharm
 
