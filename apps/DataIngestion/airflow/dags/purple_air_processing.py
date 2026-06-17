@@ -713,5 +713,7 @@ def purple_air_processing():
 
     archive_task(configuration_file_path, csv_files_to_process, normalized_header_data_files)
 
+    save_to_database_task >> archive_task
+
 purple_air_processing()
 
