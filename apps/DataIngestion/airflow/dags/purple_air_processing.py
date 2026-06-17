@@ -202,6 +202,10 @@ def purple_air_processing():
 
             saved_data_files = []
             platform_count = 0
+
+            end_date = datetime.now()
+            start_date = end_date - timedelta(hours=1)
+
             for organization in org_list:
                 platform_handles = organization.list_platform_handles()
                 platform_count += len(platform_handles)
@@ -221,8 +225,6 @@ def purple_air_processing():
                         .values_list("m_date", flat=True)
                         .first()
                     )
-                    end_date = datetime.now()
-                    start_date = end_date - timedelta(hours=1)
                     if latest_m_date is not None:
                         start_date = latest_m_date
                     try:
