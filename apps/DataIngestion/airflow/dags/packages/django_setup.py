@@ -30,3 +30,7 @@ def setup_django():
         django.setup()
 
     _DJANGO_READY = True
+
+def close_django_connections():
+    from django.db import connections
+    connections.close_all()

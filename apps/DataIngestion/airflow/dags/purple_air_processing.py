@@ -16,7 +16,7 @@ from django.db import IntegrityError, transaction
 from datautilities.purple_air_api.PurpleAPIWrapper import (
     PurpleAirClient,
 )
-from packages.django_setup import setup_django
+from packages.django_setup import setup_django, close_django_connections
 from datautilities.ccrab_api.client import CCRABRestClient, CCRABAuthenticationError
 from observationsdatabase.xenia_obs_map import Organization, Platform
 from packages.archiving import archive_file, zip_files
@@ -177,6 +177,7 @@ def purple_air_processing():
         **Inputs:** config
         **Outputs:** list[]
         """
+        saved_data_files = []
         try:
             start_time = time.perf_counter()
             logger.info(f"Starting fetch_data_task with config file: {config_file_name}")
@@ -200,7 +201,6 @@ def purple_air_processing():
             purple_air_api_key = Variable.get('PURPLE_AIR_API_KEY', None)
             purple_api = PurpleAirClient(api_key=purple_air_api_key, base_url=purple_air_base_url, timeout=30.0)
 
-            saved_data_files = []
             platform_count = 0
 
             end_date = datetime.now()
@@ -264,10 +264,15 @@ def purple_air_processing():
             if org_info['remaining_points'] < 500000:
                 logger.warning(f"Purple Air API remaining points is low: {org_info['remaining_points']}")
             logger.info(f"Completed fetch_data_task in {time.perf_counter()-start_time} seconds for {platform_count} platforms")
-            return saved_data_files
 
         except Exception as e:
+            close_django_connections()
             raise e
+        finally:
+            close_django_connections()
+
+        return saved_data_files
+
 
     @task()
     def normalize_headers_task(config_file_name: Path, uncorrected_data_files: []) -> list[Any]:
@@ -451,12 +456,16 @@ def purple_air_processing():
                                             logger.exception(e)
                                             insert_exception_count += 1
                                 except Exception as e:
+                                    close_django_connections()
                                     raise e
                     logger.info(f"Processed {row_ndx} rows from file: {file} into the database in: "
                                 f"{time.perf_counter()-file_start_time} seconds")
 
         except Exception as e:
+            close_django_connections()
             raise e
+        finally:
+            close_django_connections()
     # Merge / join task
     @task(task_id="merge_file_lists", trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
     def merge_file_lists(local_files: Optional[List[str]] = None, rest_files: Optional[List[str]] = None) -> List[str]:
