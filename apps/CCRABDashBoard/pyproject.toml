@@ -14,7 +14,11 @@ dependencies = [
     "requests>=2.32.5,<3",
     "psycopg2-binary>=2.9.10,<2.10.0",
     "djangorestframework-simplejwt>=5.5.1",
+    "json-timeseries>=0.1.7",
+    "datautilities",
 ]
+[tool.uv.sources]
+datautilities = { path = "../../packages/DataUtilities", editable = true }
 
 [dependency-groups]
 dev = [

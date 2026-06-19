@@ -1,16 +1,19 @@
 from django.db.models import F, Prefetch, Q
 from django.http import Http404, JsonResponse, request
 from django.shortcuts import render
+from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from CCRABDashboard.api_permissions import HasPrivateApiAccess
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-import json
+from json_timeseries import TsRecord, TimeSeries, JtsDocument
 import logging
+from geojson import Feature, Point, dumps as geojson_dumps
 from .models import Platform, Sensor, SourceObservationMap, PlatformSource
-from .serializers import PlatformSerializer, PlatformSourceConfigurationSerializer
+from .serializers import PlatformSerializer, PlatformSourceConfigurationSerializer, ObservationsRequestSerializer
+from .models import Multi_obs
 
 logger = logging.getLogger(__name__)
 
@@ -256,3 +259,90 @@ def platform_source_configuration(request):
         config["organizations"][ndx]["platforms"].append(platform_payload)
 
     return Response(config)
+
+@api_view(["GET"])
+#@permission_classes([IsAuthenticated])
+def platform_data_request(request):
+    serializer = ObservationsRequestSerializer(data=request.query_params)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    validated_data = serializer.validated_data
+
+    platform_handle = validated_data["platform_handle"]
+    start_date = validated_data["start_date"]
+    end_date = validated_data["end_date"]
+    observations = validated_data["observations"]
+
+    queryset = (
+        Multi_obs.objects
+        .select_related(
+            "sensor_id",
+            "sensor_id__m_type_id",
+            "sensor_id__m_type_id__m_scalar_type_id",
+            "sensor_id__m_type_id__m_scalar_type_id__obs_type_id",
+            "sensor_id__m_type_id__m_scalar_type_id__uom_type_id",
+        )
+        .filter(
+            platform_handle=platform_handle,
+            m_date__gte=start_date,
+            m_date__lte=end_date,
+            sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observations,
+        )
+        .annotate(
+            observation_name=F(
+                "sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name"
+            ),
+            uom_display=F(
+                "sensor_id__m_type_id__m_scalar_type_id__uom_type_id__display"
+            ),
+            uom_standard_name=F(
+                "sensor_id__m_type_id__m_scalar_type_id__uom_type_id__standard_name"
+            ),
+        )
+        .order_by("m_date", "observation_name")
+    )
+    jts_document = JtsDocument()
+    current_obs_type = None
+    for ndx, row in enumerate(queryset):
+        if current_obs_type != row.observation_name:
+            data_ts = TimeSeries(identifier=platform_handle,
+                                 name=row.observation_name,
+                                 units=row.uom_display or row.uom_standard_name,
+                                 data_type='NUMBER')
+            jts_document.series.append(data_ts)
+        data_ts.records.append(TsRecord(**{'timestamp': row.m_date,
+                                           'value': row.m_value}))
+        feature_rec = Feature(geometry=Point((row.m_lon, row.m_lat)),
+                              properties={
+                                "platform_handle": row.platform_handle,
+                                "start_date": start_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                                "end_date": end_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                                "timeseries": jts_document.toJSON()
+
+                              })
+        response = geojson_dumps(feature_rec)
+        return Response(response)
+    '''
+    rows = [
+        {
+            "timestamp": row.m_date,
+            "platform_handle": row.platform_handle,
+            "observation": row.observation_name,
+            "units": row.uom_display or row.uom_standard_name,
+            "value": row.m_value,
+        }
+        for row in queryset
+    ]
+
+    return Response(
+        {
+            "platform_handle": platform_handle,
+            "start_date": start_date,
+            "end_date": end_date,
+            "observations": observations,
+            "data": rows,
+        }
+    )
+    '''

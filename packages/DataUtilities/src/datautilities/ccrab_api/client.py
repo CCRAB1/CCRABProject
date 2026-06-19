@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
-
+from datetime import datetime
 import requests
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8000"
@@ -231,6 +231,15 @@ class CCRABRestClient:
 
     def get_platform_configuration(self, **params: Any) -> Any:
         return self.platform_configuration(**params)
+
+    def get_platform_data(self, start_date: datetime, end_date: datetime, platform_handle: str, observations: [], **params: Any) -> Any:
+        query_params = self._params(params,
+                                    start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                                    end_date = end_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                                    platform_handle=platform_handle,
+                                    observations=",".join(observations),
+                                    )
+        return self.get("v1/platform_data_request/", params=query_params)
 
     def get(self, path: str, **kwargs: Any) -> Any:
         return self.request("GET", path, **kwargs)

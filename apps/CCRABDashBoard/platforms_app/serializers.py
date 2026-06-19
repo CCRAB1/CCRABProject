@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from .models import (Platform, Sample, Sensor, M_type, M_scalar_type, Obs_type, Uom_type, Platform_type, Platform_images,
-    SourceObservationMap, PlatformSource)
+from .models import (Platform, Sample, Sensor, M_type, M_scalar_type, Obs_type, Uom_type, Platform_type,
+                     Platform_images,
+                     SourceObservationMap, PlatformSource, Multi_obs)
 
 
 
@@ -156,3 +157,69 @@ class PlatformSourceConfigurationSerializer(serializers.ModelSerializer):
             "neighborhood",
             "observations"
         )
+
+
+
+class ObservationsRequestSerializer(serializers.Serializer):
+    platform_handle = serializers.CharField(required=True, allow_blank=False)
+    start_date = serializers.DateTimeField(required=True, format=None)
+    end_date = serializers.DateTimeField(required=True, format=None)
+    observations = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_platform_handle(self, value):
+        if not Platform.objects.filter(platform_handle=value).exists():
+            raise serializers.ValidationError("Unknown platform_handle.")
+
+        return value
+
+    def validate_observations(self, value):
+        observations = [
+            item.strip()
+            for item in value.split(",")
+            if item.strip()
+        ]
+
+        observations = list(dict.fromkeys(observations))
+
+        if not observations:
+            raise serializers.ValidationError("At least one observation is required.")
+
+
+        return observations
+
+    def validate(self, attrs):
+        platform_handle = attrs["platform_handle"]
+        observations = attrs["observations"]
+
+        if attrs["start_date"] > attrs["end_date"]:
+            raise serializers.ValidationError(
+                {"end_date": "end_date must be after start_date."}
+            )
+
+        available_observations = set(
+            Sensor.objects.filter(
+                platform_id__platform_handle=platform_handle,
+                m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observations,
+            ).values_list(
+                "m_type_id__m_scalar_type_id__obs_type_id__standard_name",
+                flat=True,
+            )
+        )
+
+        missing_observations = [
+            observation
+            for observation in observations
+            if observation not in available_observations
+        ]
+
+        if missing_observations:
+            raise serializers.ValidationError(
+                {
+                    "observations": (
+                        "Observations not available for this platform: "
+                        f"{', '.join(missing_observations)}"
+                    )
+                }
+            )
+
+        return attrs

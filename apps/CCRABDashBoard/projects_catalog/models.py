@@ -73,7 +73,7 @@ class ProjectCatalogPage(TimestampedModel):
         constraints = [
             models.CheckConstraint(
                 name="project_dates_ok",
-                check=Q(end_date__isnull=True) | Q(start_date__isnull=True) | Q(end_date__gte=models.F("start_date")),
+                condition=Q(end_date__isnull=True) | Q(start_date__isnull=True) | Q(end_date__gte=models.F("start_date")),
             )
         ]
 
