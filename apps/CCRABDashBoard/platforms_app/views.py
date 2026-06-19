@@ -305,25 +305,32 @@ def platform_data_request(request):
     )
     jts_document = JtsDocument()
     current_obs_type = None
+    first_row = None
     for ndx, row in enumerate(queryset):
+        if ndx == 0:
+            first_row = row
         if current_obs_type != row.observation_name:
-            data_ts = TimeSeries(identifier=platform_handle,
-                                 name=row.observation_name,
-                                 units=row.uom_display or row.uom_standard_name,
-                                 data_type='NUMBER')
-            jts_document.series.append(data_ts)
+            ident = f"{row.observation_name} {row.sensor_id.s_order}"
+            data_ts = next((ts for ts in jts_document.series if ts.identifier == ident), None)
+            if data_ts is None:
+                data_ts = TimeSeries(identifier=f"{row.observation_name} {row.sensor_id.s_order}",
+                                     name=row.observation_name,
+                                     units=row.uom_display or row.uom_standard_name,
+                                     data_type='NUMBER')
+                jts_document.series.append(data_ts)
+            current_obs_type = row.observation_name
         data_ts.records.append(TsRecord(**{'timestamp': row.m_date,
                                            'value': row.m_value}))
-        feature_rec = Feature(geometry=Point((row.m_lon, row.m_lat)),
-                              properties={
-                                "platform_handle": row.platform_handle,
-                                "start_date": start_date.strftime("%Y-%m-%dT%H:%M:%S"),
-                                "end_date": end_date.strftime("%Y-%m-%dT%H:%M:%S"),
-                                "timeseries": jts_document.toJSON()
+    feature_rec = Feature(geometry=Point((first_row.m_lon, first_row.m_lat)),
+                          properties={
+                            "platform_handle": first_row.platform_handle,
+                            "start_date": start_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "end_date": end_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "timeseries": jts_document.toJSON()
 
-                              })
-        response = geojson_dumps(feature_rec)
-        return Response(response)
+                          })
+    response = geojson_dumps(feature_rec)
+    return Response(response)
     '''
     rows = [
         {
