@@ -22,11 +22,14 @@ RUN apt-get update \
 
 COPY infra/docker/scripts/requirements_from_pyproject.py /tmp/requirements_from_pyproject.py
 COPY apps/CCRABDashBoard/pyproject.toml /tmp/ccrabdashboard-pyproject.toml
+COPY packages/DataUtilities /opt/ccrab/DataUtilities
 RUN pip install --upgrade pip \
     && python /tmp/requirements_from_pyproject.py \
+        --exclude datautilities \
         /tmp/ccrabdashboard-pyproject.toml \
         > /tmp/ccrabdashboard-requirements.txt \
-    && pip install -r /tmp/ccrabdashboard-requirements.txt
+    && pip install -r /tmp/ccrabdashboard-requirements.txt \
+    && pip install --no-deps /opt/ccrab/DataUtilities
 
 RUN groupadd --gid "${APP_GID}" django \
     && useradd --uid "${APP_UID}" --gid django --home-dir /app --shell /usr/sbin/nologin --no-create-home --no-log-init django

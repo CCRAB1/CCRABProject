@@ -16,6 +16,7 @@ dependencies = [
     "djangorestframework-simplejwt>=5.5.1",
     "json-timeseries>=0.1.7",
     "datautilities",
+    "geojson>=3.2.0,<4",
 ]
 [tool.uv.sources]
 datautilities = { path = "../../packages/DataUtilities", editable = true }
