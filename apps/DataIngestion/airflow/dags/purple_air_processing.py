@@ -435,10 +435,10 @@ def purple_air_processing():
                                         logger.exception(e)
                                     else:
                                         if PURPLEAIR_TASK_LOG_INSERTS:
-                                            if row_ndx % 1000 == 0:
-                                                logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
-                                                            f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
-                                                            f"{obs_info.target_uom}({obs_info.m_type_id}) SOrder: {obs_info.s_order}")
+                                            #if row_ndx % 1000 == 0:
+                                            logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
+                                                        f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
+                                                        f"{obs_info.target_uom}({obs_info.m_type_id}) SOrder: {obs_info.s_order}")
                                         try:
                                             with transaction.atomic():
                                                 obs_rec = Multi_obs.objects.create(row_entry_date=row_entry_date,
