@@ -329,8 +329,8 @@ def platform_data_request(request):
                             "timeseries": jts_document.toJSON()
 
                           })
-    response = geojson_dumps(feature_rec)
-    return Response(response)
+    #response = geojson_dumps(feature_rec)
+    return Response(feature_rec)
     '''
     rows = [
         {
