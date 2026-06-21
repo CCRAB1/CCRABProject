@@ -309,8 +309,8 @@ def platform_data_request(request):
     for ndx, row in enumerate(queryset):
         if ndx == 0:
             first_row = row
-        if current_obs_type != row.observation_name:
-            ident = f"{row.observation_name} {row.sensor_id.s_order}"
+        ident = f"{row.observation_name} {row.sensor_id.s_order}"
+        if current_obs_type != ident:
             data_ts = next((ts for ts in jts_document.series if ts.identifier == ident), None)
             if data_ts is None:
                 data_ts = TimeSeries(identifier=f"{row.observation_name} {row.sensor_id.s_order}",
@@ -318,7 +318,7 @@ def platform_data_request(request):
                                      units=row.uom_display or row.uom_standard_name,
                                      data_type='NUMBER')
                 jts_document.series.append(data_ts)
-            current_obs_type = row.observation_name
+            current_obs_type = ident
         data_ts.records.append(TsRecord(**{'timestamp': row.m_date,
                                            'value': row.m_value}))
     feature_rec = Feature(geometry=Point((first_row.m_lon, first_row.m_lat)),
