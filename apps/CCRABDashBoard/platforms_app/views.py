@@ -329,27 +329,4 @@ def platform_data_request(request):
                             "timeseries": jts_document.toJSON()
 
                           })
-    #response = geojson_dumps(feature_rec)
     return Response(feature_rec)
-    '''
-    rows = [
-        {
-            "timestamp": row.m_date,
-            "platform_handle": row.platform_handle,
-            "observation": row.observation_name,
-            "units": row.uom_display or row.uom_standard_name,
-            "value": row.m_value,
-        }
-        for row in queryset
-    ]
-
-    return Response(
-        {
-            "platform_handle": platform_handle,
-            "start_date": start_date,
-            "end_date": end_date,
-            "observations": observations,
-            "data": rows,
-        }
-    )
-    '''
