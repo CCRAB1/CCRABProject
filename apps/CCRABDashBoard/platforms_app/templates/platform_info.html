@@ -4,108 +4,286 @@
 {% load ui_components %}
 
 {% block title %}
-    {{ platform_info.properties.short_name }}
+    {{ platform_info.properties.short_name }} | Platform
 {% endblock %}
 
-{% block platform_name %}
-    <div class="columns m-0 p-0">
-        <div class="column is-12 m-0 p-0">
-            <h1 class="is-size-1 page-montserrat">Platform: {{ platform_info.properties.long_name }}</h1>
+{% block platform_header %}
+    {{ platform_info|json_script:"platform-info-data" }}
+    <nav class="breadcrumb is-small platform-breadcrumb" aria-label="breadcrumbs">
+        <ul>
+            <li><a href="{% url 'platform_catalog' %}">Platforms</a></li>
+            <li class="is-active">
+                <a href="#" aria-current="page">{{ platform_info.properties.short_name }}</a>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="platform-header-grid">
+        <div class="platform-heading">
+            <p class="platform-eyebrow">Platform</p>
+            <h1 class="platform-title page-montserrat">{{ platform_info.properties.long_name }}</h1>
+            <p class="platform-subtitle">
+                {{ platform_info.properties.short_name }}
+                {% if platform_info.properties.neighborhood %}
+                    <span aria-hidden="true">/</span> {{ platform_info.properties.neighborhood }}
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="platform-status-tags" aria-label="Platform summary">
+            {% if platform_info.properties.active %}
+                <span class="tag is-success is-light">Active</span>
+            {% else %}
+                <span class="tag is-light">Inactive</span>
+            {% endif %}
+            {% if platform_info.properties.type_id.type_name %}
+                <span class="tag is-info is-light">{{ platform_info.properties.type_id.type_name }}</span>
+            {% endif %}
         </div>
     </div>
 {% endblock %}
 
-{% block platform_picture %}
-    {% image_carousel platform_info.properties.images autoplay=True interval=4000 aspect_ratio="16by9" items_mobile=1 items_tablet=1 items_desktop=1 %}
+{% block platform_media %}
+    {% image_carousel platform_info.properties.images autoplay=True interval=4000 aspect_ratio="16by9" items_mobile=1 items_tablet=1 items_desktop=1 aria_label="Platform images" %}
+
+    <section class="platform-panel platform-map-panel" aria-labelledby="platform-map-title">
+        <div class="platform-panel-heading">
+            <h2 id="platform-map-title" class="platform-section-title">Location</h2>
+        </div>
+        <div
+            id="map"
+            class="platform_map"
+            aria-label="Platform location map"
+            data-lat="{{ platform_info.properties.fixed_latitude|default:'0' }}"
+            data-lon="{{ platform_info.properties.fixed_longitude|default:'0' }}"
+            data-has-coordinates="{% if platform_info.properties.fixed_latitude and platform_info.properties.fixed_longitude %}true{% else %}false{% endif %}"
+            x-init="$nextTick(function () { if (window.initPlatformMap) window.initPlatformMap($el); })"
+        ></div>
+    </section>
 {% endblock %}
 
-{% block platform_map %}
-    <div id="map" class="platform_map" aria-label="Platform location map"></div>
+{% block platform_details %}
+    <div class="platform-detail-surface">
+        <div class="platform-tabs buttons has-addons" role="tablist" aria-label="Platform detail sections">
+            <button
+                type="button"
+                class="button platform-tab-button"
+                :class="activePanel === 'observations' ? 'is-primary' : 'is-light'"
+                @click="setPanel('observations')"
+                role="tab"
+                :aria-selected="activePanel === 'observations' ? 'true' : 'false'"
+            >
+                Observations
+            </button>
+            <button
+                type="button"
+                class="button platform-tab-button"
+                :class="activePanel === 'overview' ? 'is-primary' : 'is-light'"
+                @click="setPanel('overview')"
+                role="tab"
+                :aria-selected="activePanel === 'overview' ? 'true' : 'false'"
+            >
+                Overview
+            </button>
+            <button
+                type="button"
+                class="button platform-tab-button"
+                :class="activePanel === 'location' ? 'is-primary' : 'is-light'"
+                @click="setPanel('location')"
+                role="tab"
+                :aria-selected="activePanel === 'location' ? 'true' : 'false'"
+            >
+                Location
+            </button>
+        </div>
 
+        <section
+            x-show="activePanel === 'overview'"
+            x-transition.opacity
+            role="tabpanel"
+            aria-label="Platform overview"
+        >
+            <div class="content platform-description">
+                <h2 class="platform-section-title">Description</h2>
+                {% if platform_info.properties.description %}
+                    <p>{{ platform_info.properties.description }}</p>
+                {% else %}
+                    <p class="has-text-grey">No description is available for this platform.</p>
+                {% endif %}
+            </div>
+
+            <div class="platform-fact-grid" aria-label="Platform facts">
+                <div class="platform-fact">
+                    <span>Type</span>
+                    <strong>{{ platform_info.properties.type_id.type_name|default:"Not available" }}</strong>
+                </div>
+                <div class="platform-fact">
+                    <span>Active Dates</span>
+                    <strong>
+                        {% if platform_info.properties.begin_date is not None %}
+                            {{ platform_info.properties.begin_date|format_datetime:"%Y-%m-%d" }} to
+                            {% if platform_info.properties.end_date is not None %}
+                                {{ platform_info.properties.end_date|format_datetime:"%Y-%m-%d" }}
+                            {% else %}
+                                Currently active
+                            {% endif %}
+                        {% else %}
+                            Not available
+                        {% endif %}
+                    </strong>
+                </div>
+                <div class="platform-fact">
+                    <span>Neighborhood</span>
+                    <strong>{{ platform_info.properties.neighborhood|default:"Not available" }}</strong>
+                </div>
+                <div class="platform-fact">
+                    <span>Manufacturer</span>
+                    <strong>{{ platform_info.properties.manufacturer|default:"Not available" }}</strong>
+                </div>
+                <div class="platform-fact">
+                    <span>Serial Number</span>
+                    <strong>{{ platform_info.properties.serial_number|default:"Not available" }}</strong>
+                </div>
+                <div class="platform-fact">
+                    <span>Firmware</span>
+                    <strong>{{ platform_info.properties.firmware_version|default:"Not available" }}</strong>
+                </div>
+            </div>
+        </section>
+
+        <section
+            x-show="activePanel === 'observations'"
+            x-transition.opacity
+            x-cloak
+            role="tabpanel"
+            aria-label="Platform observations"
+        >
+            <div class="platform-section-header">
+                <h2 class="platform-section-title">Observations Collected</h2>
+                <span class="tag is-light">{{ platform_info.properties.sensors|length }}</span>
+            </div>
+
+            <div class="platform-observation-list">
+                {% for sensor_rec in platform_info.properties.sensors %}
+                    <div
+                        class="platform-observation-item"
+                        x-show="showAllObservations || {{ forloop.counter0 }} < 8"
+                    >
+                        <div>
+                            <strong>{{ sensor_rec.obs_standard_name }}</strong>
+                            <span class="has-text-grey">
+                                {% if sensor_rec.s_order == 1 %}A{% else %}B{% endif %}
+                            </span>
+                        </div>
+                        {% if sensor_rec.uom_display %}
+                            <span class="tag is-info is-light">{{ sensor_rec.uom_display }}</span>
+                        {% elif sensor_rec.uom_standard_name %}
+                            <span class="tag is-info is-light">{{ sensor_rec.uom_standard_name }}</span>
+                        {% endif %}
+                    </div>
+                {% empty %}
+                    <p class="has-text-grey">No observations are listed for this platform.</p>
+                {% endfor %}
+            </div>
+
+            {% if platform_info.properties.sensors|length > 8 %}
+                <button
+                    type="button"
+                    class="button is-small is-light mt-4"
+                    @click="showAllObservations = !showAllObservations"
+                    x-text="showAllObservations ? 'Show fewer' : 'Show all observations'"
+                >
+                    Show all observations
+                </button>
+            {% endif %}
+        </section>
+
+        <section
+            x-show="activePanel === 'location'"
+            x-transition.opacity
+            x-cloak
+            role="tabpanel"
+            aria-label="Platform location"
+        >
+            <div class="platform-section-header">
+                <h2 class="platform-section-title">Location Details</h2>
+            </div>
+
+            <div class="platform-fact-grid">
+                <div class="platform-fact">
+                    <span>Latitude</span>
+                    <strong>{{ platform_info.properties.fixed_latitude|default:"Not available" }}</strong>
+                </div>
+                <div class="platform-fact">
+                    <span>Longitude</span>
+                    <strong>{{ platform_info.properties.fixed_longitude|default:"Not available" }}</strong>
+                </div>
+                <div class="platform-fact">
+                    <span>City</span>
+                    <strong>{{ platform_info.properties.city|default:"Not available" }}</strong>
+                </div>
+                <div class="platform-fact">
+                    <span>Country</span>
+                    <strong>{{ platform_info.properties.country_name|default:"Not available" }}</strong>
+                </div>
+            </div>
+        </section>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
     <script src="{% static 'platforms_app/js/leaflet/dist/leaflet.js' %}"></script>
     <script>
     (function () {
-        if (typeof L === 'undefined') return;
-        try {
-            var lat = {{ platform_info.properties.fixed_latitude|default:"0" }};
-            var lon = {{ platform_info.properties.fixed_longitude|default:"0" }};
-            var map = L.map('map', { scrollWheelZoom: false }).setView([lat, lon], 13);
+        var platformMap = null;
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                zoom: 4,
-                maxZoom: 19,
-                attribution: '&copy; OpenStreetMap contributors',
-                referrerPolicy: 'strict-origin-when-cross-origin'
-            }).addTo(map);
+        window.initPlatformMap = function (element) {
+            if (!element || typeof L === "undefined") return;
 
-            {% if platform_info.properties.fixed_latitude and platform_info.properties.fixed_longitude %}
-            L.marker([{{ platform_info.properties.fixed_latitude }}, {{ platform_info.properties.fixed_longitude }}]).addTo(map);
-            {% endif %}
+            if (platformMap) {
+                platformMap.invalidateSize();
+                return;
+            }
 
-            // Allow Leaflet to properly size itself inside responsive containers.
-            // Invalidate after a short delay and on window resize.
-            setTimeout(function () { if (map && map.invalidateSize) map.invalidateSize(); }, 250);
-            window.addEventListener('resize', function () { if (map && map.invalidateSize) map.invalidateSize(); });
-        } catch (e) {
-            console.warn('Leaflet map init error', e);
-        }
+            try {
+                var lat = Number.parseFloat(element.dataset.lat || "0");
+                var lon = Number.parseFloat(element.dataset.lon || "0");
+                var hasCoordinates = element.dataset.hasCoordinates === "true";
+                var center = hasCoordinates ? [lat, lon] : [0, 0];
+
+                platformMap = L.map(element, { scrollWheelZoom: false }).setView(
+                    center,
+                    hasCoordinates ? 13 : 2
+                );
+
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    zoom: 4,
+                    maxZoom: 19,
+                    attribution: "&copy; OpenStreetMap contributors",
+                    referrerPolicy: "strict-origin-when-cross-origin"
+                }).addTo(platformMap);
+
+                if (hasCoordinates) {
+                    L.marker([lat, lon]).addTo(platformMap);
+                }
+
+                window.setTimeout(function () {
+                    if (platformMap && platformMap.invalidateSize) platformMap.invalidateSize();
+                }, 250);
+            } catch (error) {
+                console.warn("Leaflet map init error", error);
+            }
+        };
+
+        window.addEventListener("resize", function () {
+            if (platformMap && platformMap.invalidateSize) platformMap.invalidateSize();
+        });
+
+        window.addEventListener("platform-panel-changed", function () {
+            window.setTimeout(function () {
+                if (platformMap && platformMap.invalidateSize) platformMap.invalidateSize();
+            }, 125);
+        });
     })();
     </script>
-{% endblock %}
-
-{% block platform_information %}
-    <div class="columns is-multiline is-mobile">
-
-        <div class="column is-12">
-            <div class="is-size-2 mb-2">
-                Description:
-                {% if platform_info.properties.description %}
-                    {{ platform_info.properties.description }}
-                {% else %}
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="column is-12 mb-1 pt-1 pb-1">
-            <div class="is-size-5">
-                <b>Type:</b> {{ platform_info.properties.type_id.type_name }}
-            </div>
-        </div>
-
-        <div class="column is-12-mobile is-6-tablet is-size-5 mb-1 pt-1 pb-1">
-            {% if platform_info.properties.begin_date is not None %}
-                {{ my_datetime|format_datetime }}
-                <b>Active Dates:</b> {{ platform_info.properties.begin_date|format_datetime:"%Y-%m-%d" }} to
-                {% if platform_info.properties.end_date is not None %}
-                    {{ platform_info.properties.end_date|format_datetime:"%Y-%m-%d" }}
-                {% else %}
-                    Currently Active
-                {% endif %}
-
-            {% endif %}
-        </div>
-
-        <div class="column is-12 is-size-5 mb-1 pt-1 pb-1">
-            <b>Neighborhood:</b> {{ platform_info.properties.neighborhood }}
-        </div>
-
-        <div class="column is-12-mobile is-6-tablet is-size-5 mb-1 pt-1 pb-1">
-            <b>Latitude:</b> {{ platform_info.properties.fixed_latitude }}
-        </div>
-
-        <div class="column is-12-mobile is-6-tablet is-size-5 pt-0 mb-1">
-            <b>Longitude:</b> {{ platform_info.properties.fixed_longitude }}
-        </div>
-
-    </div>
-
-    <!----Area where we list out what sensors/obs the platform has.---->
-    <p>
-        <h5 class="is-size-5"><b>Observations collected</b></h5>
-        <div class="content">
-        {% for sensor_rec in platform_info.properties.sensors %}
-            {{ sensor_rec.obs_standard_name }} {% if sensor_rec.s_order == 1 %}A{% else %}B{% endif %}<br>
-        {% endfor %}
-        </div>
-    </p>
 {% endblock %}

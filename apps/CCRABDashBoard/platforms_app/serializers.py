@@ -71,9 +71,9 @@ class PlatformSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = Platform
         geo_field = "the_geom"
-        fields = ("begin_date", "end_date", "short_name", "long_name", "description", "active", "fixed_latitude",
+        fields = ("begin_date", "end_date", "short_name", "long_name", "platform_handle", "description", "active", "fixed_latitude",
                   "fixed_longitude", "type_id", "sensors", "neighborhood", "manufacturer", "serial_number",
-                  "firmware_version", "country_name", "city", "neighborhood", "images")
+                  "firmware_version", "country_name", "city", "neighborhood", "images", "description", "url")
     '''
     def get_the_geom(self, obj):
         if obj.fixed_longitude is None or obj.fixed_latitude is None:

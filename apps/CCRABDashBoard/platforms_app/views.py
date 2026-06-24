@@ -2,12 +2,11 @@ from django.db.models import F, Prefetch, Q
 from django.http import Http404, JsonResponse, request
 from django.shortcuts import render
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from CCRABDashboard.api_permissions import HasPrivateApiAccess
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from json_timeseries import TsRecord, TimeSeries, JtsDocument
 import logging
 from geojson import Feature, Point, dumps as geojson_dumps
@@ -261,7 +260,7 @@ def platform_source_configuration(request):
     return Response(config)
 
 @api_view(["GET"])
-#@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def platform_data_request(request):
     serializer = ObservationsRequestSerializer(data=request.query_params)
 

@@ -12,6 +12,195 @@
 /* Prevent horizontal overflow on narrow screens */
 html, body { overflow-x: hidden; }
 
+.platform-detail-page {
+  min-height: calc(100vh - 4rem);
+  background: #f6f8f7;
+  color: #22312c;
+}
+
+.platform-hero-section {
+  padding-top: 1.75rem;
+  padding-bottom: 1.5rem;
+  background: #eef5f0;
+  border-bottom: 1px solid #d7e2db;
+}
+
+.platform-content-section {
+  padding-top: 1.5rem;
+}
+
+.platform-breadcrumb {
+  margin-bottom: 0.75rem;
+}
+
+.platform-header-grid {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.platform-heading {
+  max-width: 56rem;
+}
+
+.platform-eyebrow {
+  margin-bottom: 0.25rem;
+  color: #476356;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.platform-title {
+  margin: 0;
+  color: #1f332b;
+  font-size: 2.35rem;
+  font-weight: 700;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+
+.platform-subtitle {
+  margin-top: 0.45rem;
+  color: #4b6159;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.platform-status-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.platform-media-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 769px) {
+  .platform-media-stack {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+.platform-panel,
+.platform-detail-surface {
+  background: #ffffff;
+  border: 1px solid #d7dfdc;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(22, 38, 31, 0.05);
+}
+
+.platform-panel {
+  padding: 1rem;
+}
+
+.platform-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.platform-detail-surface {
+  padding: 1.25rem;
+}
+
+.platform-tabs {
+  margin-bottom: 1.25rem;
+}
+
+.platform-tab-button.button {
+  min-width: 7rem;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.platform-description {
+  margin-bottom: 1.25rem;
+}
+
+.platform-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.platform-section-title {
+  margin: 0;
+  color: #22312c;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.platform-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.platform-fact {
+  min-width: 0;
+  padding: 0.85rem;
+  background: #f7faf8;
+  border: 1px solid #e1e8e4;
+  border-radius: 6px;
+}
+
+.platform-fact span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #5b6f66;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.platform-fact strong {
+  display: block;
+  color: #1f332b;
+  font-size: 0.98rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.platform-observation-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.platform-observation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 3rem;
+  padding: 0.75rem 0.85rem;
+  background: #ffffff;
+  border: 1px solid #e1e8e4;
+  border-radius: 6px;
+}
+
+.platform-empty-media {
+  display: grid;
+  min-height: 10rem;
+  place-items: center;
+  background: #f7faf8;
+  border: 1px dashed #c9d7d0;
+  border-radius: 6px;
+}
+
 /* Make images fluid */
 .platform_pic {
   display: block;
@@ -48,6 +237,50 @@ html, body { overflow-x: hidden; }
 }
 @media (min-width: 1024px) {
   #map, .platform_map { height: 480px; min-height: 420px; }
+}
+
+.platform-media-stack #map,
+.platform-media-stack .platform_map {
+  height: 300px;
+  min-height: 240px;
+  border-radius: 6px;
+}
+
+@media (min-width: 1024px) {
+  .platform-media-stack #map,
+  .platform-media-stack .platform_map {
+    height: 340px;
+    min-height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .platform-title {
+    font-size: 1.85rem;
+  }
+
+  .platform-detail-surface {
+    padding: 1rem;
+  }
+
+  .platform-tabs {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .platform-tabs.buttons.has-addons .button {
+    border-radius: 6px;
+    width: 100%;
+  }
+
+  .platform-fact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-observation-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 /* Keep full-page/equal height helpers flexible */

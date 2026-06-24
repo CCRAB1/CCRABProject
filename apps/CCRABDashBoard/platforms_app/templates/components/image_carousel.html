@@ -2,12 +2,18 @@
 
 <div
   id="{{ carousel_id }}"
-  class="bc-carousel box"
-  data-bulma-carousel
-  data-autoplay="{% if autoplay %}true{% else %}false{% endif %}"
-  data-interval="{{ interval }}"
-  data-loop="{% if loop %}true{% else %}false{% endif %}"
-  data-pause-on-hover="{% if pause_on_hover %}true{% else %}false{% endif %}"
+  class="bc-carousel platform-panel"
+  x-data="platformCarousel({
+    slideCount: {{ images|length }},
+    autoplay: {% if autoplay %}true{% else %}false{% endif %},
+    interval: {{ interval }},
+    loop: {% if loop %}true{% else %}false{% endif %},
+    pauseOnHover: {% if pause_on_hover %}true{% else %}false{% endif %}
+  })"
+  @mouseenter="pause()"
+  @mouseleave="resume()"
+  @focusin="pause()"
+  @focusout="resume()"
   aria-label="{{ aria_label }}"
   style="
     --bc-carousel-items-mobile: {{ items_mobile }};
@@ -17,12 +23,14 @@
   "
 >
 
+  {% if images %}
   {% if show_nav %}
     <div class="bc-carousel__nav" aria-hidden="false">
       <button
         type="button"
         class="button is-light is-small"
-        data-carousel-prev
+        @click="previous()"
+        :disabled="!loop && activeIndex === 0"
         aria-label="Previous"
       >
         <span aria-hidden="true">‹</span>
@@ -31,7 +39,8 @@
       <button
         type="button"
         class="button is-light is-small"
-        data-carousel-next
+        @click="next()"
+        :disabled="!loop && activeIndex >= slideCount - 1"
         aria-label="Next"
       >
         <span aria-hidden="true">›</span>
@@ -41,10 +50,18 @@
 
   <div
     class="bc-carousel__viewport"
-    data-carousel-viewport
+    x-ref="viewport"
     tabindex="0"
     role="group"
     aria-roledescription="carousel"
+    @keydown.arrow-left.prevent="previous()"
+    @keydown.arrow-right.prevent="next()"
+    @pointerdown="restartAutoplay()"
+    @touchstart="restartAutoplay()"
+    @wheel="restartAutoplay()"
+    @scroll="scheduleScrollUpdate()"
+    @resize.window="scheduleScrollUpdate(); restartAutoplay(250)"
+    @visibilitychange.document="document.hidden ? stopAutoplay() : startAutoplay()"
   >
     {% for img in images %}
       <div class="bc-carousel__slide" data-carousel-slide data-index="{{ forloop.counter0 }}">
@@ -73,12 +90,21 @@
       {% for _ in images %}
         <button
           type="button"
-          class="button is-light is-small bc-carousel__dot"
-          data-carousel-dot
-          data-carousel-dot-index="{{ forloop.counter0 }}"
+          class="button is-small bc-carousel__dot"
+          @click="goTo({{ forloop.counter0 }})"
+          :class="{
+            'is-primary': activeIndex === {{ forloop.counter0 }},
+            'is-light': activeIndex !== {{ forloop.counter0 }}
+          }"
+          :aria-current="activeIndex === {{ forloop.counter0 }} ? 'true' : 'false'"
           aria-label="Go to slide {{ forloop.counter }}"
         ></button>
       {% endfor %}
+    </div>
+  {% endif %}
+  {% else %}
+    <div class="platform-empty-media has-text-centered p-5">
+      <p class="has-text-grey">No platform images available.</p>
     </div>
   {% endif %}
 </div>
