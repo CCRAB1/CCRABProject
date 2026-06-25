@@ -82,6 +82,17 @@ test("parses JTS documents into StatsTimeSeries instances", function () {
   assert.ok(document instanceof JtsDocument);
   assert.ok(document.series[0] instanceof StatsTimeSeries);
   assert.ok(document.series[0] instanceof TimeSeries);
+  assert.ok(document.header.startTime instanceof Date);
+  assert.ok(document.header.endTime instanceof Date);
+  assert.equal(document.header.startTime.toISOString(), "2026-01-01T00:00:00.000Z");
+  assert.equal(document.header.endTime.toISOString(), "2026-01-01T01:00:00.000Z");
+  assert.equal(document.header.recordCount, 2);
+  assert.deepEqual(document.header.columns[0], {
+    id: "pm25",
+    name: "PM2.5",
+    units: "ug/m3",
+    dataType: "NUMBER",
+  });
   assert.equal(document.series[0].id, "pm25");
   assert.equal(document.series[0].units, "ug/m3");
   assert.deepEqual(document.series[0].values, [5, 10]);

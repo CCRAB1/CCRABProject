@@ -25,4 +25,5 @@ import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
 
 const statsDocument = StatsJtsDocument.from(jtsJson);
 const statsSeries = statsDocument.getSeries("pm25");
+const startTime = statsDocument.header.startTime;
 ```

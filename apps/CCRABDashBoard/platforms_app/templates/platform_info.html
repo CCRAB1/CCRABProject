@@ -160,30 +160,49 @@
         >
             <div class="platform-section-header">
                 <h2 class="platform-section-title">Observations Collected</h2>
+                <h2>
+                    From: <span x-text="formatStartDateTime"></span>
+                </h2>
+                <h2>
+                    To: <span x-text="formatEndDateTime"></span>
+                </h2>
                 <span class="tag is-light">{{ platform_info.properties.sensors|length }}</span>
             </div>
 
             <div class="platform-observation-list">
-                {% for sensor_rec in platform_info.properties.sensors %}
-                    <div
-                        class="platform-observation-item"
-                        x-show="showAllObservations || {{ forloop.counter0 }} < 8"
-                    >
-                        <div>
-                            <strong>{{ sensor_rec.obs_standard_name }}</strong>
-                            <span class="has-text-grey">
-                                {% if sensor_rec.s_order == 1 %}A{% else %}B{% endif %}
-                            </span>
-                        </div>
-                        {% if sensor_rec.uom_display %}
-                            <span class="tag is-info is-light">{{ sensor_rec.uom_display }}</span>
-                        {% elif sensor_rec.uom_standard_name %}
-                            <span class="tag is-info is-light">{{ sensor_rec.uom_standard_name }}</span>
-                        {% endif %}
-                    </div>
-                {% empty %}
-                    <p class="has-text-grey">No observations are listed for this platform.</p>
-                {% endfor %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Observation</th>
+                            <th>Current</th>
+                            <th><abbr title="Min">Minimum</abbr></th>
+                            <th><abbr title="Max">Maximum</abbr></th>
+                        </tr>
+                    </thead>
+                    <template x-for="obs_row in observationTableRows" :key="obs_row.key">
+                        <tr>
+                            <td>
+                              <strong x-text="obs_row.obsStandardName"></strong>
+                              <span class="has-text-grey" x-text="obs_row.channelLabel"></span>
+
+                              <span
+                                class="tag is-info is-light"
+                                x-show="obs_row.units"
+                                x-text="obs_row.units">
+                              </span>
+                            </td>
+                            <td x-text="formatObservationValue(obs_row.stats?.most_recent.value)"></td>
+                            <td x-text="formatObservationValue(obs_row.stats?.min.value)"></td>
+                            <td x-text="formatObservationValue(obs_row.stats?.max.value)"></td>
+                        </tr>
+
+                        <tr x-show="isLoadingObservationData">
+                          <td colspan="4" class="has-text-grey">
+                            Loading observation data...
+                          </td>
+                        </tr>
+                    </template>
+                </table>
             </div>
 
             {% if platform_info.properties.sensors|length > 8 %}

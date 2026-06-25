@@ -8,6 +8,9 @@ import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";;
 //const CCRAB_BASE_URL = window.CCRAB_BASE_URL || window.location.origin;
 let alpineComponentsRegistered = false;
 
+// Define the reusable sleep utility
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 function registerAlpineComponents() {
   if (alpineComponentsRegistered) {
     return;
@@ -19,16 +22,17 @@ function registerAlpineComponents() {
       activePanel: "observations",
       showAllObservations: false,
       isLoadingObservationData: false,
-      platformInfo: undefined,
-      observationWindow: undefined,
-      observationTimeSeriesDoc: undefined,
+      platformInfo: null,
+      observationWindow: null,
+      observationTimeSeriesDoc: null,
 
       init() {
         var endDate = DateTime.now();
         var startDate = endDate.minus({ hours: 1 });
 
         this.platformInfo = PlatformInfo.fromScriptElement("platform-info-data");
-        if (this.platformInfo !== undefined) {
+        if (this.platformInfo !== null) {
+
           this.getObservationData(
             startDate,
             endDate,
@@ -50,15 +54,11 @@ function registerAlpineComponents() {
             platformHandle,
             observations
           );
-          this.timeSeriesDoc = StatsJtsDocument.from(observationData['properties']['timeseries']);
+          this.observationTimeSeriesDoc = StatsJtsDocument.from(observationData['properties']['timeseries']);
         }
         finally {
           this.isLoadingObservationData = false;
-          this.doTimeSeriesCalcs();
         }
-      },
-      doTimeSeriesCalcs() {
-
       },
       setPanel(panel) {
         this.activePanel = panel;
@@ -68,6 +68,51 @@ function registerAlpineComponents() {
           );
         });
       },
+      get formatStartDateTime() {
+        var formattedDateTime = "";
+        if(this.observationTimeSeriesDoc != null) {
+          var header = this.observationTimeSeriesDoc.header;
+
+          var dt = new DateTime(header.startTime);
+          formattedDateTime = dt.toFormat("yyyy-MM-dd HH:mm:ss");
+        }
+        return formattedDateTime
+      },
+      get formatEndDateTime() {
+        var formattedDateTime = "";
+        if(this.observationTimeSeriesDoc != null) {
+          var header = this.observationTimeSeriesDoc.header;
+          var dt = new DateTime(header.endTime);
+          formattedDateTime = dt.toFormat("yyyy-MM-dd HH:mm:ss");
+        }
+        return formattedDateTime
+      },
+
+      get observationTableRows() {
+        const sensors = this.platformInfo.sensors || [];
+        return sensors.map((sensor) => {
+          var timeseries_id = sensor.obsStandardName + " " + sensor.order;
+          var stats = null;
+          if(this.observationTimeSeriesDoc != null) {
+            var series = this.observationTimeSeriesDoc.getSeries(timeseries_id);
+            stats = series.getStats();
+          }
+          return {
+            key: `${sensor.obsStandardName}-${sensor.order}`,
+            obsStandardName: timeseries_id,
+            channelLabel: sensor.channelLabel,
+            units: sensor.uomDisplay || sensor.uomStandardName,
+            stats,
+          };
+        });
+      },
+      formatObservationValue(value) {
+        if (value === null || value === undefined) return "No data";
+        if (!Number.isFinite(Number(value))) return String(value);
+
+        return Number(value).toFixed(2);
+      },
+
     };
   });
 
