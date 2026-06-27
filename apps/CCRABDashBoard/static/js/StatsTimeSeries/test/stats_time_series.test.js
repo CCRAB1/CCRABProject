@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { JtsDocument, TimeSeries } from "../../timeseries-ts/esm/index.js";
+import { JtsDocument, TimeSeries } from "../../../vendor/timeseries-ts/1.0.7/index.js";
 import { StatsJtsDocument, StatsTimeSeries } from "../src/index.js";
 
 test("extends timeseries-ts TimeSeries", function () {

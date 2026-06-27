@@ -3,7 +3,7 @@
 JavaScript client for the CCRAB Dashboard REST API. This package mirrors the
 Python `datautilities.ccrab_api.client` API for use from the dashboard's static
 JavaScript directory. It uses the built-in `fetch` implementation available in
-Node 18 and newer, plus the vendored Luxon copy in `static/js/luxon` for
+Node 18 and newer, plus the vendored Luxon copy in `static/vendor/luxon` for
 date-time formatting.
 
 ## Location

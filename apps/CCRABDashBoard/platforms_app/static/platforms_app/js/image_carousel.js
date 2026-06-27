@@ -1,5 +1,6 @@
 import { CCRABRestClient } from "../../js/CCRABApiClient/src/index.js";
-import { DateTime } from "../../js/luxon/src/luxon.js";
+import Alpine from "../../vendor/alpinejs/3.15.12/module.esm.min.js";
+import { DateTime } from "../../vendor/luxon/3.7.2/luxon.min.js";
 import { PlatformInfo } from "./platform_info.js";
 import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
 import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";;
@@ -16,7 +17,7 @@ function registerAlpineComponents() {
   }
   alpineComponentsRegistered = true;
 
-  window.Alpine.data("platformPage", function () {
+  Alpine.data("platformPage", function () {
     return {
       activePanel: "observations",
       showAllObservations: false,
@@ -112,7 +113,7 @@ function registerAlpineComponents() {
     };
   });
 
-  window.Alpine.data("platformCarousel", function (options) {
+  Alpine.data("platformCarousel", function (options) {
     return {
       activeIndex: 0,
       autoplay: Boolean(options && options.autoplay),
@@ -297,8 +298,6 @@ function registerAlpineComponents() {
   });
 }
 
-if (window.Alpine) {
-  registerAlpineComponents();
-} else {
-  document.addEventListener("alpine:init", registerAlpineComponents);
-}
+window.Alpine = Alpine;
+registerAlpineComponents();
+Alpine.start();

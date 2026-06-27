@@ -1,4 +1,4 @@
-import { TimeSeries } from "../../timeseries-ts/esm/index.js";
+import { TimeSeries } from "../../../vendor/timeseries-ts/1.0.7/index.js";
 
 
 export class StatsTimeSeries extends TimeSeries {
@@ -88,7 +88,7 @@ export class StatsTimeSeries extends TimeSeries {
   }
   normalizeRecords(recordOrRecords) {
     if (Array.isArray(recordOrRecords)) {
-      return recordOrRecords.map(function (record) {
+      return recordOrRecords.map((record) => {
         return this.normalizeRecord(record);
       });
     }

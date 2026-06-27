@@ -6,7 +6,7 @@ import {
   CCRABRestClient,
   TokenBundle,
 } from "../src/index.js";
-import { DateTime } from "../../luxon/src/luxon.js";
+import { DateTime } from "../../../vendor/luxon/3.7.2/luxon.min.js";
 
 test("obtainToken posts credentials and stores returned tokens", async () => {
   const fetch = createFakeFetch([
