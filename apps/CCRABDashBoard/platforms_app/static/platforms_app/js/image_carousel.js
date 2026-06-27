@@ -3,7 +3,6 @@ import { DateTime } from "../../js/luxon/src/luxon.js";
 import { PlatformInfo } from "./platform_info.js";
 import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
 import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";;
-//import { TimeSeries, JtsDocument } from "../../js/timeseries-ts/esm/index.js";
 
 //const CCRAB_BASE_URL = window.CCRAB_BASE_URL || window.location.origin;
 let alpineComponentsRegistered = false;
@@ -25,11 +24,12 @@ function registerAlpineComponents() {
       platformInfo: null,
       observationWindow: null,
       observationTimeSeriesDoc: null,
+      startDateTime: null,
+      endDateTime: null,
 
       init() {
-        var endDate = DateTime.now();
+        var endDate = DateTime.utc();
         var startDate = endDate.minus({ hours: 1 });
-
         this.platformInfo = PlatformInfo.fromScriptElement("platform-info-data");
         if (this.platformInfo !== null) {
 
@@ -55,6 +55,7 @@ function registerAlpineComponents() {
             observations
           );
           this.observationTimeSeriesDoc = StatsJtsDocument.from(observationData['properties']['timeseries']);
+
         }
         finally {
           this.isLoadingObservationData = false;
@@ -68,23 +69,9 @@ function registerAlpineComponents() {
           );
         });
       },
-      get formatStartDateTime() {
-        var formattedDateTime = "";
-        if(this.observationTimeSeriesDoc != null) {
-          var header = this.observationTimeSeriesDoc.header;
-
-          var dt = new DateTime(header.startTime);
-          formattedDateTime = dt.toFormat("yyyy-MM-dd HH:mm:ss");
-        }
-        return formattedDateTime
-      },
-      get formatEndDateTime() {
-        var formattedDateTime = "";
-        if(this.observationTimeSeriesDoc != null) {
-          var header = this.observationTimeSeriesDoc.header;
-          var dt = new DateTime(header.endTime);
-          formattedDateTime = dt.toFormat("yyyy-MM-dd HH:mm:ss");
-        }
+      formatDateTimeStr(timestamp_rec) {
+        var dt = DateTime.fromJSDate(timestamp_rec);
+        var formattedDateTime = dt.toFormat("yyyy-MM-dd hh:mm:ss a");
         return formattedDateTime
       },
 
@@ -95,7 +82,16 @@ function registerAlpineComponents() {
           var stats = null;
           if(this.observationTimeSeriesDoc != null) {
             var series = this.observationTimeSeriesDoc.getSeries(timeseries_id);
-            stats = series.getStats();
+            //Get the start/end date from the series.
+            this.startDateTime = this.formatDateTimeStr(series.getOldestRecord().timestamp);
+            this.endDateTime = this.formatDateTimeStr(series.getLatestRecord().timestamp);
+
+            //stats = series.getStats();
+            stats = {
+              min: series.min_record,
+              max: series.max_record,
+              most_recent: series.getLatestRecord()
+            }
           }
           return {
             key: `${sensor.obsStandardName}-${sensor.order}`,

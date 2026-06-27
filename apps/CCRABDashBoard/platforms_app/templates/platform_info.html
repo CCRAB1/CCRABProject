@@ -161,10 +161,10 @@
             <div class="platform-section-header">
                 <h2 class="platform-section-title">Observations Collected</h2>
                 <h2>
-                    From: <span x-text="formatStartDateTime"></span>
+                    From: <span x-text="startDateTime"></span>
                 </h2>
                 <h2>
-                    To: <span x-text="formatEndDateTime"></span>
+                    To: <span x-text="endDateTime"></span>
                 </h2>
                 <span class="tag is-light">{{ platform_info.properties.sensors|length }}</span>
             </div>
@@ -183,8 +183,9 @@
                         <tr>
                             <td>
                               <strong x-text="obs_row.obsStandardName"></strong>
+                              <!---
                               <span class="has-text-grey" x-text="obs_row.channelLabel"></span>
-
+                              --->
                               <span
                                 class="tag is-info is-light"
                                 x-show="obs_row.units"

@@ -45,6 +45,27 @@ test("wraps an existing TimeSeries", function () {
   assert.equal(series.records[0].value, 21);
 });
 
+test("overloads insert to normalize timestamps", function () {
+  const series = new StatsTimeSeries({ id: "pm25" });
+
+  const result = series.insert("2026-01-01T00:00:00.000Z", 5, {
+    quality: 0,
+    annotation: "loaded from scalar arguments",
+  });
+
+  series.insert([
+    { timestamp: "2026-01-01T01:00:00.000Z", value: 10 },
+  ]);
+
+  assert.equal(result, series);
+  assert.ok(series.records[0].timestamp instanceof Date);
+  assert.ok(series.records[1].timestamp instanceof Date);
+  assert.equal(series.records[0].value, 5);
+  assert.equal(series.records[0].quality, 0);
+  assert.equal(series.records[0].annotation, "loaded from scalar arguments");
+  assert.equal(series.records[1].value, 10);
+});
+
 test("parses JTS documents into StatsTimeSeries instances", function () {
   const document = StatsJtsDocument.from({
     docType: "jts",

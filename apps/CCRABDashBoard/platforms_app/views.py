@@ -299,8 +299,9 @@ def platform_data_request(request):
             uom_standard_name=F(
                 "sensor_id__m_type_id__m_scalar_type_id__uom_type_id__standard_name"
             ),
+            s_order=F("sensor_id__s_order"),
         )
-        .order_by("m_date", "observation_name")
+        .order_by("m_date", "observation_name", "s_order")
     )
     jts_document = JtsDocument()
     current_obs_type = None

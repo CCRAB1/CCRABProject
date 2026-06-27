@@ -111,8 +111,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_gis",
     "platforms_app.apps.PlatformsAppConfig",
-    "projects_catalog.apps.ProjectsCatalogConfig"
-
+    "projects_catalog.apps.ProjectsCatalogConfig",
+    "corsheaders"
 ]
 
 REST_FRAMEWORK = {
@@ -138,6 +138,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+
 ]
 
 ROOT_URLCONF = 'CCRABDashboard.urls'
@@ -219,6 +222,10 @@ USE_I18N = True
 
 USE_TZ = True
 
+
+CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=False)
+raw_cors_allowed_origins = env.list("CORS_ALLOWED_ORIGINS", default=[])
+CORS_ALLOWED_ORIGINS = _clean_env_list(raw_cors_allowed_origins)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/

@@ -3,7 +3,7 @@ import { DateTime } from "../../luxon/src/luxon.js";
 const DEFAULT_TIMEOUT_MS = 30000;
 const API_DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
 
-export const DEFAULT_BASE_URL = "https://localhost";
+export const DEFAULT_BASE_URL = "https://159.203.109.18.sslip.io/";
 //export const DEFAULT_BASE_URL = "http://127.0.0.1:8000";
 
 export class TokenBundle {

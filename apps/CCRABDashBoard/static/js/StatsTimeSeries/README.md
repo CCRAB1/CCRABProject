@@ -17,6 +17,14 @@ const series = new StatsTimeSeries({
 });
 ```
 
+`StatsTimeSeries.insert` supports the original `TimeSeries` record shape and a
+scalar convenience form:
+
+```js
+series.insert({ timestamp: "2026-01-01T00:00:00.000Z", value: 5 });
+series.insert("2026-01-01T01:00:00.000Z", 10, { quality: 0 });
+```
+
 For parsed JTS documents, use `StatsJtsDocument` so parsed series are
 `StatsTimeSeries` instances:
 

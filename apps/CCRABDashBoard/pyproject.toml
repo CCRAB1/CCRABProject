@@ -17,6 +17,7 @@ dependencies = [
     "json-timeseries>=0.1.7",
     "datautilities",
     "geojson>=3.2.0,<4",
+    "django-cors-headers>=4.9.0",
 ]
 [tool.uv.sources]
 datautilities = { path = "../../packages/DataUtilities", editable = true }
