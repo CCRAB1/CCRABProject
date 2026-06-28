@@ -1,49 +1,106 @@
 {% load static %}
-{% load custom_filters %}
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="platforms-map-document">
     <head>
         <meta charset="UTF-8">
-        <title>Title</title>
-    </head>
-    <link rel="stylesheet" href="{% static 'css/bulma/css/versions/bulma-no-dark-mode.css' %}">
-    <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
-    <link rel="stylesheet" href="{% static 'platforms_app/css/platforms_map.css' %}">
-    <link rel="stylesheet" href="{% static 'platforms_app/js/leaflet/dist/leaflet.css' %}"
-          crossorigin="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>CCRAB Platforms Map</title>
+        <link rel="stylesheet" href="{% static 'css/bulma/css/versions/bulma-no-dark-mode.css' %}">
+        <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+        <link rel="stylesheet" href="{% static 'platforms_app/css/platforms_map.css' %}">
+        <link rel="stylesheet" href="{% static 'platforms_app/js/leaflet/dist/leaflet.css' %}"
+              crossorigin="">
 
-    <script src="{% static 'platforms_app/js/leaflet/dist/leaflet.js' %}"></script>
-    <body>
+        <script src="{% static 'platforms_app/js/leaflet/dist/leaflet.js' %}"></script>
+        <script type="module" src="{% static 'platforms_app/js/platforms_map.js' %}"></script>
+    </head>
+    <body class="platforms-map-page">
     {% include "top_navbar_template.html" %}
 
-    <section class="section">
-        <div class="container">
-            <h1 class="title">CCRAB Platforms</h1>
+    <main class="platforms-map-shell" x-data="platformsMap()" x-cloak>
+        <aside class="platforms-map-controls" aria-label="Platform map controls">
+            <div class="platforms-map-controls-header">
+                <p class="heading">Platforms</p>
+                <h1 class="title is-4">CCRAB Platforms</h1>
+                <p class="subtitle is-6" x-text="statusLabel"></p>
+            </div>
 
-            <div class="columns is-variable is-6">
-                <div class="column is-one-third">
-                    <div class="box">
-                        <p class="subtitle">Controls / Info</p>
-                        <p>Put form inputs, legend, or text here. Resize the window to see the map adapt.</p>
-                        <!-- Example control that changes column width to demonstrate responsiveness -->
-                        <button id="toggle-width" class="button is-small is-info mt-3">Toggle wide</button>
-                    </div>
-                </div>
-
-                <!-- Map column -->
-                <div id="map-col" class="column map-column page-fullheight">
-                    <!-- You can have other content above/below map in this column if desired -->
-                    <div
-                        id="map"
-                        class="leaflet-map"
-                        data-platforms-url="{% url 'platform-list-web-data' %}"
-                        data-api-token="{{ api_access_token|default:'' }}"
-                    ></div>
+            <div class="field">
+                <label class="label" for="platform-search">Search</label>
+                <div class="control">
+                    <input
+                        id="platform-search"
+                        class="input"
+                        type="search"
+                        placeholder="Name, handle, or neighborhood"
+                        x-model.debounce.150ms="searchTerm"
+                    >
                 </div>
             </div>
-        </div>
-    </section>
-    <script src="{% static 'platforms_app/js/platform_map.js' %}"></script>
+
+            <div class="field">
+                <label class="checkbox">
+                    <input type="checkbox" x-model="showInactive">
+                    Show inactive platforms
+                </label>
+            </div>
+
+            <div class="buttons are-small">
+                <button
+                    type="button"
+                    class="button is-link"
+                    x-on:click="fitVisiblePlatforms()"
+                    x-bind:disabled="visiblePlatforms.length === 0"
+                >
+                    Fit map
+                </button>
+                <a class="button is-light" href="{% url 'platform_catalog' %}">List view</a>
+            </div>
+
+            <div class="notification is-danger is-light platforms-map-alert" x-show="errorMessage" x-text="errorMessage"></div>
+
+            <div class="platforms-map-list" aria-label="Platform results">
+                <template x-for="platform in visiblePlatforms" x-bind:key="featureKey(platform)">
+                    <a
+                        class="platform-list-item"
+                        x-bind:href="platformDetailUrl(platform)"
+                        x-on:mouseenter="focusPlatform(platform, false)"
+                        x-on:focus="focusPlatform(platform, false)"
+                    >
+                        <span>
+                            <strong x-text="platformName(platform)"></strong>
+                            <small x-text="platformMeta(platform)"></small>
+                        </span>
+                        <!--
+                        <span class="tag is-light" x-text="sensorCountLabel(platform)"></span>
+                        -->
+                    </a>
+                </template>
+
+                <p
+                    class="has-text-grey platforms-map-empty"
+                    x-show="!isLoading && !errorMessage && visiblePlatforms.length === 0"
+                >
+                    No platforms found.
+                </p>
+            </div>
+        </aside>
+
+        <section class="platforms-map-stage" aria-label="Platforms map">
+            <div
+                id="map"
+                class="leaflet-map"
+                x-ref="map"
+                data-platforms-url="{% url 'platform-list-web-data' %}"
+                data-platform-detail-url="{% url 'platform_info' '__short_name__' %}"
+                data-api-token="{{ api_access_token|default:'' }}"
+            ></div>
+
+            <div class="platforms-map-loading notification is-info is-light" x-show="isLoading">
+                Loading platforms
+            </div>
+        </section>
+    </main>
     </body>
 </html>

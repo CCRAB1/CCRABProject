@@ -2,7 +2,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path("data/platforms/", views.platform_collection_web_data, name="platform-list-web-data"),
     path("data/platforms/<str:short_name>/", views.platform_detail_web_data, name="platform-detail-web-data"),
 
     # Legacy aliases

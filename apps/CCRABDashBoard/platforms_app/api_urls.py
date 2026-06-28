@@ -7,6 +7,8 @@ urlpatterns = [
     path("platforms/<str:short_name>/", views.platform_detail_api, name="platform-detail-api"),
 
     # Legacy aliases
+    path("v1/platforms/", views.platform_collection_web_data, name="platform-list-web-data"),
+
     path("v1/platform_info/", views.PlatformViewSet.as_view(), name="platforminfo"),
 
     path("v1/system/platform_configuration/", views.platform_source_configuration, name="platform_configuration"),

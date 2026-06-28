@@ -1,4 +1,4 @@
-name: ccrabdashboard_development
+name: ${CCRAB_CONTAINER_NAME}
 
 x-prod-env: &prod_env
   env_file:
