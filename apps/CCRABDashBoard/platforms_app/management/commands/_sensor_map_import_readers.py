@@ -255,6 +255,67 @@ class GoogleSheetSensorMapReader:
         )
 
 
+def build_sensor_map_reader(
+    *,
+    input_type: str = "auto",
+    file_path: str | Path | None = None,
+    sheet: str | None = None,
+    sheet_id: str | None = None,
+    gid: str | None = None,
+    google_sheet_url: str | None = None,
+):
+    if input_type == "auto":
+        if file_path:
+            input_type = infer_input_type(file_path)
+        elif sheet_id or google_sheet_url:
+            input_type = "google-sheet"
+        else:
+            raise SensorMapReaderError(
+                "--input-type auto requires --file, --sheet-id, "
+                "or --google-sheet-url."
+            )
+
+    if input_type == "csv":
+        if not file_path:
+            raise SensorMapReaderError("CSV imports require a file.")
+
+        return CsvSensorMapReader(file_path)
+
+    if input_type == "excel":
+        if not file_path:
+            raise SensorMapReaderError("Excel imports require a file.")
+
+        return ExcelSensorMapReader(file_path, sheet_name=sheet)
+
+    if input_type == "google-sheet":
+        return GoogleSheetSensorMapReader(
+            sheet_id=sheet_id,
+            url=google_sheet_url,
+            worksheet=sheet,
+            gid=gid,
+        )
+
+    raise SensorMapReaderError(f"Unsupported input type: {input_type}")
+
+
+def infer_input_type(file_path: str | Path | None) -> str:
+    if not file_path:
+        raise SensorMapReaderError("--input-type auto requires a file.")
+
+    suffix = Path(file_path).suffix.lower()
+
+    if suffix == ".csv":
+        return "csv"
+
+    if suffix in {".xlsx", ".xls"}:
+        return "excel"
+
+    raise SensorMapReaderError(
+        f"Could not infer input type from extension '{suffix}'. "
+        "Pass --input-type explicitly."
+    )
+
+
 def records_from_csv_text(csv_text: str):
     reader = csv.DictReader(StringIO(csv_text))
     fieldnames = normalize_headers(reader.fieldnames or ())

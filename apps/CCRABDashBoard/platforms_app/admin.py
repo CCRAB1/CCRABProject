@@ -1,15 +1,41 @@
+import logging
+from contextlib import contextmanager
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.gis.admin import (
     GISModelAdmin,  # requires GeoDjango; remove if not using
 )
+from django.core.exceptions import PermissionDenied
+from django.db import IntegrityError
 from django.http import JsonResponse
+from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
 
 from . import models
+from .management.commands._sensor_map_import_processor import (
+    SensorMapImportError,
+    SensorMapImportProcessor,
+    SensorMapImportSummary,
+)
+from .management.commands._sensor_map_import_readers import (
+    SensorMapReaderError,
+    build_sensor_map_reader,
+)
+
+logger = logging.getLogger(__name__)
 
 ROW_TIMESTAMP_FIELD_NAMES = ("row_entry_date", "row_update_date")
+SENSOR_MAP_IMPORT_RESULT_LIMIT = 200
+SENSOR_MAP_INPUT_TYPE_CHOICES = (
+    ("auto", "Auto-detect"),
+    ("csv", "CSV"),
+    ("excel", "Excel"),
+    ("google-sheet", "Google Sheet"),
+)
 
 PLATFORMS_ADMIN_MODEL_GROUPS = [
     ("Core", ["Organization", "Platform", "Sensor", "Obs_type", "Uom_type"]),
@@ -93,6 +119,162 @@ class TimestampedGISModelAdmin(RowTimestampAdminMixin, GISModelAdmin):
 
 class TimestampedTabularInline(RowTimestampInlineMixin, admin.TabularInline):
     pass
+
+
+class SensorMapUploadForm(forms.Form):
+    input_type = forms.ChoiceField(
+        choices=SENSOR_MAP_INPUT_TYPE_CHOICES,
+        initial="auto",
+        help_text="Auto-detect uses the uploaded file extension.",
+    )
+    import_file = forms.FileField(
+        required=False,
+        help_text="Upload a CSV, .xlsx, or .xls file.",
+    )
+    sheet = forms.CharField(
+        required=False,
+        help_text="Excel sheet name or Google Sheet worksheet title.",
+    )
+    sheet_id = forms.CharField(
+        required=False,
+        help_text="Google Sheet ID.",
+    )
+    gid = forms.CharField(
+        required=False,
+        help_text="Google Sheet gid.",
+    )
+    google_sheet_url = forms.URLField(
+        required=False,
+        help_text="Google Sheet URL or CSV export URL.",
+    )
+    dry_run = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="Validate the import and roll back all row changes.",
+    )
+    strict = forms.BooleanField(
+        required=False,
+        help_text="Stop on the first failed row.",
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        input_type = cleaned_data.get("input_type")
+        import_file = cleaned_data.get("import_file")
+        has_google_source = bool(
+            cleaned_data.get("sheet_id") or cleaned_data.get("google_sheet_url")
+        )
+
+        if input_type in {"csv", "excel"} and not import_file:
+            raise forms.ValidationError("Upload a file for CSV or Excel imports.")
+
+        if input_type == "google-sheet" and not has_google_source:
+            raise forms.ValidationError(
+                "Enter a Google Sheet ID or Google Sheet URL."
+            )
+
+        if input_type == "auto" and not import_file and not has_google_source:
+            raise forms.ValidationError(
+                "Upload a file, or enter Google Sheet details."
+            )
+
+        return cleaned_data
+
+
+@contextmanager
+def temporary_uploaded_file(uploaded_file):
+    if uploaded_file is None:
+        yield None
+        return
+
+    suffix = Path(uploaded_file.name).suffix
+    temp_file = NamedTemporaryFile(delete=False, suffix=suffix)
+    temp_path = Path(temp_file.name)
+
+    try:
+        with temp_file:
+            for chunk in uploaded_file.chunks():
+                temp_file.write(chunk)
+
+        yield temp_path
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def process_sensor_map_admin_upload(cleaned_data, uploaded_file):
+    summary = SensorMapImportSummary()
+    import_results = []
+    strict = cleaned_data.get("strict", False)
+
+    with temporary_uploaded_file(uploaded_file) as file_path:
+        reader = build_sensor_map_reader(
+            input_type=cleaned_data["input_type"],
+            file_path=file_path,
+            sheet=cleaned_data.get("sheet"),
+            sheet_id=cleaned_data.get("sheet_id"),
+            gid=cleaned_data.get("gid"),
+            google_sheet_url=cleaned_data.get("google_sheet_url"),
+        )
+        processor = SensorMapImportProcessor(
+            dry_run=cleaned_data.get("dry_run", False),
+        )
+
+        for record in reader.iter_records():
+            try:
+                result = processor.process(record)
+            except SensorMapImportError as exc:
+                summary.failed += 1
+                append_admin_import_result(
+                    import_results,
+                    "failed",
+                    record.row_number,
+                    str(exc),
+                )
+
+                if strict:
+                    raise
+
+                continue
+            except IntegrityError as exc:
+                summary.failed += 1
+                message = (
+                    f"Row {record.row_number}: database integrity error: {exc}"
+                )
+                logger.exception(message)
+                append_admin_import_result(
+                    import_results,
+                    "failed",
+                    record.row_number,
+                    message,
+                )
+
+                if strict:
+                    raise SensorMapImportError(message) from exc
+
+                continue
+
+            summary.add_result(result)
+            append_admin_import_result(
+                import_results,
+                result.status,
+                result.row_number,
+                result.message,
+            )
+
+    return summary, import_results
+
+
+def append_admin_import_result(import_results, status, row_number, message):
+    if len(import_results) >= SENSOR_MAP_IMPORT_RESULT_LIMIT:
+        return
+
+    import_results.append(
+        {
+            "status": status,
+            "row_number": row_number,
+            "message": message,
+        }
+    )
 
 
 def platform_source_platform_label(platform_source):
@@ -665,6 +847,7 @@ class DataSourceAdmin(TimestampedModelAdmin):
 
 @admin.register(models.PlatformSource)
 class PlatformSourceAdmin(TimestampedModelAdmin):
+    change_list_template = "admin/platforms_app/platformsource/change_list.html"
     list_display = (
         'row_id',
         'platform_id',
@@ -685,6 +868,78 @@ class PlatformSourceAdmin(TimestampedModelAdmin):
     readonly_fields = ('row_entry_date', 'row_update_date')
     date_hierarchy = "row_entry_date"
     inlines = [SourceObservationMapInline]
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "import-sensor-map/",
+                self.admin_site.admin_view(self.import_sensor_map),
+                name="platforms_app_platformsource_import_sensor_map",
+            ),
+        ]
+        return custom_urls + urls
+
+    def import_sensor_map(self, request):
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+
+        summary = None
+        import_results = []
+
+        if request.method == "POST":
+            form = SensorMapUploadForm(request.POST, request.FILES)
+
+            if form.is_valid():
+                try:
+                    summary, import_results = process_sensor_map_admin_upload(
+                        form.cleaned_data,
+                        request.FILES.get("import_file"),
+                    )
+                except (SensorMapImportError, SensorMapReaderError) as exc:
+                    form.add_error(None, str(exc))
+                else:
+                    if summary.failed:
+                        messages.warning(
+                            request,
+                            (
+                                "Sensor map import finished with failures: "
+                                f"imported={summary.imported}, "
+                                f"skipped={summary.skipped}, "
+                                f"failed={summary.failed}"
+                            ),
+                        )
+                    else:
+                        dry_run_label = (
+                            " (dry run)" if form.cleaned_data["dry_run"] else ""
+                        )
+                        messages.success(
+                            request,
+                            (
+                                "Sensor map import complete"
+                                f"{dry_run_label}: "
+                                f"imported={summary.imported}, "
+                                f"skipped={summary.skipped}, "
+                                f"failed={summary.failed}"
+                            ),
+                        )
+        else:
+            form = SensorMapUploadForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Import Platform Sensor Map",
+            "opts": self.model._meta,
+            "form": form,
+            "summary": summary,
+            "import_results": import_results,
+            "result_limit": SENSOR_MAP_IMPORT_RESULT_LIMIT,
+        }
+        return TemplateResponse(
+            request,
+            "admin/platforms_app/platformsource/import_sensor_map.html",
+            context,
+        )
 
 @admin.register(models.SourceObservationMap)
 class SourceObservationMapAdmin(TimestampedModelAdmin):

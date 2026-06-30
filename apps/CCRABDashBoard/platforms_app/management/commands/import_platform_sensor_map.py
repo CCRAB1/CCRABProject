@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import IntegrityError
@@ -10,10 +9,8 @@ from ._sensor_map_import_processor import (
     SensorMapImportSummary,
 )
 from ._sensor_map_import_readers import (
-    CsvSensorMapReader,
-    ExcelSensorMapReader,
-    GoogleSheetSensorMapReader,
     SensorMapReaderError,
+    build_sensor_map_reader,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +62,14 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         try:
-            reader = build_reader(options)
+            reader = build_sensor_map_reader(
+                input_type=options["input_type"],
+                file_path=options.get("file"),
+                sheet=options.get("sheet"),
+                sheet_id=options.get("sheet_id"),
+                gid=options.get("gid"),
+                google_sheet_url=options.get("google_sheet_url"),
+            )
             processor = SensorMapImportProcessor(dry_run=options["dry_run"])
             summary = SensorMapImportSummary()
 
@@ -109,54 +113,3 @@ class Command(BaseCommand):
             )
         except SensorMapReaderError as exc:
             raise CommandError(str(exc)) from exc
-
-
-def build_reader(options):
-    input_type = options["input_type"]
-    file_path = options.get("file")
-
-    if input_type == "auto":
-        input_type = infer_input_type(file_path)
-
-    if input_type == "csv":
-        if not file_path:
-            raise SensorMapReaderError("CSV imports require --file.")
-
-        return CsvSensorMapReader(file_path)
-
-    if input_type == "excel":
-        if not file_path:
-            raise SensorMapReaderError("Excel imports require --file.")
-
-        return ExcelSensorMapReader(file_path, sheet_name=options.get("sheet"))
-
-    if input_type == "google-sheet":
-        return GoogleSheetSensorMapReader(
-            sheet_id=options.get("sheet_id"),
-            url=options.get("google_sheet_url"),
-            worksheet=options.get("sheet"),
-            gid=options.get("gid"),
-        )
-
-    raise SensorMapReaderError(f"Unsupported input type: {input_type}")
-
-
-def infer_input_type(file_path):
-    if not file_path:
-        raise SensorMapReaderError(
-            "--input-type auto requires --file. Use --input-type google-sheet "
-            "for Google Sheet imports."
-        )
-
-    suffix = Path(file_path).suffix.lower()
-
-    if suffix == ".csv":
-        return "csv"
-
-    if suffix in {".xlsx", ".xls"}:
-        return "excel"
-
-    raise SensorMapReaderError(
-        f"Could not infer input type from extension '{suffix}'. "
-        "Pass --input-type explicitly."
-    )
