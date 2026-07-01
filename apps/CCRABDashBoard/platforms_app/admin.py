@@ -1026,7 +1026,7 @@ class Uom_typeAdmin(TimestampedModelAdmin):
 
 @admin.register(models.Obs_type)
 class Obs_typeAdmin(TimestampedModelAdmin):
-    list_display = ('row_id', 'standard_name', 'definition')
+    list_display = ('row_id', 'standard_name', 'definition', 'display')
     search_fields = ('standard_name',)
     inlines = [M_scalar_typeInline]
 
