@@ -1,0 +1,89 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo; <a href="{% url 'admin:platforms_app_platformsource_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; {% translate "Import sensor map" %}
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div id="content-main">
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <p class="errornote">{{ form.non_field_errors }}</p>
+      {% endif %}
+
+      <fieldset class="module aligned">
+        {% for field in form %}
+          <div class="form-row{% if field.errors %} errors{% endif %}">
+            {{ field.errors }}
+            <div>
+              {{ field.label_tag }}
+              {{ field }}
+              {% if field.help_text %}
+                <div class="help">{{ field.help_text }}</div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </fieldset>
+
+      <div class="submit-row">
+        <input type="submit" value="{% translate 'Import' %}" class="default">
+        <a href="{% url 'admin:platforms_app_platformsource_changelist' %}" class="closelink">
+          {% translate "Back" %}
+        </a>
+      </div>
+    </form>
+
+    {% if summary %}
+      <h2>{% translate "Summary" %}</h2>
+      <table>
+        <tbody>
+          <tr>
+            <th scope="row">{% translate "Imported" %}</th>
+            <td>{{ summary.imported }}</td>
+          </tr>
+          <tr>
+            <th scope="row">{% translate "Skipped" %}</th>
+            <td>{{ summary.skipped }}</td>
+          </tr>
+          <tr>
+            <th scope="row">{% translate "Failed" %}</th>
+            <td>{{ summary.failed }}</td>
+          </tr>
+        </tbody>
+      </table>
+    {% endif %}
+
+    {% if import_results %}
+      <h2>{% translate "Row Results" %}</h2>
+      <p class="help">
+        {% blocktranslate %}Showing up to {{ result_limit }} row results.{% endblocktranslate %}
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">{% translate "Row" %}</th>
+            <th scope="col">{% translate "Status" %}</th>
+            <th scope="col">{% translate "Message" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in import_results %}
+            <tr>
+              <td>{{ result.row_number }}</td>
+              <td>{{ result.status }}</td>
+              <td>{{ result.message }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+{% endblock %}
