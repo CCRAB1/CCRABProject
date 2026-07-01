@@ -291,6 +291,12 @@ class Sensor(models.Model):
     class Meta:
         db_table = '"platforms"."sensor"'
         managed = True
+        constraints = [
+            models.UniqueConstraint(
+                fields=["platform_id", "m_type_id", "s_order"],
+                name='q_sensor_platform_m_type_s_order',
+            ),
+        ]
 
     def __str__(self):
         return f"{getattr(self, 'short_name', self.pk)}-{getattr(self, 's_order', '1')}"
