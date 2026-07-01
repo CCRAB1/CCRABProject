@@ -294,7 +294,7 @@ class Sensor(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["platform_id", "m_type_id", "s_order"],
-                name='q_sensor_platform_m_type_s_order',
+                name='uq_sensor_platform_m_type_s_order',
             ),
         ]
 
