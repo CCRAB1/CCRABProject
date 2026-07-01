@@ -293,7 +293,7 @@ class Sensor(models.Model):
         managed = True
 
     def __str__(self):
-        return f"Sensor {getattr(self, 'short_name', self.pk)}"
+        return f"{getattr(self, 'short_name', self.pk)}-{getattr(self, 's_order', '1')}"
 
 class Multi_obs(models.Model):
     row_id = models.AutoField(primary_key=True)

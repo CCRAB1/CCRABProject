@@ -312,7 +312,7 @@ def sensors_for_platform_source(platform_source_id):
 
     return models.Sensor.objects.filter(platform_id=platform_id).order_by(
         "short_name",
-        "row_id",
+        "s_order",
     )
 
 
@@ -1011,7 +1011,7 @@ class SourceObservationMapAdmin(TimestampedModelAdmin):
             sensors.append(
                 {
                     "value": sensor.pk,
-                    "label": str(sensor),
+                    "label": {str(sensor)}
                 }
             )
 
