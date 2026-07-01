@@ -239,12 +239,23 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "handlers": {
-        "console": {"class": "logging.StreamHandler"},
+        "console": {
+            "class": "logging.StreamHandler",
+        },
     },
     "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
         "django.request": {
             "handlers": ["console"],
-            "level": "NOTSET",
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "platforms_app": {
+            "handlers": ["console"],
+            "level": "INFO",
             "propagate": False,
         },
     },
