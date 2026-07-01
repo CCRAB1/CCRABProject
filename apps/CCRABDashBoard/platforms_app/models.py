@@ -231,7 +231,7 @@ class Obs_type(models.Model):
     row_id = models.AutoField(primary_key=True)
     standard_name = models.CharField(max_length=50, null=True, blank=True)
     definition = models.CharField(max_length=1000, null=True, blank=True)
-    standard_name = models.CharField(max_length=50, null=True, blank=True)
+    display = models.CharField(max_length=50, null=True, blank=True)
 
     class Meta:
         db_table = '"platforms"."obs_type"'
@@ -291,12 +291,6 @@ class Sensor(models.Model):
     class Meta:
         db_table = '"platforms"."sensor"'
         managed = True
-        constraints = [
-            models.UniqueConstraint(
-                fields=["platform_id", "m_type_id", "s_order"],
-                name="uq_sensor_platform_m_type_s_order",
-            ),
-        ]
 
     def __str__(self):
         return f"Sensor {getattr(self, 'short_name', self.pk)}"
