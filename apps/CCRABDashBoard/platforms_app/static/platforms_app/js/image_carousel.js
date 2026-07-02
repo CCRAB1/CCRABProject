@@ -80,23 +80,27 @@ function registerAlpineComponents() {
         const sensors = this.platformInfo.sensors || [];
         return sensors.map((sensor) => {
           var timeseries_id = sensor.obsStandardName + " " + sensor.order;
-          var stats = null;
+          var stats = {
+            min: "N/A",
+            max: "N/A",
+            most_recent: "N/A"
+          };
           if(this.observationTimeSeriesDoc != null) {
             var series = this.observationTimeSeriesDoc.getSeries(timeseries_id);
             if(series !== undefined) {
               //Get the start/end date from the series.
               this.startDateTime = this.formatDateTimeStr(series.getOldestRecord().timestamp);
               this.endDateTime = this.formatDateTimeStr(series.getLatestRecord().timestamp);
+              //stats = series.getStats();
+              stats = {
+                min: series.min_record,
+                max: series.max_record,
+                most_recent: series.getLatestRecord()
+              }
             }
             else
             {
               console.error("Timeseries ID: " + timeseries_id + " is undefined.");
-            }
-            //stats = series.getStats();
-            stats = {
-              min: series.min_record,
-              max: series.max_record,
-              most_recent: series.getLatestRecord()
             }
           }
           return {
