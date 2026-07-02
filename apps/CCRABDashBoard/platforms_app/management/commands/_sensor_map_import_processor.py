@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from platforms_app.models import (
@@ -21,14 +22,24 @@ from ._sensor_map_import_readers import NormalizedSensorMapRecord
 logger = logging.getLogger(__name__)
 
 SENSOR_UNIQUE_CONSTRAINT_NAME = "uq_sensor_platform_m_type_s_order"
+PLATFORM_SOURCE_PLATFORM_UNIQUE_CONSTRAINT_NAME = "unique_platform_source_platform_id"
 
 
 class SensorMapImportError(ValueError):
     pass
 
 
-class DuplicateTargetSensorError(SensorMapImportError):
-    pass
+@dataclass(frozen=True)
+class SensorResolution:
+    sensor: Sensor
+    created: bool
+
+
+@dataclass(frozen=True)
+class SourceObservationMapResolution:
+    source_observation_map: SourceObservationMap
+    created: bool
+    updated: bool
 
 
 @dataclass(frozen=True)
@@ -75,21 +86,13 @@ class SensorMapImportProcessor:
         self,
         record: NormalizedSensorMapRecord,
     ) -> SensorMapImportResult:
-        try:
-            with transaction.atomic():
-                result = self._process_in_transaction(record)
+        with transaction.atomic():
+            result = self._process_in_transaction(record)
 
-                if self.dry_run:
-                    transaction.set_rollback(True)
+            if self.dry_run:
+                transaction.set_rollback(True)
 
-                return result
-        except DuplicateTargetSensorError as exc:
-            logger.info(str(exc))
-            return SensorMapImportResult(
-                status="skipped",
-                message=str(exc),
-                row_number=record.row_number,
-            )
+            return result
 
     def _process_in_transaction(
         self,
@@ -100,7 +103,7 @@ class SensorMapImportProcessor:
         obs_type = self.resolve_obs_type(record)
         uom_type = self.resolve_uom_type(record)
         m_type = resolve_m_type(obs_type, uom_type)
-        sensor = self.create_sensor(record, platform, m_type, now)
+        sensor_resolution = self.resolve_sensor(record, platform, m_type, now)
         data_source = self.resolve_data_source(record, now)
         platform_source = self.resolve_platform_source(
             record,
@@ -108,23 +111,27 @@ class SensorMapImportProcessor:
             data_source,
             now,
         )
-        source_observation_map = self.resolve_source_observation_map(
+        source_map_resolution = self.resolve_source_observation_map(
             record,
             platform_source,
-            sensor,
+            sensor_resolution.sensor,
             now,
         )
+        status = result_status(sensor_resolution, source_map_resolution)
 
         return SensorMapImportResult(
-            status="imported",
-            message=(
-                f"Imported row {record.row_number}: sensor {sensor.pk} "
-                f"for platform {record.target_platform_handle}"
+            status=status,
+            message=import_result_message(
+                record,
+                sensor_resolution,
+                source_map_resolution,
             ),
             row_number=record.row_number,
-            sensor_id=sensor.pk,
+            sensor_id=sensor_resolution.sensor.pk,
             platform_source_id=platform_source.pk,
-            source_observation_map_id=source_observation_map.pk,
+            source_observation_map_id=(
+                source_map_resolution.source_observation_map.pk
+            ),
         )
 
     def resolve_platform(self, record: NormalizedSensorMapRecord) -> Platform:
@@ -173,37 +180,55 @@ class SensorMapImportProcessor:
             display=record.target_uom_display or record.target_uom,
         )
 
-    def create_sensor(
+    def resolve_sensor(
         self,
         record: NormalizedSensorMapRecord,
         platform: Platform,
         m_type: M_type,
         now,
-    ) -> Sensor:
+    ) -> SensorResolution:
         try:
-            return Sensor.objects.create(
-                row_entry_date=now,
-                row_update_date=now,
-                platform_id=platform,
-                short_name=record.target_sensor_short_name,
-                m_type_id=m_type,
-                fixed_z=record.fixed_z,
-                active=record.active,
-                begin_date=record.begin_date,
-                end_date=record.end_date,
-                s_order=record.s_order,
-            )
+            with transaction.atomic():
+                sensor = Sensor.objects.create(
+                    row_entry_date=now,
+                    row_update_date=now,
+                    platform_id=platform,
+                    short_name=record.target_sensor_short_name,
+                    m_type_id=m_type,
+                    fixed_z=record.fixed_z,
+                    active=record.active,
+                    begin_date=record.begin_date,
+                    end_date=record.end_date,
+                    s_order=record.s_order,
+                )
         except IntegrityError as exc:
             if is_duplicate_target_sensor_error(exc):
-                raise DuplicateTargetSensorError(
-                    "Skipping row "
-                    f"{record.row_number}: sensor already exists for platform "
-                    f"{record.target_platform_handle}, target_obs "
-                    f"{record.target_obs}, target_uom {record.target_uom}, "
-                    f"s_order {record.s_order}"
-                ) from exc
+                sensor = (
+                    Sensor.objects.filter(
+                        platform_id=platform,
+                        m_type_id=m_type,
+                        s_order=record.s_order,
+                    )
+                    .order_by("row_id")
+                    .first()
+                )
+
+                if sensor is None:
+                    raise SensorMapImportError(
+                        "Could not resolve existing sensor after duplicate "
+                        f"constraint for row {record.row_number}."
+                    ) from exc
+
+                logger.info(
+                    "Reusing existing sensor %s for row %s.",
+                    sensor.pk,
+                    record.row_number,
+                )
+                return SensorResolution(sensor=sensor, created=False)
 
             raise
+
+        return SensorResolution(sensor=sensor, created=True)
 
     def resolve_data_source(
         self,
@@ -234,37 +259,83 @@ class SensorMapImportProcessor:
         data_source: DataSource,
         now,
     ) -> PlatformSource:
-        platform_source, created = PlatformSource.objects.get_or_create(
-            platform_id=platform,
-            data_source_id=data_source,
-            external_identifier=record.source_platform_identifier,
-            defaults={
-                "row_entry_date": now,
-                "row_update_date": now,
-                "active": record.active,
-                "begin_date": record.begin_date,
-                "end_date": record.end_date,
-                "settings": record.settings,
-            },
+        platform_source = (
+            PlatformSource.objects.filter(
+                platform_id=platform,
+                data_source_id=data_source,
+                external_identifier=record.source_platform_identifier,
+            )
+            .order_by("row_id")
+            .first()
         )
+        created = False
+
+        if platform_source is None:
+            try:
+                with transaction.atomic():
+                    platform_source = PlatformSource.objects.create(
+                        row_entry_date=now,
+                        row_update_date=now,
+                        platform_id=platform,
+                        data_source_id=data_source,
+                        external_identifier=record.source_platform_identifier,
+                        active=record.active,
+                        begin_date=record.begin_date,
+                        end_date=record.end_date,
+                        settings=record.settings,
+                    )
+                    created = True
+            except IntegrityError as exc:
+                if is_duplicate_platform_source_error(exc):
+                    platform_source = (
+                        PlatformSource.objects.filter(platform_id=platform)
+                        .order_by("row_id")
+                        .first()
+                    )
+
+                    if platform_source is None:
+                        raise SensorMapImportError(
+                            "Could not resolve existing platform source after "
+                            "duplicate constraint for row "
+                            f"{record.row_number}."
+                        ) from exc
+
+                    logger.info(
+                        "Reusing existing platform source %s for row %s.",
+                        platform_source.pk,
+                        record.row_number,
+                    )
+                else:
+                    raise
 
         if not created:
-            platform_source.active = record.active
-            platform_source.row_update_date = now
-            update_optional_dates(platform_source, record)
+            update_fields = []
+            update_model_field(
+                platform_source,
+                update_fields,
+                "active",
+                record.active,
+            )
+            update_optional_dates(platform_source, record, update_fields)
+            fill_blank_platform_source_identity(
+                platform_source,
+                update_fields,
+                record,
+                data_source,
+            )
 
             if record.settings is not None:
-                platform_source.settings = record.settings
-
-            platform_source.save(
-                update_fields=[
-                    "active",
-                    "begin_date",
-                    "end_date",
+                update_model_field(
+                    platform_source,
+                    update_fields,
                     "settings",
-                    "row_update_date",
-                ]
-            )
+                    record.settings,
+                )
+
+            if update_fields:
+                platform_source.row_update_date = now
+                update_fields.append("row_update_date")
+                platform_source.save(update_fields=update_fields)
 
         return platform_source
 
@@ -274,46 +345,75 @@ class SensorMapImportProcessor:
         platform_source: PlatformSource,
         sensor: Sensor,
         now,
-    ) -> SourceObservationMap:
-        source_observation_map, created = SourceObservationMap.objects.get_or_create(
-            platform_source_id=platform_source,
-            source_obs=record.source_obs,
-            source_identifier=record.source_identifier,
-            defaults={
-                "row_entry_date": now,
-                "row_update_date": now,
-                "sensor_id": sensor,
-                "source_uom": record.source_uom,
-                "active": record.active,
-                "begin_date": record.begin_date,
-                "end_date": record.end_date,
-                "settings": record.settings,
-            },
+    ) -> SourceObservationMapResolution:
+        source_observation_map = find_source_observation_map(
+            record,
+            platform_source,
         )
+        created = False
+
+        if source_observation_map is None:
+            source_observation_map = SourceObservationMap.objects.create(
+                row_entry_date=now,
+                row_update_date=now,
+                platform_source_id=platform_source,
+                sensor_id=sensor,
+                source_obs=record.source_obs,
+                source_uom=record.source_uom,
+                source_identifier=record.source_identifier,
+                active=record.active,
+                begin_date=record.begin_date,
+                end_date=record.end_date,
+                settings=record.settings,
+            )
+            created = True
 
         if not created:
-            source_observation_map.sensor_id = sensor
-            source_observation_map.source_uom = record.source_uom
-            source_observation_map.active = record.active
-            source_observation_map.row_update_date = now
-            update_optional_dates(source_observation_map, record)
+            update_fields = []
+            update_model_field(
+                source_observation_map,
+                update_fields,
+                "sensor_id",
+                sensor,
+            )
+            update_model_field(
+                source_observation_map,
+                update_fields,
+                "source_uom",
+                record.source_uom,
+            )
+            update_model_field(
+                source_observation_map,
+                update_fields,
+                "active",
+                record.active,
+            )
+            update_optional_dates(source_observation_map, record, update_fields)
 
             if record.settings is not None:
-                source_observation_map.settings = record.settings
-
-            source_observation_map.save(
-                update_fields=[
-                    "sensor_id",
-                    "source_uom",
-                    "active",
-                    "begin_date",
-                    "end_date",
+                update_model_field(
+                    source_observation_map,
+                    update_fields,
                     "settings",
-                    "row_update_date",
-                ]
+                    record.settings,
+                )
+
+            if update_fields:
+                source_observation_map.row_update_date = now
+                update_fields.append("row_update_date")
+                source_observation_map.save(update_fields=update_fields)
+
+            return SourceObservationMapResolution(
+                source_observation_map=source_observation_map,
+                created=False,
+                updated=bool(update_fields),
             )
 
-        return source_observation_map
+        return SourceObservationMapResolution(
+            source_observation_map=source_observation_map,
+            created=True,
+            updated=False,
+        )
 
 
 def resolve_m_type(obs_type: Obs_type, uom_type: Uom_type) -> M_type:
@@ -367,12 +467,154 @@ def m_type_description(obs_type: Obs_type, uom_type: Uom_type) -> str:
     return f"{obs_label} / {uom_label}"
 
 
-def update_optional_dates(model_instance, record: NormalizedSensorMapRecord):
+def result_status(
+    sensor_resolution: SensorResolution,
+    source_map_resolution: SourceObservationMapResolution,
+) -> str:
+    if (
+        sensor_resolution.created
+        or source_map_resolution.created
+        or source_map_resolution.updated
+    ):
+        return "imported"
+
+    return "skipped"
+
+
+def import_result_message(
+    record: NormalizedSensorMapRecord,
+    sensor_resolution: SensorResolution,
+    source_map_resolution: SourceObservationMapResolution,
+) -> str:
+    sensor_action = "created sensor"
+
+    if not sensor_resolution.created:
+        sensor_action = "reused existing sensor"
+
+    if source_map_resolution.created:
+        map_action = "created source observation map"
+    elif source_map_resolution.updated:
+        map_action = "updated source observation map"
+    else:
+        map_action = "source observation map already existed"
+
+    verb = "Imported"
+
+    if not (
+        sensor_resolution.created
+        or source_map_resolution.created
+        or source_map_resolution.updated
+    ):
+        verb = "Skipping"
+
+    return (
+        f"{verb} row {record.row_number}: {sensor_action} "
+        f"{sensor_resolution.sensor.pk} and {map_action} "
+        f"{source_map_resolution.source_observation_map.pk} "
+        f"for platform {record.target_platform_handle}"
+    )
+
+
+def update_optional_dates(
+    model_instance,
+    record: NormalizedSensorMapRecord,
+    update_fields=None,
+):
     if record.begin_date is not None:
-        model_instance.begin_date = record.begin_date
+        update_model_field(
+            model_instance,
+            update_fields,
+            "begin_date",
+            record.begin_date,
+        )
 
     if record.end_date is not None:
-        model_instance.end_date = record.end_date
+        update_model_field(
+            model_instance,
+            update_fields,
+            "end_date",
+            record.end_date,
+        )
+
+
+def update_model_field(model_instance, update_fields, field_name, value):
+    if getattr(model_instance, field_name) == value:
+        return
+
+    setattr(model_instance, field_name, value)
+
+    if update_fields is not None:
+        update_fields.append(field_name)
+
+
+def fill_blank_platform_source_identity(
+    platform_source: PlatformSource,
+    update_fields,
+    record: NormalizedSensorMapRecord,
+    data_source: DataSource,
+):
+    if platform_source.data_source_id_id is None:
+        update_model_field(
+            platform_source,
+            update_fields,
+            "data_source_id",
+            data_source,
+        )
+
+    if not platform_source.external_identifier:
+        update_model_field(
+            platform_source,
+            update_fields,
+            "external_identifier",
+            record.source_platform_identifier,
+        )
+
+
+def find_source_observation_map(
+    record: NormalizedSensorMapRecord,
+    platform_source: PlatformSource,
+) -> SourceObservationMap | None:
+    queryset = SourceObservationMap.objects.filter(
+        platform_source_id=platform_source,
+        source_obs=record.source_obs,
+    )
+
+    if record.source_identifier:
+        exact_identifier_match = (
+            queryset.filter(source_identifier=record.source_identifier)
+            .order_by("row_id")
+            .first()
+        )
+
+        if exact_identifier_match is not None:
+            return exact_identifier_match
+    else:
+        blank_identifier_match = (
+            queryset.filter(
+                Q(source_identifier__isnull=True) | Q(source_identifier="")
+            )
+            .order_by("row_id")
+            .first()
+        )
+
+        if blank_identifier_match is not None:
+            return blank_identifier_match
+
+    uom_match = (
+        queryset.filter(source_uom=record.source_uom)
+        .order_by("row_id")
+        .first()
+    )
+
+    if uom_match is not None:
+        return uom_match
+
+    candidates = list(queryset.order_by("row_id")[:2])
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    return None
 
 
 def is_duplicate_target_sensor_error(exc: IntegrityError) -> bool:
@@ -392,3 +634,21 @@ def is_duplicate_target_sensor_error(exc: IntegrityError) -> bool:
 
     field_names = ("platform_id", "m_type_id", "s_order")
     return all(field_name in message for field_name in field_names)
+
+
+def is_duplicate_platform_source_error(exc: IntegrityError) -> bool:
+    constraint_name = getattr(
+        getattr(getattr(exc, "__cause__", None), "diag", None),
+        "constraint_name",
+        None,
+    )
+
+    if constraint_name == PLATFORM_SOURCE_PLATFORM_UNIQUE_CONSTRAINT_NAME:
+        return True
+
+    message = str(exc)
+
+    if PLATFORM_SOURCE_PLATFORM_UNIQUE_CONSTRAINT_NAME in message:
+        return True
+
+    return "platform_source" in message and "platform_id" in message
