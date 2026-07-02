@@ -210,6 +210,12 @@ class PlatformSource(models.Model):
         unique_together = (
             ('platform_id', 'data_source_id', 'external_identifier'),
         )
+        constraints = [
+            models.UniqueConstraint(
+                fields=["platform_id"],
+                name='unique_platform_source_platform_id',
+            ),
+        ]
 
     def __str__(self):
         return f"Platform Source {getattr(self, 'external_identifier', self.pk)}"
