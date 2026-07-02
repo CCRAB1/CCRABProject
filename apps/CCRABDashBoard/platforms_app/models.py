@@ -207,9 +207,9 @@ class PlatformSource(models.Model):
     class Meta:
         db_table = '"platforms"."platform_source"'
         managed = True
-        unique_together = (
-            ('platform_id', 'data_source_id', 'external_identifier'),
-        )
+        #unique_together = (
+        #    ('platform_id', 'data_source_id', 'external_identifier'),
+        #)
         constraints = [
             models.UniqueConstraint(
                 fields=["platform_id"],
