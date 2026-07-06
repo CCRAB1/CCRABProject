@@ -11,6 +11,7 @@ let alpineComponentsRegistered = false;
 // Define the reusable sleep utility
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+const default_obs_to_display = ["air_temperature 1", "air_pressure 1", "relative_humidity 1", "pm2.5 1"];
 function registerAlpineComponents() {
   if (alpineComponentsRegistered) {
     return;
@@ -19,7 +20,7 @@ function registerAlpineComponents() {
 
   Alpine.data("platformPage", function () {
     return {
-      activePanel: "observations",
+      activePanel: "current_data",
       showAllObservations: false,
       isLoadingObservationData: false,
       platformInfo: null,
@@ -27,13 +28,18 @@ function registerAlpineComponents() {
       observationTimeSeriesDoc: null,
       startDateTime: null,
       endDateTime: null,
+      currentObservationsToDisplay: null,
+      sensorListToDisplay: null,
 
       init() {
+        console.log("Initializing platform page");
         var endDate = DateTime.utc();
         var startDate = endDate.minus({ hours: 1 });
+        console.log("Getting platformInfo from page element.")
         this.platformInfo = PlatformInfo.fromScriptElement("platform-info-data");
+        this.setupDisplayObservations();
         if (this.platformInfo !== null) {
-
+          console.log("Querying data for platform: " + this.platformInfo.platformHandle + " from: " + startDate + " to " + endDate);
           this.getObservationData(
             startDate,
             endDate,
@@ -62,6 +68,58 @@ function registerAlpineComponents() {
           this.isLoadingObservationData = false;
         }
       },
+      /**
+       * Sets up the initial display observations based on the platform info.
+       *
+       * @returns {void}*/
+      setupDisplayObservations() {
+        console.log("Setting up display observations");
+        var platform_handle = this.platformInfo.platformHandle;
+        var initial_setup = false;
+        if(this.currentObservationsToDisplay == null) {
+          initial_setup = true;
+          this.currentObservationsToDisplay = {};
+          this.currentObservationsToDisplay[platform_handle] = {};
+        }
+        for (const sensor_nfo of this.platformInfo.sensors)
+        {
+          if(initial_setup)
+          {
+            //We will have multiple sensors of the same type, so we build the key based on name and order.
+            var obs_key = sensor_nfo.obsStandardName + " " + sensor_nfo.order;
+            this.currentObservationsToDisplay[platform_handle][obs_key] = false;
+            if(default_obs_to_display.includes(obs_key)) {
+              console.log("Setting default observation to true: " + obs_key);
+              this.currentObservationsToDisplay[platform_handle][obs_key] = true;
+            }
+          }
+        }
+      },
+      /**
+       * Determines the initial display state of the observations based on the platform info.
+       *
+       * @param check_box_obs_name
+       * @param check_box_sensor_order
+       */
+      initialObservationDisplayState(check_box_obs_name, check_box_sensor_order) {
+        var initial_state = false;
+        if(this.currentObservationsToDisplay != null) {
+          var platform_handle = this.platformInfo.platformHandle;
+          var obs_state = Object.entries(this.currentObservationsToDisplay[platform_handle]);
+          for(const [observation, state] of obs_state) {
+            var check_box_obs_name_key = check_box_obs_name + " " + check_box_sensor_order;
+            if (check_box_obs_name_key == observation) {
+              console.log("Observation is in the list of observations to display: " + check_box_obs_name_key);
+              initial_state = this.currentObservationsToDisplay[platform_handle][observation];
+              if(initial_state) {
+                console.log("Observation is set to true: " + check_box_obs_name_key);
+              }
+              break;
+            }
+          }
+        }
+        return initial_state;
+      },
       setPanel(panel) {
         this.activePanel = panel;
         this.$nextTick(function () {
@@ -76,6 +134,22 @@ function registerAlpineComponents() {
         return formattedDateTime
       },
 
+      /**
+       * This funciton creates the listing of the observation the platform collects.
+       * @returns {{key: string, obsStandardName: *, sensorOrder: *, units}[]}
+       */
+      get platformInfoTableRows() {
+        const sensors = this.platformInfo.sensors || [];
+        return sensors.map((sensor) => {
+          return {
+            key: `${sensor.obsStandardName}-${sensor.order}`,
+            obsStandardName: sensor.obsStandardName,
+            sensorOrder: sensor.order,
+            units: sensor.uomDisplay || sensor.uomStandardName
+          };
+        });
+      },
+
       get observationTableRows() {
         const sensors = this.platformInfo.sensors || [];
         return sensors.map((sensor) => {
@@ -85,9 +159,9 @@ function registerAlpineComponents() {
             max: "N/A",
             most_recent: "N/A"
           };
-          if(this.observationTimeSeriesDoc != null) {
+          if (this.observationTimeSeriesDoc != null) {
             var series = this.observationTimeSeriesDoc.getSeries(timeseries_id);
-            if(series !== undefined) {
+            if (series !== undefined) {
               //Get the start/end date from the series.
               this.startDateTime = this.formatDateTimeStr(series.getOldestRecord().timestamp);
               this.endDateTime = this.formatDateTimeStr(series.getLatestRecord().timestamp);
@@ -97,28 +171,54 @@ function registerAlpineComponents() {
                 max: series.max_record,
                 most_recent: series.getLatestRecord()
               }
-            }
-            else
-            {
+            } else {
               console.error("Timeseries ID: " + timeseries_id + " is undefined.");
             }
           }
           return {
             key: `${sensor.obsStandardName}-${sensor.order}`,
-            obsStandardName: timeseries_id,
-            channelLabel: sensor.channelLabel,
+            obsStandardName: sensor.obsStandardName,
+            obsSOrder: sensor.order,
             units: sensor.uomDisplay || sensor.uomStandardName,
+            display: this.displayObservation(sensor.obsStandardName, sensor.order),
             stats,
           };
         });
       },
+      displayObservation(obsStandardName, obsSOrder) {
+        var platform_handle = this.platformInfo.platformHandle;
+        if(platform_handle in this.currentObservationsToDisplay) {
+          var current_platform_settings = this.currentObservationsToDisplay[platform_handle];
+          var obs_key = obsStandardName + " " + obsSOrder;
+          if(obs_key in current_platform_settings) {
+            return current_platform_settings[obs_key];
+          }
+        }
+        return false;
+      },
+
       formatObservationValue(value) {
         if (value === null || value === undefined) return "No data";
         if (!Number.isFinite(Number(value))) return String(value);
 
         return Number(value).toFixed(2);
       },
-
+      /**
+       * Determines if the observation should be displayed based on the current state of the check box.
+       * @param checked
+       * @param obsStandardName
+       * @param obsSOrder
+       */
+      observationCheckClicked(checked, obsStandardName, obsSOrder) {
+        console.log("Displaying observation: " + obsStandardName + " Order: " + obsSOrder + " Checked: " + checked);
+        var obs_key = obsStandardName + " " + obsSOrder;
+        if(!(this.platformInfo.platformHandle in this.currentObservationsToDisplay))
+        {
+          this.platformInfo.platformHandle[this.platformInfo.platformHandle] = {};
+        }
+        var current_platform_settings = this.currentObservationsToDisplay[this.platformInfo.platformHandle];
+        current_platform_settings[obs_key] = !!checked;
+      }
     };
   });
 
@@ -306,6 +406,8 @@ function registerAlpineComponents() {
     };
   });
 }
+
+
 
 window.Alpine = Alpine;
 registerAlpineComponents();

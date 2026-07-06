@@ -68,12 +68,22 @@
             <button
                 type="button"
                 class="button platform-tab-button"
+                :class="activePanel === 'current_data' ? 'is-primary' : 'is-light'"
+                @click="setPanel('current_data')"
+                role="tab"
+                :aria-selected="activePanel === 'current_data' ? 'true' : 'false'"
+            >
+                Current Data
+            </button>
+            <button
+                type="button"
+                class="button platform-tab-button"
                 :class="activePanel === 'observations' ? 'is-primary' : 'is-light'"
                 @click="setPanel('observations')"
                 role="tab"
                 :aria-selected="activePanel === 'observations' ? 'true' : 'false'"
             >
-                Observations
+                Observations Collected
             </button>
             <button
                 type="button"
@@ -152,14 +162,13 @@
         </section>
 
         <section
-            x-show="activePanel === 'observations'"
+            x-show="activePanel === 'current_data'"
             x-transition.opacity
             x-cloak
             role="tabpanel"
-            aria-label="Platform observations"
+            aria-label="Obervations Collected"
         >
             <div class="platform-section-header">
-                <h2 class="platform-section-title">Observations Collected</h2>
                 <h2>
                     From: <span x-text="startDateTime"></span>
                 </h2>
@@ -180,9 +189,11 @@
                         </tr>
                     </thead>
                     <template x-for="obs_row in observationTableRows" :key="obs_row.key">
-                        <tr>
+                        <template x-if="displayObservation(obs_row.obsStandardName, obs_row.obsSOrder)">
+                            <tr>
                             <td>
                               <strong x-text="obs_row.obsStandardName"></strong>
+                              <strong x-text="obs_row.obsSOrder"></strong>
                               <!---
                               <span class="has-text-grey" x-text="obs_row.channelLabel"></span>
                               --->
@@ -196,10 +207,67 @@
                             <td x-text="formatObservationValue(obs_row.stats?.min.value)"></td>
                             <td x-text="formatObservationValue(obs_row.stats?.max.value)"></td>
                         </tr>
-
+                        </template>
                         <tr x-show="isLoadingObservationData">
                           <td colspan="4" class="has-text-grey">
                             Loading observation data...
+                          </td>
+                        </tr>
+                    </template>
+                </table>
+            </div>
+
+            {% if platform_info.properties.sensors|length > 8 %}
+                <button
+                    type="button"
+                    class="button is-small is-light mt-4"
+                    @click="showAllObservations = !showAllObservations"
+                    x-text="showAllObservations ? 'Show fewer' : 'Show all observations'"
+                >
+                    Show all observations
+                </button>
+            {% endif %}
+        </section>
+        <section
+            x-show="activePanel === 'observations'"
+            x-transition.opacity
+            x-cloak
+            role="tabpanel"
+            aria-label="Platform observations"
+        >
+            <div class="platform-section-header">
+                <h2 class="platform-section-title">Observations Collected</h2>
+                <span class="tag is-light">{{ platform_info.properties.sensors|length }}</span>
+            </div>
+
+            <div class="platform-observation-list">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Observation</th>
+                            <th>Units of Measurement</th>
+                            <th>Show in Current Observations</th>
+                        </tr>
+                    </thead>
+                    <template x-for="obs_row in platformInfoTableRows" :key="obs_row.key">
+                        <tr>
+                            <td>
+                              <strong x-text="obs_row.obsStandardName"></strong>
+                              <strong x-text="obs_row.sensorOrder"></strong>
+                            </td>
+                            <td>
+                                <strong x-text="obs_row.units"></strong>
+                            </td>
+                            <td>
+                                <input
+                                    type="checkbox"
+                                    :checked="initialObservationDisplayState(obs_row.obsStandardName, obs_row.sensorOrder)"
+                                    @change="observationCheckClicked($event.target.checked, obs_row.obsStandardName, obs_row.sensorOrder)"/>
+                            </td>
+                        </tr>
+                        <tr x-show="isLoadingObservationData">
+                          <td colspan="4" class="has-text-grey">
+                            Loading observation list...
                           </td>
                         </tr>
                     </template>
