@@ -352,6 +352,11 @@ class Multi_obs(models.Model):
                 fields=['m_date', 'platform_handle'],
                 name='i_multi_obs_date_platform',
             ),
+            models.Index(
+                fields=['platform_handle', 'm_date'],
+                include=['sensor_id', 'm_value', 'm_lon', 'm_lat'],
+                name='i_multi_obs_platform_date',
+            ),
         ]
 
     def __str__(self):
