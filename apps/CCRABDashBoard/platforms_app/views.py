@@ -276,13 +276,6 @@ def platform_data_request(request):
 
     queryset = (
         Multi_obs.objects
-        .select_related(
-            "sensor_id",
-            "sensor_id__m_type_id",
-            "sensor_id__m_type_id__m_scalar_type_id",
-            "sensor_id__m_type_id__m_scalar_type_id__obs_type_id",
-            "sensor_id__m_type_id__m_scalar_type_id__uom_type_id",
-        )
         .filter(
             m_date__gte=start_date,
             m_date__lte=end_date,
@@ -302,6 +295,17 @@ def platform_data_request(request):
             s_order=F("sensor_id__s_order"),
         )
         .order_by("m_date", "observation_name", "s_order")
+        .values(
+            "m_date",
+            "m_value",
+            "m_lon",
+            "m_lat",
+            "platform_handle",
+            "observation_name",
+            "uom_display",
+            "uom_standard_name",
+            "s_order",
+        )
     )
     jts_document = JtsDocument()
     current_obs_type = None
@@ -309,21 +313,21 @@ def platform_data_request(request):
     for ndx, row in enumerate(queryset):
         if ndx == 0:
             first_row = row
-        ident = f"{row.observation_name} {row.sensor_id.s_order}"
+        ident = f"{row['observation_name']} {row['s_order']}"
         if current_obs_type != ident:
             data_ts = next((ts for ts in jts_document.series if ts.identifier == ident), None)
             if data_ts is None:
-                data_ts = TimeSeries(identifier=f"{row.observation_name} {row.sensor_id.s_order}",
-                                     name=row.observation_name,
-                                     units=row.uom_display or row.uom_standard_name,
+                data_ts = TimeSeries(identifier=ident,
+                                     name=row["observation_name"],
+                                     units=row["uom_display"] or row["uom_standard_name"],
                                      data_type='NUMBER')
                 jts_document.series.append(data_ts)
             current_obs_type = ident
-        data_ts.records.append(TsRecord(**{'timestamp': row.m_date,
-                                           'value': row.m_value}))
-    feature_rec = Feature(geometry=Point((first_row.m_lon, first_row.m_lat)),
+        data_ts.records.append(TsRecord(**{'timestamp': row["m_date"],
+                                           'value': row["m_value"]}))
+    feature_rec = Feature(geometry=Point((first_row["m_lon"], first_row["m_lat"])),
                           properties={
-                            "platform_handle": first_row.platform_handle,
+                            "platform_handle": first_row["platform_handle"],
                             "start_date": start_date.strftime("%Y-%m-%dT%H:%M:%S"),
                             "end_date": end_date.strftime("%Y-%m-%dT%H:%M:%S"),
                             "timeseries": jts_document.toJSON()

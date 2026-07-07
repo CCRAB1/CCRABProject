@@ -160,7 +160,6 @@
                 </div>
             </div>
         </section>
-
         <section
             x-show="activePanel === 'current_data'"
             x-transition.opacity
@@ -179,6 +178,31 @@
             </div>
 
             <div class="platform-observation-list">
+                <div class="columns is-mobile">
+                    <div class="column is-one-third"><strong>Observation</strong></div>
+                    <div class="column"><strong>Current</strong></div>
+                    <div class="column"><abbr title="Min"><strong>Minimum</strong></abbr></div>
+                    <div class="column"><abbr title="Max"><strong>Maximum</strong></abbr></div>
+                </div>
+                <template x-for="obs_row in observationTableRows" :key="obs_row.key">
+                    <template x-if="displayObservation(obs_row.obsStandardName, obs_row.obsSOrder)">
+                        <div class="columns is-mobile">
+                            <div class="column is-one-third" @click="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
+                              <span x-text="obs_row.obsStandardName"></span>
+                              <span x-text="obs_row.obsSOrder"></span>
+                              <span
+                                class="tag is-info is-light"
+                                x-show="obs_row.units"
+                                x-text="obs_row.units">
+                              </span>
+                            </div>
+                            <div class="column" x-text="formatObservationValue(obs_row.stats?.most_recent.value)"></div>
+                            <div class="column" x-text="formatObservationValue(obs_row.stats?.min.value)"></div>
+                            <div class="column" x-text="formatObservationValue(obs_row.stats?.max.value)"></div>
+                    </div>
+                    </template>
+                </template>
+                <!--
                 <table class="table">
                     <thead>
                         <tr>
@@ -191,12 +215,9 @@
                     <template x-for="obs_row in observationTableRows" :key="obs_row.key">
                         <template x-if="displayObservation(obs_row.obsStandardName, obs_row.obsSOrder)">
                             <tr>
-                            <td>
+                            <td @change="toggleObservation(obs_row.obsStandardName, obs_row.obsSOrder)">
                               <strong x-text="obs_row.obsStandardName"></strong>
                               <strong x-text="obs_row.obsSOrder"></strong>
-                              <!---
-                              <span class="has-text-grey" x-text="obs_row.channelLabel"></span>
-                              --->
                               <span
                                 class="tag is-info is-light"
                                 x-show="obs_row.units"
@@ -215,6 +236,7 @@
                         </tr>
                     </template>
                 </table>
+                -->
             </div>
 
             {% if platform_info.properties.sensors|length > 8 %}
@@ -285,7 +307,6 @@
                 </button>
             {% endif %}
         </section>
-
         <section
             x-show="activePanel === 'location'"
             x-transition.opacity
@@ -317,6 +338,9 @@
             </div>
         </section>
     </div>
+    <canvas id="graph-container" style="width:100%; height:400px;">
+
+    </canvas>
 {% endblock %}
 
 {% block extra_scripts %}

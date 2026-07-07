@@ -30,14 +30,16 @@ function registerAlpineComponents() {
       endDateTime: null,
       currentObservationsToDisplay: null,
       sensorListToDisplay: null,
+      observationChart: null,
 
       init() {
         console.log("Initializing platform page");
         var endDate = DateTime.utc();
-        var startDate = endDate.minus({ hours: 1 });
+        var startDate = endDate.minus({ hours: 24 });
         console.log("Getting platformInfo from page element.")
         this.platformInfo = PlatformInfo.fromScriptElement("platform-info-data");
         this.setupDisplayObservations();
+        this.createChart("graph-container");
         if (this.platformInfo !== null) {
           console.log("Querying data for platform: " + this.platformInfo.platformHandle + " from: " + startDate + " to " + endDate);
           this.getObservationData(
@@ -67,6 +69,44 @@ function registerAlpineComponents() {
         finally {
           this.isLoadingObservationData = false;
         }
+      },
+      /**
+       *
+       */
+      createChart(chartID) {
+        console.log("Creating chart");
+        var chart_id = document.getElementById(chartID);
+        this.observationChart = new Chart(
+          chart_id,
+          {
+            type: 'line',
+            data: {
+                labels: [], // No labels initially
+                datasets: [] // No datasets initially
+            },
+            options: {
+              responsive: true,
+              scales: {
+                  y: {
+                      beginAtZero: true // Ensures scale starts nicely
+                  }
+              }
+            }
+          });
+      },
+      addObservationToChart(label, newData) {
+          this.observationChart.data.labels.push(label);
+          this.observationChart.data.datasets.forEach((dataset) => {
+              dataset.data.push(newData);
+          });
+          this.observationChart.update();
+      },
+      removeObservationToChart() {
+          this.observationChart.data.labels.pop();
+          this.observationChart.data.datasets.forEach((dataset) => {
+              dataset.data.pop();
+          });
+          this.observationChart.update();
       },
       /**
        * Sets up the initial display observations based on the platform info.
@@ -218,6 +258,9 @@ function registerAlpineComponents() {
         }
         var current_platform_settings = this.currentObservationsToDisplay[this.platformInfo.platformHandle];
         current_platform_settings[obs_key] = !!checked;
+      },
+      graphObservationClicked(obsStandardName, obsSOrder) {
+        console.log("Toggling observation: " + obsStandardName + " Order: " + obsSOrder);
       }
     };
   });
