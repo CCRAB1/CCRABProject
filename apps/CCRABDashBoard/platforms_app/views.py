@@ -284,9 +284,9 @@ def platform_data_request(request):
             "sensor_id__m_type_id__m_scalar_type_id__uom_type_id",
         )
         .filter(
-            platform_handle=platform_handle,
             m_date__gte=start_date,
             m_date__lte=end_date,
+            platform_handle=platform_handle,
             sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observations,
         )
         .annotate(
