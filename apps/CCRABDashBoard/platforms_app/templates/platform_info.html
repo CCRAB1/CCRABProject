@@ -179,17 +179,20 @@
 
             <div class="platform-observation-list">
                 <div class="columns is-mobile">
-                    <div class="column is-one-third"><strong>Observation</strong></div>
+                    <div class="column is-one-quarter"><strong>Observation</strong></div>
+                    <div class="column"><strong>Units</strong></div>
                     <div class="column"><strong>Current</strong></div>
                     <div class="column"><abbr title="Min"><strong>Minimum</strong></abbr></div>
                     <div class="column"><abbr title="Max"><strong>Maximum</strong></abbr></div>
                 </div>
                 <template x-for="obs_row in observationTableRows" :key="obs_row.key">
-                    <template x-if="displayObservation(obs_row.obsStandardName, obs_row.obsSOrder)">
+                    <template x-if="getObservationDisplayState(obs_row.obsStandardName, obs_row.obsSOrder)">
                         <div class="columns is-mobile">
-                            <div class="column is-one-third" @click="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
+                            <div class="column is-one-quarter" @click="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
                               <span x-text="obs_row.obsStandardName"></span>
-                              <span x-text="obs_row.obsSOrder"></span>
+                              <span x-text="obs_row.obsSOrderLabel"></span>
+                            </div>
+                            <div class="column" @click="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
                               <span
                                 class="tag is-info is-light"
                                 x-show="obs_row.units"
@@ -238,17 +241,18 @@
                 </table>
                 -->
             </div>
-
-            {% if platform_info.properties.sensors|length > 8 %}
-                <button
-                    type="button"
-                    class="button is-small is-light mt-4"
-                    @click="showAllObservations = !showAllObservations"
-                    x-text="showAllObservations ? 'Show fewer' : 'Show all observations'"
-                >
-                    Show all observations
-                </button>
-            {% endif %}
+            <div
+                class="platform-chart-panel"
+                x-data="chartComponent()"
+                @graph:toggle-dataset.window="toggleDataset($event.detail)"
+            >
+                <div class="platform-chart-header">
+                    <h2 class="platform-section-title">Observation Graph</h2>
+                </div>
+                <div class="platform-chart-canvas-wrap">
+                    <canvas x-ref="canvas" aria-label="Observation graph"></canvas>
+                </div>
+            </div>
         </section>
         <section
             x-show="activePanel === 'observations'"
@@ -275,7 +279,7 @@
                         <tr>
                             <td>
                               <strong x-text="obs_row.obsStandardName"></strong>
-                              <strong x-text="obs_row.sensorOrder"></strong>
+                              <strong x-text="obs_row.sensorLabel"></strong>
                             </td>
                             <td>
                                 <strong x-text="obs_row.units"></strong>
@@ -338,9 +342,7 @@
             </div>
         </section>
     </div>
-    <canvas id="graph-container" style="width:100%; height:400px;">
 
-    </canvas>
 {% endblock %}
 
 {% block extra_scripts %}

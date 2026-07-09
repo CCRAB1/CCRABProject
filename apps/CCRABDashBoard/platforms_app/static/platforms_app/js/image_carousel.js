@@ -1,6 +1,7 @@
 import { CCRABRestClient } from "../../js/CCRABApiClient/src/index.js";
 import Alpine from "../../vendor/alpinejs/3.15.12/module.esm.min.js";
 import { DateTime } from "../../vendor/luxon/3.7.2/luxon.min.js";
+import { registerGraphComponents } from "./graph.js";
 import { PlatformInfo } from "./platform_info.js";
 import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
 import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";;
@@ -11,12 +12,14 @@ let alpineComponentsRegistered = false;
 // Define the reusable sleep utility
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-const default_obs_to_display = ["air_temperature 1", "air_pressure 1", "relative_humidity 1", "pm2.5 1"];
+const default_obs_to_display = ["air_temperature 1", "air_pressure 1", "relative_humidity 1", "pm2.5_atm 1"];
 function registerAlpineComponents() {
   if (alpineComponentsRegistered) {
     return;
   }
   alpineComponentsRegistered = true;
+
+  registerGraphComponents(Alpine);
 
   Alpine.data("platformPage", function () {
     return {
@@ -30,7 +33,6 @@ function registerAlpineComponents() {
       endDateTime: null,
       currentObservationsToDisplay: null,
       sensorListToDisplay: null,
-      observationChart: null,
 
       init() {
         console.log("Initializing platform page");
@@ -39,7 +41,6 @@ function registerAlpineComponents() {
         console.log("Getting platformInfo from page element.")
         this.platformInfo = PlatformInfo.fromScriptElement("platform-info-data");
         this.setupDisplayObservations();
-        this.createChart("graph-container");
         if (this.platformInfo !== null) {
           console.log("Querying data for platform: " + this.platformInfo.platformHandle + " from: " + startDate + " to " + endDate);
           this.getObservationData(
@@ -69,44 +70,6 @@ function registerAlpineComponents() {
         finally {
           this.isLoadingObservationData = false;
         }
-      },
-      /**
-       *
-       */
-      createChart(chartID) {
-        console.log("Creating chart");
-        var chart_id = document.getElementById(chartID);
-        this.observationChart = new Chart(
-          chart_id,
-          {
-            type: 'line',
-            data: {
-                labels: [], // No labels initially
-                datasets: [] // No datasets initially
-            },
-            options: {
-              responsive: true,
-              scales: {
-                  y: {
-                      beginAtZero: true // Ensures scale starts nicely
-                  }
-              }
-            }
-          });
-      },
-      addObservationToChart(label, newData) {
-          this.observationChart.data.labels.push(label);
-          this.observationChart.data.datasets.forEach((dataset) => {
-              dataset.data.push(newData);
-          });
-          this.observationChart.update();
-      },
-      removeObservationToChart() {
-          this.observationChart.data.labels.pop();
-          this.observationChart.data.datasets.forEach((dataset) => {
-              dataset.data.pop();
-          });
-          this.observationChart.update();
       },
       /**
        * Sets up the initial display observations based on the platform info.
@@ -168,11 +131,6 @@ function registerAlpineComponents() {
           );
         });
       },
-      formatDateTimeStr(timestamp_rec) {
-        var dt = DateTime.fromJSDate(timestamp_rec);
-        var formattedDateTime = dt.toFormat("yyyy-MM-dd hh:mm:ss a");
-        return formattedDateTime
-      },
 
       /**
        * This funciton creates the listing of the observation the platform collects.
@@ -185,11 +143,15 @@ function registerAlpineComponents() {
             key: `${sensor.obsStandardName}-${sensor.order}`,
             obsStandardName: sensor.obsStandardName,
             sensorOrder: sensor.order,
+            sensorLabel: this.formatSOrder(sensor.order),
             units: sensor.uomDisplay || sensor.uomStandardName
           };
         });
       },
-
+      /**
+       * This is an iterator that returns the data we want to display in the tab.
+       * @returns {{key: string, obsStandardName: *, obsSOrder: *, units, display: *, stats: {min: *, max: *, most_recent: *}|*}[]}
+       */
       get observationTableRows() {
         const sensors = this.platformInfo.sensors || [];
         return sensors.map((sensor) => {
@@ -219,29 +181,13 @@ function registerAlpineComponents() {
             key: `${sensor.obsStandardName}-${sensor.order}`,
             obsStandardName: sensor.obsStandardName,
             obsSOrder: sensor.order,
+            obsSOrderLabel: this.formatSOrder(sensor.order),
             units: sensor.uomDisplay || sensor.uomStandardName,
-            display: this.displayObservation(sensor.obsStandardName, sensor.order),
+            display: this.getObservationDisplayState(sensor.obsStandardName,
+                                                      sensor.order),
             stats,
           };
         });
-      },
-      displayObservation(obsStandardName, obsSOrder) {
-        var platform_handle = this.platformInfo.platformHandle;
-        if(platform_handle in this.currentObservationsToDisplay) {
-          var current_platform_settings = this.currentObservationsToDisplay[platform_handle];
-          var obs_key = obsStandardName + " " + obsSOrder;
-          if(obs_key in current_platform_settings) {
-            return current_platform_settings[obs_key];
-          }
-        }
-        return false;
-      },
-
-      formatObservationValue(value) {
-        if (value === null || value === undefined) return "No data";
-        if (!Number.isFinite(Number(value))) return String(value);
-
-        return Number(value).toFixed(2);
       },
       /**
        * Determines if the observation should be displayed based on the current state of the check box.
@@ -254,14 +200,114 @@ function registerAlpineComponents() {
         var obs_key = obsStandardName + " " + obsSOrder;
         if(!(this.platformInfo.platformHandle in this.currentObservationsToDisplay))
         {
-          this.platformInfo.platformHandle[this.platformInfo.platformHandle] = {};
+          this.currentObservationsToDisplay[this.platformInfo.platformHandle] = {};
         }
         var current_platform_settings = this.currentObservationsToDisplay[this.platformInfo.platformHandle];
         current_platform_settings[obs_key] = !!checked;
       },
+      /**
+       * If the user clicks on the observation name, we figure out if we are showing or hiding the data on the
+       * graph.
+       * @param obsStandardName
+       * @param obsSOrder
+       */
       graphObservationClicked(obsStandardName, obsSOrder) {
         console.log("Toggling observation: " + obsStandardName + " Order: " + obsSOrder);
+        var payload = this.buildChartSeriesPayload(obsStandardName, obsSOrder);
+        if (!payload) return;
+
+        window.dispatchEvent(new CustomEvent("graph:toggle-dataset", {
+          detail: payload,
+        }));
+      },
+      buildChartSeriesPayload(obsStandardName, obsSOrder) {
+        if (!this.observationTimeSeriesDoc) return null;
+
+        var seriesId = this.observationSeriesId(obsStandardName, obsSOrder);
+        var series = this.observationTimeSeriesDoc.getSeries(seriesId);
+        if (!series) {
+          console.warn("Timeseries ID: " + seriesId + " is undefined.");
+          return null;
+        }
+        var graphData = [];
+        series._records.forEach((record) => {
+          graphData.push({x: record.timestamp.toISOString(),
+            y: Number(record.value)});
+        });
+
+        var sensor = this.findSensor(obsStandardName, obsSOrder);
+        return {
+          id: seriesId,
+          label: this.formatObservationLabel(obsStandardName, obsSOrder),
+          data: graphData,
+        };
+      },
+      findSensor(obsStandardName, obsSOrder) {
+        const sensors = this.platformInfo?.sensors || [];
+        return sensors.find((sensor) => {
+          return (
+            sensor.obsStandardName === obsStandardName &&
+            String(sensor.order) === String(obsSOrder)
+          );
+        });
+      },
+      observationSeriesId(obsStandardName, obsSOrder) {
+        return obsStandardName + " " + obsSOrder;
+      },
+      formatObservationLabel(obsStandardName, obsSOrder) {
+        return obsStandardName + " " + this.formatSOrder(obsSOrder);
+      },
+      /**
+       * Given the parameters, determine what the display state of the observation is.
+       * @param obsStandardName
+       * @param obsSOrder
+       * @returns {*|boolean}
+       */
+      getObservationDisplayState(obsStandardName, obsSOrder)
+      {
+          var obs_key = obsStandardName + " " + obsSOrder;
+          if(this.platformInfo.platformHandle in this.currentObservationsToDisplay &&
+              (obs_key in this.currentObservationsToDisplay[this.platformInfo.platformHandle]))
+          {
+              return this.currentObservationsToDisplay[this.platformInfo.platformHandle][obs_key];
+          }
+          return false;
+      },
+      /**
+       * Formats the passed in value for display.
+       * @param value
+       * @returns {string}
+       */
+      formatObservationValue(value) {
+        if (value === null || value === undefined) return "No data";
+        if (!Number.isFinite(Number(value))) return String(value);
+
+        return Number(value).toFixed(2);
+      },
+      /**
+       * Formats the passed in timestamp param for display.
+       * @param timestamp_rec
+       * @returns {string}
+       */
+      formatDateTimeStr(timestamp_rec) {
+        var dt = DateTime.fromJSDate(timestamp_rec);
+        var formattedDateTime = dt.toFormat("yyyy-MM-dd hh:mm:ss a");
+        return formattedDateTime
+      },
+      /**
+       * Formats the sOrder to the more industry appropriate format.
+       * @param sOrder
+       */
+      formatSOrder(sOrder) {
+        if(sOrder == 1) {
+          return 'A';
+        }
+        else if(sOrder == 2) {
+          return 'B';
+        }
+        return String(sOrder);
       }
+
     };
   });
 
