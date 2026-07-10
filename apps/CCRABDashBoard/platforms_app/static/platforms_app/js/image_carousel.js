@@ -213,12 +213,25 @@ function registerAlpineComponents() {
        */
       graphObservationClicked(obsStandardName, obsSOrder) {
         console.log("Toggling observation: " + obsStandardName + " Order: " + obsSOrder);
-        var payload = this.buildChartSeriesPayload(obsStandardName, obsSOrder);
-        if (!payload) return;
+        var seriesId = this.observationSeriesId(obsStandardName, obsSOrder);
+        if (Alpine.store("graph").has(seriesId))
+        {
+          console.log("Removing seriesID: " + seriesId + " from graph")
+          Alpine.store("graph").remove(seriesId);
+          window.dispatchEvent(new CustomEvent("graph:remove-dataset", {
+            detail: seriesId,
+          }));
+        }
+        else {
+          Alpine.store("graph").add(seriesId);
+          // build data and dispatch add event
+          var payload = this.buildChartSeriesPayload(obsStandardName, obsSOrder);
+          if (!payload) return;
 
-        window.dispatchEvent(new CustomEvent("graph:toggle-dataset", {
-          detail: payload,
-        }));
+          window.dispatchEvent(new CustomEvent("graph:add-dataset", {
+            detail: payload,
+          }));
+        }
       },
       buildChartSeriesPayload(obsStandardName, obsSOrder) {
         if (!this.observationTimeSeriesDoc) return null;
@@ -230,11 +243,17 @@ function registerAlpineComponents() {
           return null;
         }
         var graphData = [];
+        for(const record of series._records) {
+          var ts = DateTime.fromJSDate(record.timestamp);
+          graphData.push({x: ts.toFormat("yyyy-MM-dd hh:mm:ss a"),
+            y: Number(record.value)});
+        }
+        /*
         series._records.forEach((record) => {
           graphData.push({x: record.timestamp.toISOString(),
             y: Number(record.value)});
         });
-
+        */
         var sensor = this.findSensor(obsStandardName, obsSOrder);
         return {
           id: seriesId,
@@ -399,15 +418,29 @@ function registerAlpineComponents() {
 
       scrollToIndex(index, behavior) {
         var slides = this.slides();
-        if (!slides.length) return;
+        var viewport = this.viewport();
+        if (!viewport || !slides.length) return;
+
+        //if (!slides.length) return;
 
         var targetIndex = Math.max(0, Math.min(index, slides.length - 1));
+        var targetSlide = slides[targetIndex];
+        var targetLeft =
+          targetSlide.getBoundingClientRect().left -
+          viewport.getBoundingClientRect().left +
+          viewport.scrollLeft;
+
         this.activeIndex = targetIndex;
-        slides[targetIndex].scrollIntoView({
+        viewport.scrollTo({
+            left: targetLeft,
+            behavior: behavior || "smooth",
+          });
+
+        /*slides[targetIndex].scrollIntoView({
           behavior: behavior || "smooth",
           inline: "start",
           block: "nearest",
-        });
+        });*/
       },
 
       previous() {

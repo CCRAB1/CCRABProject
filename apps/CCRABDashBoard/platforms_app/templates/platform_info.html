@@ -244,7 +244,8 @@
             <div
                 class="platform-chart-panel"
                 x-data="chartComponent()"
-                @graph:toggle-dataset.window="toggleDataset($event.detail)"
+                @graph:add-dataset.window="addDataset($event.detail)"
+                @graph:remove-dataset.window="removeDataset($event.detail)"
             >
                 <div class="platform-chart-header">
                     <h2 class="platform-section-title">Observation Graph</h2>

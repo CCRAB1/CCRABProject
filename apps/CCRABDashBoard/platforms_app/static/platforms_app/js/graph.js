@@ -1,99 +1,187 @@
+const backgroundColors = ['#36A2EB33', '#FF638433', '#FFCD5633', '#4BC0C033'];
+const borderColors = ['#36A2EB', '#FF6384', '#FFCD56', '#4BC0C0'];
+
+
+
 export function registerGraphComponents(Alpine) {
-  Alpine.data("chartComponent", function (options) {
-    var config = options || {};
-    var chart = null;
+    if (!Alpine.store("graph")) {
+        Alpine.store("graph", {
+            plottedIds: [],
 
-    return {
-      chartType: config.type || "line",
-      chartData: config.data || {
-        labels: [],
-        datasets: [],
-      },
-      chartOptions: config.options || {},
+            has(id) {
+                return this.plottedIds.includes(id);
+            },
 
-      init() {
-        this.$nextTick(() => {
-          this.createChart();
+            add(id) {
+                if (!this.has(id)) {
+                  console.log("Adding id: " + id + " to graph")
+                    this.plottedIds.push(id);
+                }
+            },
+
+            remove(id) {
+                this.plottedIds = this.plottedIds.filter((item) => {
+                    console.log("Removing id: " + id + " to graph")
+                    return item !== id;
+                });
+            },
         });
-      },
+    }
+    Alpine.data("chartComponent", function (options) {
+        var config = options || {};
+        var chart = null;
+        var currentColorIndex = 0;
+        return {
+            chartType: config.type || "line",
+            chartData: config.data || {
+                labels: [],
+                datasets: [],
+            },
+            chartOptions: config.options || {},
 
-      destroy() {
-        if (chart) {
-          chart.destroy();
-          chart = null;
-        }
-      },
+            init() {
+                this.$nextTick(() => {
+                    this.createChart();
+                });
+            },
 
-      createChart() {
-        if (chart) return;
+            destroy() {
+                if (chart) {
+                    chart.destroy();
+                    chart = null;
+                }
+            },
 
-        if (!window.Chart) {
-          console.warn("Chart.js is unavailable.");
-          return;
-        }
+            createChart() {
+                if (chart) return;
 
-        var canvas = this.$refs.canvas;
-        if (!canvas) return;
-        chart = new window.Chart(this.$refs.canvas, {
-          type: this.chartType,
-          data: {
-            labels: [],
-            datasets: [],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-          },
-        });
+                if (!window.Chart) {
+                    console.warn("Chart.js is unavailable.");
+                    return;
+                }
 
-      },
+                var canvas = this.$refs.canvas;
+                if (!canvas) return;
+                chart = new window.Chart(this.$refs.canvas, {
+                    type: this.chartType,
+                    data: {
+                        labels: [],
+                        datasets: [],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                          x: {
+                            type: "category",
+                          },
+                        },
 
-      addDataset(id, label, points) {
-        if (!chart) return;
+                    },
+                });
 
-        chart.data.datasets.push({
-          id: id,
-          label: label,
-          data: points,
-          borderColor: "#2364aa",
-          tension: 0.25,
-        });
+            },
 
-        chart.update();
-      },
+            addDataset(dataset) {
+                if (!chart || !dataset || !dataset.id || !Array.isArray(dataset.data)) {
+                    console.warn("Invalid graph dataset payload", dataset);
+                    return;
+                }
+                var axisId = "y-" + dataset.id.replaceAll(" ", "-");
 
-      removeDataset(id) {
-        if (!chart) return;
+                //chart.options.scales = chart.options.scales || {};
+                if(!(axisId in chart.options.scales))
+                {
+                    chart.options.scales[axisId] = {};
+                }
+                chart.options.scales[axisId] = {
+                    type: "linear",
+                    position: chart.data.datasets.length % 2 === 0 ? "left" : "right",
+                    title: {
+                        display: true,
+                        text: dataset.units || dataset.label,
+                    },
+                    grid: {
+                        drawOnChartArea: chart.data.datasets.length === 0,
+                    },
+                };
+                if(currentColorIndex == 4) {
+                    currentColorIndex = 0;
+                }
+                chart.data.datasets.push({
+                    id: dataset.id,
+                    label: dataset.label,
+                    data: dataset.data,
+                    yAxisID: axisId,
+                    borderColor: borderColors[currentColorIndex++]
+                });
+                if (chart.scales && chart.scales.y) {
+                  delete chart.scales.y;
+                }
 
-        chart.data.datasets = chart.data.datasets.filter((dataset) => {
-          return dataset.id !== id;
-        });
+                chart.update();
+            },
 
-        chart.update();
-      },
-      toggleDataset(dataset) {
-        if (!chart || !dataset || !dataset.id || !Array.isArray(dataset.data)) {
-          console.warn("Invalid graph dataset payload", dataset);
-          return;
-        }
-        var existingIndex = chart.data.datasets.findIndex((item) => {
-          return item.id === dataset.id;
-        });
+            removeDataset(id) {
+                if (!chart) return;
 
-        if (existingIndex >= 0) {
-          chart.data.datasets.splice(existingIndex, 1);
-        } else {
-          chart.data.datasets.push({
-            id: dataset.id,
-            label: dataset.label,
-            data: dataset.data,
-            borderColor: "#2364aa",
-            tension: 0.25,
-          });
-        }
+                var existingIndex = chart.data.datasets.filter((dataset) => {
+                    return dataset.id !== id;
+                });
+                if (existingIndex) {
+                    chart.data.datasets.splice(id, 1);
+                }
+                var axisId = "y-" + id.replaceAll(" ", "-");
 
-        chart.update();
-      }
-    };
-  });
+                var axisStillUsed = chart.data.datasets.some((item) => {
+                    return item.yAxisID === axisId;
+                });
+
+                if (!axisStillUsed && chart.options.scales) {
+                    delete chart.options.scales[axisId];
+                }
+
+                chart.update();
+            },
+            toggleDataset(dataset) {
+                if (!chart || !dataset || !dataset.id || !Array.isArray(dataset.data)) {
+                    console.warn("Invalid graph dataset payload", dataset);
+                    return;
+                }
+                var axisId = "y-" + dataset.id.replaceAll(" ", "-");
+
+                chart.options.scales = chart.options.scales || {};
+
+                chart.options.scales[axisId] = {
+                    type: "linear",
+                    position: chart.data.datasets.length % 2 === 0 ? "left" : "right",
+                    title: {
+                        display: true,
+                        text: dataset.units || dataset.label,
+                    },
+                    grid: {
+                        drawOnChartArea: chart.data.datasets.length === 0,
+                    },
+                };
+
+                var existingIndex = chart.data.datasets.findIndex((item) => {
+                    return item.id === dataset.id;
+                });
+
+                if (existingIndex >= 0) {
+                    chart.data.datasets.splice(existingIndex, 1);
+                } else {
+                    chart.data.datasets.push({
+                        id: dataset.id,
+                        label: dataset.label,
+                        data: dataset.data,
+                        borderColor: "#2364aa",
+                        tension: 0.25,
+                    });
+                }
+
+                chart.update();
+            }
+        };
+    });
 }
