@@ -562,14 +562,25 @@ def purple_air_processing():
         return chosen
 
     @task()
-    def archive_task(config_file_name: Path, data_source_files: [], normalized_header_files: []) :
+    def archive_task(config_file_name: Path, data_source_files: [], normalized_header_files: [], ancillary_calculations_data_files: []) :
         archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY", default="purple_air")
         archive_directory.mkdir(parents=True, exist_ok=True)
         logger.info(f"Starting archive_task with config file.")
-        logger.info("Archiving source data files.")
         process_run_time = datetime.now()
+
         raw_data_archive_directory = archive_directory / Variable.get("RAW_DATA_DIRECTORY")
         raw_data_archive_directory.mkdir(parents=True, exist_ok=True)
+        archive_and_zip(data_source_files, raw_data_archive_directory, archive_directory, process_run_time)
+
+        normalized_data_archive_directory = archive_directory / Variable.get("NORMALIZED_HEADER_DIRECTORY")
+        normalized_data_archive_directory.mkdir(parents=True, exist_ok=True)
+        archive_and_zip(normalized_header_files, normalized_data_archive_directory, archive_directory, process_run_time)
+
+        anicllary_data_archive_directory = archive_directory / Variable.get("EPA_CORRECTED_DIRECTORY")
+        anicllary_data_archive_directory.mkdir(parents=True, exist_ok=True)
+        archive_and_zip(normalized_header_files, anicllary_data_archive_directory, archive_directory, process_run_time)
+
+        '''
         logger.info(f"Archiving raw data files: {raw_data_archive_directory}")
 
         for file in data_source_files:
@@ -583,7 +594,7 @@ def purple_air_processing():
             zip_files(raw_data_archive_directory)
         except Exception as e:
             logger.error(f"Unable to zip directory: {archive_directory}")
-
+        
         normalized_data_archive_directory = archive_directory / Variable.get("NORMALIZED_HEADER_DIRECTORY")
         normalized_data_archive_directory.mkdir(parents=True, exist_ok=True)
         logger.info(f"Archiving normalized data files: {normalized_data_archive_directory}")
@@ -599,8 +610,24 @@ def purple_air_processing():
             zip_files(normalized_data_archive_directory)
         except Exception as e:
             logger.error(f"Unable to zip directory: {archive_directory}")
+        '''
+        logger.info(f"Completed archiving data files.)
+        return
 
+    def archive_and_zip(file_list: [], directory_to_process: Path, archive_directory: Path, process_run_time: datetime) -> None:
+        logger.info(f"Archiving data files: {directory_to_process}")
 
+        for file in file_list:
+            logger.info(f"Archiving file: {file}")
+            try:
+                archive_file(Path(file), directory_to_process, process_run_time)
+            except Exception as e:
+                logger.error(f"Unable to archive file: {file}")
+        logger.info(f"Zipping directory: {archive_directory}")
+        try:
+            zip_files(directory_to_process)
+        except Exception as e:
+            logger.error(f"Unable to zip directory: {archive_directory}")
         return
 
     def bulk_insert_to_database(csv_file: Path, platform_nfo: Platform, insert_chunk_size: int):
@@ -805,7 +832,9 @@ def purple_air_processing():
     #qaqcd_data = qaqc_task(CONFIG, normalized_header_data_files)
     save_to_database = save_to_database_task(configuration_file_path, ancillary_calculations_data_files)
 
-    archive = archive_task(configuration_file_path, csv_files_to_process, normalized_header_data_files)
+    archive = archive_task(configuration_file_path, csv_files_to_process,
+                           normalized_header_data_files,
+                           ancillary_calculations_data_files)
 
     save_to_database >> archive
 
