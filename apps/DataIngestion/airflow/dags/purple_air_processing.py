@@ -103,7 +103,7 @@ def purple_air_processing():
         #dag_conf_mode =
 
         base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-        local_path = base_dir / Path(Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
+        local_path = base_dir / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
         # If user passes a conf via dag run, Airflow will pass it; we handle via Variable for now.
         if mode is not None:
             requested = mode.lower()
@@ -192,7 +192,7 @@ def purple_air_processing():
                 org_list.append(Organization().from_dict(organization))
 
             base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-            data_directory = base_dir / Path(Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
+            data_directory = base_dir / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
             data_directory = Path(data_directory)
             data_directory.mkdir(parents=True, exist_ok=True)
 
@@ -290,7 +290,7 @@ def purple_air_processing():
             configuration_data = json.load(open(config_file_name))
 
             base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-            header_corrected_directory = base_directory / Path(Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY")) / Path(Variable.get("NORMALIZED_HEADER_DIRECTORY"))
+            header_corrected_directory = base_directory / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY")) / Path(Variable.get("NORMALIZED_HEADER_DIRECTORY"))
             #Let's make sure the directory exists.
             header_corrected_directory.mkdir(parents=True, exist_ok=True)
 
@@ -563,7 +563,7 @@ def purple_air_processing():
 
     @task()
     def archive_task(config_file_name: Path, data_source_files: [], normalized_header_files: [], ancillary_calculations_data_files: []) :
-        archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("PURPLE_AIR_WORKiNG_DIRECTORY", default="purple_air")
+        archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY", default="purple_air")
         archive_directory.mkdir(parents=True, exist_ok=True)
         logger.info(f"Starting archive_task with config file.")
         process_run_time = datetime.now()
