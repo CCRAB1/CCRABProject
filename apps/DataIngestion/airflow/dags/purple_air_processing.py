@@ -611,7 +611,7 @@ def purple_air_processing():
         except Exception as e:
             logger.error(f"Unable to zip directory: {archive_directory}")
         '''
-        logger.info(f"Completed archiving data files.)
+        logger.info(f"Completed archiving data files.")
         return
 
     def archive_and_zip(file_list: [], directory_to_process: Path, archive_directory: Path, process_run_time: datetime) -> None:
