@@ -248,12 +248,6 @@ function registerAlpineComponents() {
           graphData.push({x: ts.toFormat("yyyy-MM-dd hh:mm:ss a"),
             y: Number(record.value)});
         }
-        /*
-        series._records.forEach((record) => {
-          graphData.push({x: record.timestamp.toISOString(),
-            y: Number(record.value)});
-        });
-        */
         var sensor = this.findSensor(obsStandardName, obsSOrder);
         return {
           id: seriesId,

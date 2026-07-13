@@ -35,6 +35,9 @@ STATION_METADATA_FIELDS = [
     "confidence_manual",
     "confidence_auto",
 ]
+HISTORY_STATION_METADATA_FIELDS = [
+"hardware", "latitude", "longitude", "altitude", "firmware_version", "private", "rssi", "uptime", "pa_latency", "memory"
+]
 
 ENVIRONMENT_FIELDS = [
     "humidity",
@@ -47,8 +50,8 @@ ENVIRONMENT_FIELDS = [
     "pressure_a",
     "pressure_b",
 ]
-
 MISCELLANEOUS_FIELDS = ["voc", "voc_a", "voc_b", "ozone1", "analog_input"]
+HISTORY_MISCELLANEOUS_FIELDS = ["voc", "voc_a", "voc_b", "analog_input"]
 
 PM1_FIELDS = [
     "pm1.0",
@@ -61,8 +64,20 @@ PM1_FIELDS = [
     "pm1.0_cf_1_a",
     "pm1.0_cf_1_b",
 ]
+HISTORY_PM1_FIELDS = [
+    "pm1.0_atm",
+    "pm1.0_atm_a",
+    "pm1.0_atm_b",
+    "pm1.0_cf_1",
+    "pm1.0_cf_1_a",
+    "pm1.0_cf_1_b",
+]
 
 PM2_FIELDS = [
+    "pm2.5_alt", "pm2.5_alt_a", "pm2.5_alt_b", "pm2.5", "pm2.5_a", "pm2.5_b", "pm2.5_atm", "pm2.5_atm_a", "pm2.5_atm_b",
+    "pm2.5_cf_1", "pm2.5_cf_1_a", "pm2.5_cf_1_b"
+]
+HISTORY_PM2_FIELDS = [
     "pm2.5_atm",
     "pm2.5_atm_a",
     "pm2.5_atm_b",
@@ -103,8 +118,10 @@ PM10_FIELDS = [
     "pm10.0_cf_1_a",
     "pm10.0_cf_1_b",
 ]
-
-VISIBILITY_FIELDS = [
+HISTORY_PM10_FIELDS = [
+    "pm10.0_atm", "pm10.0_atm_a", "pm10.0_atm_b", "pm10.0_cf_1", "pm10.0_cf_1_a", "pm10.0_cf_1_b"
+]
+HISTORY_VISIBILITY_FIELDS = [
     "scattering_coefficient",
     "scattering_coefficient_a",
     "scattering_coefficient_b",

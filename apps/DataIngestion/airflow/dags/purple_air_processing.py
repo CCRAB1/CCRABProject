@@ -16,6 +16,7 @@ from django.db import IntegrityError, transaction
 from datautilities.purple_air_api.PurpleAPIWrapper import (
     PurpleAirClient,
 )
+from datautilities.epa.epa_calculations import apply_epa_correction
 from packages.django_setup import setup_django, close_django_connections
 from datautilities.ccrab_api.client import CCRABRestClient, CCRABAuthenticationError
 from observationsdatabase.xenia_obs_map import Organization, Platform
@@ -24,13 +25,12 @@ from ioos_qc.config import QcConfig
 from ioos_qc.streams import PandasStream
 from ioos_qc.results import CollectedResult, collect_results
 import pandas as pd
-from packages.pycharm_debugging import maybe_attach_debugger
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -332,6 +332,88 @@ def purple_air_processing():
         except Exception as e:
             raise e
         logger.info(f"Completed normalize_headers_task in {time.perf_counter()-start_time} seconds")
+        return corrected_file_list
+
+    @task()
+    def ancillary_calculations(config_file_name: Path, normalized_header_files: []) -> list[Any]:
+        try:
+            start_time = time.perf_counter()
+            logger.info(f"Starting ancillary_calculations with config file: {config_file_name}")
+            configuration_data = json.load(open(config_file_name))
+
+            base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
+            epa_corrected_directory = base_directory / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY")) / Path(Variable.get("EPA_CORRECTED_DIRECTORY"))
+            #Let's make sure the directory exists.
+            epa_corrected_directory.mkdir(parents=True, exist_ok=True)
+
+            corrected_file_list = []
+            organizations_setup = []
+            #Build our org and platform objects.
+            for organization in configuration_data['organizations']:
+                organizations_setup.append(Organization().from_dict(organization))
+
+            for normalized_file in normalized_header_files:
+                file_path = Path(normalized_file)
+                file_name_parts = file_path.stem.split("-")
+                # The platform handle format we need is <org>.<platform name>.<platform type>. When
+                # we create the filename, we replace the "." with "_" to avoid any OS/Filesystem issues.
+                file_platform_handle = file_name_parts[0].replace("_", ".")
+                platform_nfo = None
+                for organization in organizations_setup:
+                    logger.info(
+                        f"Check for platform: {file_platform_handle} in organization: {organization.short_name}")
+                    platform_nfo = organization.get_platform(file_platform_handle)
+                    if platform_nfo is None:
+                        logger.error(f"Platform {file_platform_handle} not found in list.")
+                    else:
+                        break
+                if platform_nfo is not None:
+                    if file_path.stem.find("corrected") != -1:
+                        corrected_filename = file_path.stem.replace("corrected", "epa_corrected")
+                    else:
+                        corrected_filename = f"{file_path.stem}-epa_corrected.csv"
+                    corrected_file = epa_corrected_directory / f"{corrected_filename}.csv"
+                    logger.info(f"Reading source file: {normalized_file} Writing corrected file: {corrected_file}")
+                    with open(normalized_file, "r") as csv_file_obj:
+                        csv_reader = csv.reader(csv_file_obj)
+                        with open(corrected_file, "w") as corrected_file_obj:
+                            csv_writer = csv.writer(corrected_file_obj)
+                            humidity_a_ndx = humidity_b_ndx = pm25_cf1_a_ndx = pm25_cf1_b_ndx = None
+                            for row_number, row in enumerate(csv_reader):
+                                if row_number == 0:
+                                    #Get the column indexes for the pm2.5 cf obs and humidty so we can calc the
+                                    #epa aqi. We have to have at least the relative_humidity_1 and pm2.5_cf_1_1.
+                                    if "relative_humidity_1" in row and "pm2.5_cf_1_1" in row:
+                                        humidity_a_ndx = row.index("relative_humidity_1")
+                                        pm25_cf1_a_ndx = row.index("pm2.5_cf_1_1")
+                                        if "relative_humidity_2" in row:
+                                            humidity_b_ndx = row.index("relative_humidity_2")
+                                        if "pm2.5_cf_1_2" in row:
+                                            pm25_cf1_b_ndx = row.index("pm2.5_cf_1_2")
+                                    else:
+                                        logger.error(f"Missing relative_humidity_1 or pm2.5_cf_1_1 in header: {row}")
+                                    row.append("pm2.5_aqi")
+                                    #Write new header back out.
+                                    csv_writer.writerow(row)
+
+                                else:
+                                    humidity_a = humidity_b = pm25_cf1_a = pm25_cf1_b = None
+                                    if humidity_a and pm25_cf1_a_ndx:
+                                        humidity_a = float(row[humidity_a_ndx])
+                                        pm25_cf1_a = float(row[pm25_cf1_a_ndx])
+                                        if humidity_b and pm25_cf1_b_ndx:
+                                            humidity_b = float(row[humidity_b_ndx])
+                                            pm25_cf1_b = float(row[pm25_cf1_b_ndx])
+                                        epa_corrected = apply_epa_correction(pm25_cf1_a, humidity_a, pm25_cf1_b, humidity_b)
+                                        row.append(f"{epa_corrected:.2f}")
+                                    else:
+                                        row.append("")
+                                    csv_writer.writerow(row)
+                        corrected_file_list.append(str(corrected_file))
+            logger.info(f"Finished ancillary_calculations in {time.perf_counter()-start_time} seconds")
+
+        except Exception as e:
+            raise e
         return corrected_file_list
 
     @task()
@@ -716,11 +798,12 @@ def purple_air_processing():
     csv_files_to_process = merge_file_lists(local_files=local_file_list, rest_files=remote_file_list)
 
     #We want to correct the headers from the Purple Air fields to our normalized names.
-    #We want to correct the headers from the Purple Air fields to our normalized names.
     normalized_header_data_files = normalize_headers_task(configuration_file_path, csv_files_to_process)
 
+    ancillary_calculations_data_files = ancillary_calculations(configuration_file_path, normalized_header_data_files)
+
     #qaqcd_data = qaqc_task(CONFIG, normalized_header_data_files)
-    save_to_database = save_to_database_task(configuration_file_path, normalized_header_data_files)
+    save_to_database = save_to_database_task(configuration_file_path, ancillary_calculations_data_files)
 
     archive = archive_task(configuration_file_path, csv_files_to_process, normalized_header_data_files)
 
