@@ -92,14 +92,18 @@ class SourceObservationMapConfigurationSerializer(serializers.ModelSerializer):
     sensor_id = serializers.SerializerMethodField()
     m_type_id = serializers.SerializerMethodField()
     s_order = serializers.SerializerMethodField()
+    target_active = serializers.IntegerField(source="sensor_id.active", read_only=True)
+    source_active = serializers.IntegerField(source="active", read_only=True)
 
     class Meta:
         model = SourceObservationMap
         fields = (
             "source_obs",
             "source_uom",
+            "source_active",
             "target_obs",
             "target_uom",
+            "target_active",
             "sensor_id",
             "m_type_id",
             "s_order",
@@ -155,7 +159,8 @@ class PlatformSourceConfigurationSerializer(serializers.ModelSerializer):
             "external_identifier",
             "country_code",
             "neighborhood",
-            "observations"
+            "observations",
+            "active"
         )
 
 

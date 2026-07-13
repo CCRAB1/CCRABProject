@@ -208,7 +208,7 @@ def platform_source_configuration(request):
             "sensor_id__m_type_id__m_scalar_type_id__obs_type_id",
             "sensor_id__m_type_id__m_scalar_type_id__uom_type_id",
         )
-        .filter(active=1)
+        #.filter(active=1)
         .order_by("sensor_id__s_order", "source_obs")
     )
 
@@ -225,7 +225,6 @@ def platform_source_configuration(request):
         .filter(
             data_source_id__key=data_source_key,
             data_source_id__active=1,
-            active=1,
             platform_id__active=1,
         )
         .order_by(
