@@ -505,10 +505,10 @@ def purple_air_processing():
 
                         for row_ndx, row in enumerate(csv_reader):
                             for obs_info in platform_nfo.obs_map:
-                                if obs_info.target_active == 1:
-                                    #We build the name for each column we want which is >target_obs>_<s_order>. The date
-                                    #column has been renamed m_date during the normalize task.
-                                    try:
+                                #We build the name for each column we want which is >target_obs>_<s_order>. The date
+                                #column has been renamed m_date during the normalize task.
+                                try:
+                                    if obs_info.target_active == 1:
                                         column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
                                         m_date = row['m_date']
                                         try:
@@ -539,9 +539,11 @@ def purple_air_processing():
                                                 logger.error(f"Error adding record: {e}")
                                                 logger.exception(e)
                                                 insert_exception_count += 1
-                                    except Exception as e:
-                                        close_django_connections()
-                                        raise e
+                                    else:
+                                        logger.info(f"Observation: {obs_info.target_obs} is not active, not saving to DB")
+                                except Exception as e:
+                                    close_django_connections()
+                                    raise e
                     logger.info(f"Processed {row_ndx} rows from file: {file} into the database in: "
                                 f"{time.perf_counter()-file_start_time} seconds")
 
