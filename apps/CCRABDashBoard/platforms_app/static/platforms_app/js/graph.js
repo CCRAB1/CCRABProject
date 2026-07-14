@@ -88,7 +88,7 @@ export function registerGraphComponents(Alpine) {
                     return;
                 }
                 var axisId = "y-" + dataset.id.replaceAll(" ", "-");
-                console.log.debug("Adding dataset id: " + dataset.id + "axis: " + axisId);
+                console.debug("Adding dataset id: " + dataset.id + "axis: " + axisId);
                 //chart.options.scales = chart.options.scales || {};
                 if(!(axisId in chart.options.scales))
                 {
@@ -129,7 +129,7 @@ export function registerGraphComponents(Alpine) {
                     return dataset.id !== id;
                 });
                 var axisId = "y-" + id.replaceAll(" ", "-");
-                console.log.debug("Removing dataset id: " + id + "axis: " + axisId);
+                console.debug("Removing dataset id: " + id + "axis: " + axisId);
 
                 if (existingIndex) {
                     chart.data.datasets.splice(id, 1);
