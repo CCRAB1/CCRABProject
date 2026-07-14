@@ -542,8 +542,8 @@ def purple_air_processing():
                                 except Exception as e:
                                     close_django_connections()
                                     raise e
-                    logger.info(f"Processed {row_ndx} rows from file: {file} into the database in: "
-                                f"{time.perf_counter()-file_start_time} seconds")
+                            logger.info(f"Processed {row_ndx} rows from file: {file} into the database in: "
+                                        f"{time.perf_counter()-file_start_time} seconds")
 
         except Exception as e:
             close_django_connections()
