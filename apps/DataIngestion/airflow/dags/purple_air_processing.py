@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -230,7 +230,7 @@ def purple_air_processing():
                         start_date = latest_m_date + timedelta(minutes=1)
                     try:
                         #These are the sensors we want to retrieve from PUrple Air API.
-                        fields = [obs['source_obs'] for obs in platform.observations]
+                        fields = [obs['source_obs'] for obs in platform.observations if obs['source_active'] == 1]
 
                         logger.info(f"Getting sensor history for sensor_index {external_indentifier} Start: {start_date}"
                                     f" End: {end_date} Fields: {fields}")
