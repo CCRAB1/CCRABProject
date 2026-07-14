@@ -832,7 +832,8 @@ def purple_air_processing():
 
     #Figure out how we are running. We could be fetching new data from the Purple AIr API, or
     #we could be processing previous files.
-    run_config = decide_mode(None)
+    mode = Variable.get("PURPLE_AIR_CSV_PIPELINE_MODE", None)
+    run_config = decide_mode(mode)
 
     branch = branch_on_mode(run_config['mode'])
 
