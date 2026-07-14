@@ -141,9 +141,10 @@ function registerAlpineComponents() {
         return sensors.map((sensor) => {
           return {
             key: `${sensor.obsStandardName}-${sensor.order}`,
+            active: sensor.active,
             obsStandardName: sensor.obsStandardName,
             sensorOrder: sensor.order,
-            sensorLabel: this.formatSOrder(sensor.order),
+            sensorLabel: sensor.channelLabel,
             units: sensor.uomDisplay || sensor.uomStandardName
           };
         });
