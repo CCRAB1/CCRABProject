@@ -540,8 +540,6 @@ def purple_air_processing():
                                                 logger.error(f"Error adding record: {e}")
                                                 logger.exception(e)
                                                 insert_exception_count += 1
-                                    else:
-                                        logger.info(f"Observation: {obs_info.target_obs} is not active, not saving to DB")
                                 except Exception as e:
                                     close_django_connections()
                                     raise e
