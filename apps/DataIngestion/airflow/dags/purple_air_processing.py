@@ -508,7 +508,8 @@ def purple_air_processing():
                                 #We build the name for each column we want which is >target_obs>_<s_order>. The date
                                 #column has been renamed m_date during the normalize task.
                                 try:
-                                    if obs_info.target_active == 1:
+                                    if column_name in row:
+                                        if obs_info.target_active == 1:
                                         column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
                                         m_date = row['m_date']
                                         try:
@@ -541,6 +542,8 @@ def purple_air_processing():
                                                 logger.error(f"Error adding record: {e}")
                                                 logger.exception(e)
                                                 insert_exception_count += 1
+                                    else:
+                                        logger.error(f"Column: {column_name} not found in row_ndx: {row_ndx}")
                                 except Exception as e:
                                     close_django_connections()
                                     raise e
