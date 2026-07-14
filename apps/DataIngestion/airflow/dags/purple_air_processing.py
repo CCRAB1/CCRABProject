@@ -510,38 +510,38 @@ def purple_air_processing():
                                 try:
                                     if column_name in row:
                                         if obs_info.target_active == 1:
-                                        column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
-                                        m_date = row['m_date']
-                                        try:
-                                            val = None
-                                            if len(row[column_name]):
-                                                val = float(row[column_name])
-                                        except (ValueError, TypeError) as e:
-                                            logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
-                                            logger.exception(e)
-                                        else:
-                                            if PURPLEAIR_TASK_LOG_INSERTS:
-                                                #if row_ndx % 1000 == 0:
-                                                logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
-                                                            f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
-                                                            f"{obs_info.target_uom}({obs_info.m_type_id}) SOrder: {obs_info.s_order}")
+                                            column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
+                                            m_date = row['m_date']
                                             try:
-                                                with transaction.atomic():
-                                                    obs_rec = Multi_obs.objects.create(row_entry_date=row_entry_date,
-                                                                        platform_handle=platform_nfo.platform_handle,
-                                                                        m_date=m_date,
-                                                                        m_value=val,
-                                                                        sensor_id_id=obs_info.sensor_id,
-                                                                        m_type_id_id=obs_info.m_type_id,
-                                                                        m_lon=platform_nfo.longitude,
-                                                                        m_lat=platform_nfo.latitude)
-                                            except IntegrityError as e:
-                                                logger.error(f"Record already exists: {e}")
-                                                duplicate_row_count += 1
-                                            except Exception as e:
-                                                logger.error(f"Error adding record: {e}")
+                                                val = None
+                                                if len(row[column_name]):
+                                                    val = float(row[column_name])
+                                            except (ValueError, TypeError) as e:
+                                                logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
                                                 logger.exception(e)
-                                                insert_exception_count += 1
+                                            else:
+                                                if PURPLEAIR_TASK_LOG_INSERTS:
+                                                    #if row_ndx % 1000 == 0:
+                                                    logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
+                                                                f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
+                                                                f"{obs_info.target_uom}({obs_info.m_type_id}) SOrder: {obs_info.s_order}")
+                                                try:
+                                                    with transaction.atomic():
+                                                        obs_rec = Multi_obs.objects.create(row_entry_date=row_entry_date,
+                                                                            platform_handle=platform_nfo.platform_handle,
+                                                                            m_date=m_date,
+                                                                            m_value=val,
+                                                                            sensor_id_id=obs_info.sensor_id,
+                                                                            m_type_id_id=obs_info.m_type_id,
+                                                                            m_lon=platform_nfo.longitude,
+                                                                            m_lat=platform_nfo.latitude)
+                                                except IntegrityError as e:
+                                                    logger.error(f"Record already exists: {e}")
+                                                    duplicate_row_count += 1
+                                                except Exception as e:
+                                                    logger.error(f"Error adding record: {e}")
+                                                    logger.exception(e)
+                                                    insert_exception_count += 1
                                     else:
                                         logger.error(f"Column: {column_name} not found in row_ndx: {row_ndx}")
                                 except Exception as e:
