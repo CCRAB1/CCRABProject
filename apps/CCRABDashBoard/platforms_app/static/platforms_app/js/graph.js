@@ -119,7 +119,7 @@ export function registerGraphComponents(Alpine) {
                   delete chart.scales.y;
                 }
 
-                chart.update();
+                chart.update("none");
             },
 
             removeDataset(id) {
@@ -148,7 +148,7 @@ export function registerGraphComponents(Alpine) {
                       }
                     }
                 }
-                chart.update();
+                chart.update("none");
             },
             toggleDataset(dataset) {
                 if (!chart || !dataset || !dataset.id || !Array.isArray(dataset.data)) {
