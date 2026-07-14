@@ -513,7 +513,7 @@ def purple_air_processing():
                                         m_date = row['m_date']
                                         try:
                                             val = None
-                                            if row[column_name].length:
+                                            if len(row[column_name]):
                                                 val = float(row[column_name])
                                         except (ValueError, TypeError) as e:
                                             logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
