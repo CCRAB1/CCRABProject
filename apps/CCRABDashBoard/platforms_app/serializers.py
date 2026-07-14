@@ -89,14 +89,40 @@ class SampleSerializer(serializers.ModelSerializer):
         fields = ("row_id", "platform", "timestamp", "value", "obs_type")
 
 
+def _sensor_scalar_type(sensor):
+    if not sensor or not sensor.m_type_id:
+        return None
+    return sensor.m_type_id.m_scalar_type_id
+
+
+def _sensor_target_obs(sensor):
+    scalar_type = _sensor_scalar_type(sensor)
+    if not scalar_type or not scalar_type.obs_type_id:
+        return None
+    return scalar_type.obs_type_id.standard_name
+
+
+def _sensor_target_uom(sensor):
+    scalar_type = _sensor_scalar_type(sensor)
+    if not scalar_type or not scalar_type.uom_type_id:
+        return None
+    return scalar_type.uom_type_id.standard_name
+
+
+def _sensor_m_type_id(sensor):
+    if not sensor or not sensor.m_type_id:
+        return None
+    return sensor.m_type_id.row_id
+
+
 class SourceObservationMapConfigurationSerializer(serializers.ModelSerializer):
     target_obs = serializers.SerializerMethodField()
     target_uom = serializers.SerializerMethodField()
     sensor_id = serializers.SerializerMethodField()
     m_type_id = serializers.SerializerMethodField()
     s_order = serializers.SerializerMethodField()
-    target_active = serializers.IntegerField(source="sensor_id.active", read_only=True)
-    source_active = serializers.IntegerField(source="active", read_only=True)
+    target_active = serializers.SerializerMethodField()
+    source_active = serializers.SerializerMethodField()
 
     class Meta:
         model = SourceObservationMap
@@ -113,23 +139,27 @@ class SourceObservationMapConfigurationSerializer(serializers.ModelSerializer):
         )
 
     def get_sensor_id(self, obj):
-        return obj.sensor_id.row_id
+        return obj.sensor_id.row_id if obj.sensor_id else None
 
     def get_m_type_id(self, obj):
-        return obj.sensor_id.m_type_id.row_id
+        return _sensor_m_type_id(obj.sensor_id)
 
     def get_s_order(self, obj):
-        return obj.sensor_id.s_order
+        return obj.sensor_id.s_order if obj.sensor_id else None
 
     def get_target_uom(self, obj):
-        scalar_type = obj.sensor_id.m_type_id.m_scalar_type_id
-        return scalar_type.uom_type_id.standard_name
+        return _sensor_target_uom(obj.sensor_id)
 
     def get_target_obs(self, obj):
         #if obj.sensor_id and obj.sensor_id.short_name:
         #    return obj.sensor_id.short_name
-        scalar_type = obj.sensor_id.m_type_id.m_scalar_type_id
-        return scalar_type.obs_type_id.standard_name
+        return _sensor_target_obs(obj.sensor_id)
+
+    def get_target_active(self, obj):
+        return obj.sensor_id.active if obj.sensor_id else None
+
+    def get_source_active(self, obj):
+        return obj.active
 
 
 class PlatformSourceConfigurationSerializer(serializers.ModelSerializer):
@@ -148,11 +178,7 @@ class PlatformSourceConfigurationSerializer(serializers.ModelSerializer):
         }
     }
     """
-    observations = SourceObservationMapConfigurationSerializer(
-        source="observation_maps",
-        many=True,
-        read_only=True,
-    )
+    observations = serializers.SerializerMethodField()
 
     class Meta:
         model = PlatformSource
@@ -167,6 +193,65 @@ class PlatformSourceConfigurationSerializer(serializers.ModelSerializer):
             "observations",
             "active"
         )
+
+    def get_observations(self, obj):
+        observation_maps = getattr(obj, "observation_maps", [])
+        observations = list(
+            SourceObservationMapConfigurationSerializer(
+                observation_maps,
+                many=True,
+                context=self.context,
+            ).data
+        )
+
+        mapped_sensor_ids = {
+            obs_map.sensor_id.row_id
+            for obs_map in observation_maps
+            if obs_map.sensor_id
+        }
+
+        platform = obj.platform_id
+        if not platform:
+            return observations
+
+        sensors = getattr(platform, "sensors", None)
+        if sensors is None:
+            sensors = (
+                platform.sensor_set
+                .select_related(
+                    "m_type_id",
+                    "m_type_id__m_scalar_type_id",
+                    "m_type_id__m_scalar_type_id__obs_type_id",
+                    "m_type_id__m_scalar_type_id__uom_type_id",
+                )
+                .order_by("s_order")
+            )
+
+        for sensor in sensors:
+            if sensor.row_id in mapped_sensor_ids:
+                continue
+
+            observations.append({
+                "source_obs": None,
+                "source_uom": None,
+                "source_active": None,
+                "target_obs": _sensor_target_obs(sensor),
+                "target_uom": _sensor_target_uom(sensor),
+                "target_active": sensor.active,
+                "sensor_id": sensor.row_id,
+                "m_type_id": _sensor_m_type_id(sensor),
+                "s_order": sensor.s_order,
+            })
+
+        observations.sort(
+            key=lambda observation: (
+                observation["s_order"] is None,
+                observation["s_order"] or 0,
+                observation["source_obs"] or "",
+                observation["target_obs"] or "",
+            )
+        )
+        return observations
 
 
 

@@ -212,6 +212,17 @@ def platform_source_configuration(request):
         .order_by("sensor_id__s_order", "source_obs")
     )
 
+    sensor_qs = (
+        Sensor.objects
+        .select_related(
+            "m_type_id",
+            "m_type_id__m_scalar_type_id",
+            "m_type_id__m_scalar_type_id__obs_type_id",
+            "m_type_id__m_scalar_type_id__uom_type_id",
+        )
+        .order_by("s_order")
+    )
+
     platform_sources = (
         PlatformSource.objects
         .select_related("data_source_id", "platform_id", "platform_id__organization_id")
@@ -220,7 +231,12 @@ def platform_source_configuration(request):
                 "sourceobservationmap_set",
                 queryset=observation_qs,
                 to_attr="observation_maps",
-            )
+            ),
+            Prefetch(
+                "platform_id__sensor_set",
+                queryset=sensor_qs,
+                to_attr="sensors",
+            ),
         )
         .filter(
             data_source_id__key=data_source_key,
