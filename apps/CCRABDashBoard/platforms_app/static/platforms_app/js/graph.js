@@ -142,6 +142,9 @@ export function registerGraphComponents(Alpine) {
                 if (axisStillUsed && chart.options.scales) {
                     console.log("Deleting chart scale: " + axisId);
                     delete chart.options.scales[axisId];
+                    if (chart.scales && chart.scales.y) {
+                      delete chart.scales.y;
+                    }
                 }
                 chart.update();
             },
