@@ -40,9 +40,11 @@ def _norm_key(s: Optional[str]) -> Optional[str]:
 class ObsMapRecord(BaseModel):
     target_obs: str = Field(..., min_length=1)
     target_uom: Optional[str] = None
+    target_active: Optional[int] = None
 
     source_obs: Optional[str] = None
     source_uom: Optional[str] = None
+    source_active: Optional[int] = None
 
     # s_order is required to be a positive integer (default 1)
     s_order: int = Field(default=1, ge=1)
