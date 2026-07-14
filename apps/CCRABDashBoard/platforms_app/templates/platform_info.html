@@ -277,7 +277,8 @@
                         </tr>
                     </thead>
                     <template x-for="obs_row in platformInfoTableRows" :key="obs_row.key">
-                        <tr>
+                        <template x-if="obs_row.active == 1">
+                            <tr>
                             <td>
                               <strong x-text="obs_row.obsStandardName"></strong>
                               <strong x-text="obs_row.sensorLabel"></strong>
@@ -292,7 +293,8 @@
                                     @change="observationCheckClicked($event.target.checked, obs_row.obsStandardName, obs_row.sensorOrder)"/>
                             </td>
                         </tr>
-                        <tr x-show="isLoadingObservationData">
+                        </template>
+                         <tr x-show="isLoadingObservationData">
                           <td colspan="4" class="has-text-grey">
                             Loading observation list...
                           </td>
