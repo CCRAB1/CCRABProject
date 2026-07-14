@@ -123,13 +123,10 @@ class SourceObservationMapConfigurationSerializer(serializers.ModelSerializer):
         return scalar_type.uom_type_id.standard_name
 
     def get_target_obs(self, obj):
-        if obj.sensor_id and obj.sensor_id.short_name:
-            return obj.sensor_id.short_name
-
+        #if obj.sensor_id and obj.sensor_id.short_name:
+        #    return obj.sensor_id.short_name
         scalar_type = obj.sensor_id.m_type_id.m_scalar_type_id
         return scalar_type.obs_type_id.standard_name
-        #scalar_type = obj.sensor_id.m_type_id.m_scalar_type_id
-        #return scalar_type.uom_type_id.standard_name
 
 
 class PlatformSourceConfigurationSerializer(serializers.ModelSerializer):
