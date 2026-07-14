@@ -234,7 +234,7 @@ class PlatformSourceConfigurationSerializer(serializers.ModelSerializer):
             observations.append({
                 "source_obs": None,
                 "source_uom": None,
-                "source_active": None,
+                "source_active": 0,
                 "target_obs": _sensor_target_obs(sensor),
                 "target_uom": _sensor_target_uom(sensor),
                 "target_active": sensor.active,
