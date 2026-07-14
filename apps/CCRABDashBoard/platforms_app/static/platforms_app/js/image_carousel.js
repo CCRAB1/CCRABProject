@@ -12,7 +12,7 @@ let alpineComponentsRegistered = false;
 // Define the reusable sleep utility
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-const default_obs_to_display = ["air_temperature 1", "air_pressure 1", "relative_humidity 1", "pm2.5_atm 1"];
+const default_obs_to_display = ["pm2.5 1", "pm2.5_atm 1"];
 function registerAlpineComponents() {
   if (alpineComponentsRegistered) {
     return;

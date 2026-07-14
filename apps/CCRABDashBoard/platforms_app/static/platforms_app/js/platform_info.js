@@ -148,6 +148,7 @@ export class PlatformInfo {
     return {
       shortName: source.short_name || "",
       order: order,
+      active: source.active || 1,
       channelLabel: order === 1 ? "A" : "B",
       obsStandardName: source.obs_standard_name || "",
       obsDefinition: source.obs_definition || "",
