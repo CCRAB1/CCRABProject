@@ -109,8 +109,7 @@ def purple_air_processing():
         if mode is not None:
             requested = mode.lower()
         else:
-            requested = Variable.get("purple_air_csv_pipeline_mode", "auto").lower()
-
+            requested = Variable.get("PURPLE_AIR_CSV_PIPELINE_MODE", "auto").lower()
         assert requested in ("auto", "local", "rest"), "mode must be 'auto', 'local', or 'rest'"
 
         local_path.mkdir(parents=True, exist_ok=True)
@@ -121,6 +120,8 @@ def purple_air_processing():
             resolved_mode = "local" if len(found) > 0 else "rest"
         else:
             resolved_mode = requested
+
+        logger.info(f"mode: {resolved_mode} directory_to_process: {str(local_path)}")
 
         return {"mode": resolved_mode, "directory_to_process": str(local_path)}
 
@@ -833,7 +834,7 @@ def purple_air_processing():
     #we could be processing previous files.
     run_config = decide_mode(None)
 
-    branch = branch_on_mode(['mode'])
+    branch = branch_on_mode(run_config['mode'])
 
     configuration_file_path >> run_config >> branch
 
