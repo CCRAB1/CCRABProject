@@ -508,7 +508,7 @@ def purple_air_processing():
                                 #We build the name for each column we want which is >target_obs>_<s_order>. The date
                                 #column has been renamed m_date during the normalize task.
                                 try:
-                                    logger.debug(obs_info)
+                                    logger.info(str(obs_info))
                                     if obs_info.target_active == 1:
                                         column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
                                         m_date = row['m_date']
