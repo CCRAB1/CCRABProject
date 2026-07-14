@@ -398,11 +398,11 @@ def purple_air_processing():
                                     csv_writer.writerow(row)
 
                                 else:
-                                    humidity_a = humidity_b = pm25_cf1_a = pm25_cf1_b = None
-                                    if humidity_a and pm25_cf1_a_ndx:
+                                    if humidity_a_ndx and pm25_cf1_a_ndx:
+                                        humidity_b = pm25_cf1_b = None
                                         humidity_a = float(row[humidity_a_ndx])
                                         pm25_cf1_a = float(row[pm25_cf1_a_ndx])
-                                        if humidity_b and pm25_cf1_b_ndx:
+                                        if humidity_b_ndx and pm25_cf1_b_ndx:
                                             humidity_b = float(row[humidity_b_ndx])
                                             pm25_cf1_b = float(row[pm25_cf1_b_ndx])
                                         epa_corrected = apply_epa_correction(pm25_cf1_a, humidity_a, pm25_cf1_b, humidity_b)
