@@ -393,7 +393,7 @@ def purple_air_processing():
                                             pm25_cf1_b_ndx = row.index("pm2.5_cf_1_2")
                                     else:
                                         logger.error(f"Missing relative_humidity_1 or pm2.5_cf_1_1 in header: {row}")
-                                    row.append("pm2.5_EPAc")
+                                    row.append("pm2.5_EPAc_1")
                                     #Write new header back out.
                                     csv_writer.writerow(row)
 
