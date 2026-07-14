@@ -38,12 +38,14 @@ class SensorAnnotatedSerializer(serializers.ModelSerializer):
     uom_display = serializers.CharField(read_only=True)
     uom_standard_name = serializers.CharField(read_only=True)
     uom_definition = serializers.CharField(read_only=True)
+    active = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Sensor
         fields = (
             'short_name',
             's_order',
+            'active',
             'obs_standard_name',
             'obs_definition',
             'uom_display',
