@@ -38,7 +38,7 @@ class SensorAnnotatedSerializer(serializers.ModelSerializer):
     uom_display = serializers.CharField(read_only=True)
     uom_standard_name = serializers.CharField(read_only=True)
     uom_definition = serializers.CharField(read_only=True)
-    target_active = serializers.IntegerField(source="sensor.active", read_only=True)
+    active = serializers.IntegerField(source="sensor.active", read_only=True)
 
     class Meta:
         model = Sensor
