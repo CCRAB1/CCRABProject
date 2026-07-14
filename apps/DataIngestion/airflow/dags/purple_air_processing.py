@@ -49,6 +49,7 @@ if remote_debug == "True":
     schedule="*/30 * * * *",
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     catchup=False,
+    pool='purple_air_one_at_a_time',
     tags=["purpleair","ccrab"],
 )
 def purple_air_processing():
@@ -569,22 +570,38 @@ def purple_air_processing():
 
     @task()
     def archive_task(config_file_name: Path, data_source_files: [], normalized_header_files: [], ancillary_calculations_data_files: []) :
+        archive_all_files = Variable.get("ARCHIVE_ALL_FILES_IN_DIRECTORY")
         archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY", default="purple_air")
+        base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY"))
+
         archive_directory.mkdir(parents=True, exist_ok=True)
         logger.info(f"Starting archive_task with config file.")
         process_run_time = datetime.now()
 
         raw_data_archive_directory = archive_directory / Variable.get("RAW_DATA_DIRECTORY")
         raw_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        archive_and_zip(data_source_files, raw_data_archive_directory, archive_directory, process_run_time)
+        files_to_archive = data_source_files
+        if archive_all_files:
+            data_directory = base_dir / Path(Variable.get("RAW_DATA_DIRECTORY"))
+            files_to_archive = data_directory.glob("*.*")
+        archive_and_zip(files_to_archive, raw_data_archive_directory, archive_directory, process_run_time)
 
         normalized_data_archive_directory = archive_directory / Variable.get("NORMALIZED_HEADER_DIRECTORY")
         normalized_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        archive_and_zip(normalized_header_files, normalized_data_archive_directory, archive_directory, process_run_time)
+        files_to_archive = normalized_header_files
+        if archive_all_files:
+            data_directory = base_dir / Path(Variable.get("NORMALIZED_HEADER_DIRECTORY"))
+            files_to_archive = data_directory.glob("*.*")
+
+        archive_and_zip(files_to_archive, normalized_data_archive_directory, archive_directory, process_run_time)
 
         anicllary_data_archive_directory = archive_directory / Variable.get("EPA_CORRECTED_DIRECTORY")
         anicllary_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        archive_and_zip(normalized_header_files, anicllary_data_archive_directory, archive_directory, process_run_time)
+        files_to_archive = ancillary_calculations_data_files
+        if archive_all_files:
+            data_directory = base_dir / Path(Variable.get("EPA_CORRECTED_DIRECTORY"))
+            files_to_archive = data_directory.glob("*.*")
+        archive_and_zip(files_to_archive, anicllary_data_archive_directory, archive_directory, process_run_time)
 
         '''
         logger.info(f"Archiving raw data files: {raw_data_archive_directory}")
