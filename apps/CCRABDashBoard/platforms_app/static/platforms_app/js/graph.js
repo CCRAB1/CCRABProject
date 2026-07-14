@@ -139,7 +139,7 @@ export function registerGraphComponents(Alpine) {
                     return item.yAxisID === axisId;
                 });
 
-                if (axisStillUsed && chart.options.scales) {
+                if (!axisStillUsed && chart.options.scales) {
                     console.log("Deleting chart scale: " + axisId);
                     delete chart.options.scales[axisId];
                     if (chart.scales) {
