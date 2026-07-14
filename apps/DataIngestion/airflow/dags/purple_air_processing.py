@@ -47,9 +47,9 @@ if remote_debug == "True":
 @dag(
     dag_id="purple_air_processing",
     schedule="*/30 * * * *",
+    max_active_runs=1,
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     catchup=False,
-    pool='purple_air_one_at_a_time',
     tags=["purpleair","ccrab"],
 )
 def purple_air_processing():
