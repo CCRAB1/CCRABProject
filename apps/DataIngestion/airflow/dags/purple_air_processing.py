@@ -505,42 +505,43 @@ def purple_air_processing():
 
                         for row_ndx, row in enumerate(csv_reader):
                             for obs_info in platform_nfo.obs_map:
-                                #We build the name for each column we want which is >target_obs>_<s_order>. The date
-                                #column has been renamed m_date during the normalize task.
-                                try:
-                                    column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
-                                    m_date = row['m_date']
+                                if obs_info.target_active == 1:
+                                    #We build the name for each column we want which is >target_obs>_<s_order>. The date
+                                    #column has been renamed m_date during the normalize task.
                                     try:
-                                        val = float(row[column_name])
-                                    except (ValueError, TypeError) as e:
-                                        logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
-                                        logger.exception(e)
-                                    else:
-                                        if PURPLEAIR_TASK_LOG_INSERTS:
-                                            #if row_ndx % 1000 == 0:
-                                            logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
-                                                        f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
-                                                        f"{obs_info.target_uom}({obs_info.m_type_id}) SOrder: {obs_info.s_order}")
+                                        column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
+                                        m_date = row['m_date']
                                         try:
-                                            with transaction.atomic():
-                                                obs_rec = Multi_obs.objects.create(row_entry_date=row_entry_date,
-                                                                    platform_handle=platform_nfo.platform_handle,
-                                                                    m_date=m_date,
-                                                                    m_value=val,
-                                                                    sensor_id_id=obs_info.sensor_id,
-                                                                    m_type_id_id=obs_info.m_type_id,
-                                                                    m_lon=platform_nfo.longitude,
-                                                                    m_lat=platform_nfo.latitude)
-                                        except IntegrityError as e:
-                                            logger.error(f"Record already exists: {e}")
-                                            duplicate_row_count += 1
-                                        except Exception as e:
-                                            logger.error(f"Error adding record: {e}")
+                                            val = float(row[column_name])
+                                        except (ValueError, TypeError) as e:
+                                            logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
                                             logger.exception(e)
-                                            insert_exception_count += 1
-                                except Exception as e:
-                                    close_django_connections()
-                                    raise e
+                                        else:
+                                            if PURPLEAIR_TASK_LOG_INSERTS:
+                                                #if row_ndx % 1000 == 0:
+                                                logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
+                                                            f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
+                                                            f"{obs_info.target_uom}({obs_info.m_type_id}) SOrder: {obs_info.s_order}")
+                                            try:
+                                                with transaction.atomic():
+                                                    obs_rec = Multi_obs.objects.create(row_entry_date=row_entry_date,
+                                                                        platform_handle=platform_nfo.platform_handle,
+                                                                        m_date=m_date,
+                                                                        m_value=val,
+                                                                        sensor_id_id=obs_info.sensor_id,
+                                                                        m_type_id_id=obs_info.m_type_id,
+                                                                        m_lon=platform_nfo.longitude,
+                                                                        m_lat=platform_nfo.latitude)
+                                            except IntegrityError as e:
+                                                logger.error(f"Record already exists: {e}")
+                                                duplicate_row_count += 1
+                                            except Exception as e:
+                                                logger.error(f"Error adding record: {e}")
+                                                logger.exception(e)
+                                                insert_exception_count += 1
+                                    except Exception as e:
+                                        close_django_connections()
+                                        raise e
                     logger.info(f"Processed {row_ndx} rows from file: {file} into the database in: "
                                 f"{time.perf_counter()-file_start_time} seconds")
 
