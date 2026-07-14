@@ -118,9 +118,9 @@ class SourceObservationMapConfigurationSerializer(serializers.ModelSerializer):
     def get_s_order(self, obj):
         return obj.sensor_id.s_order
 
-    def get_target_obs(self, obj):
+    def get_target_uom(self, obj):
         scalar_type = obj.sensor_id.m_type_id.m_scalar_type_id
-        return scalar_type.obs_type_id.standard_name
+        return scalar_type.uom_type_id.standard_name
 
     def get_target_obs(self, obj):
         if obj.sensor_id and obj.sensor_id.short_name:
