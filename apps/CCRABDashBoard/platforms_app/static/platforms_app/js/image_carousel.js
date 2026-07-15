@@ -341,7 +341,7 @@ function registerAlpineComponents() {
         if(obsValue !== undefined) {
           if (obsName === "pm2.5_EPAc") {
             var epaRange = getEPABreakpoint(obsValue);
-            return "color: " + epaRange.color + ";";
+            return "background-color: " + epaRange.color + ";";
           }
         }
       }
