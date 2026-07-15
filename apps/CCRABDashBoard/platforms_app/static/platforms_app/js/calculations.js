@@ -1,4 +1,4 @@
-function CalculateAqiPM25EPA(pm25_1, pm25_2, humidity)
+export function CalculateAqiPM25EPA(pm25_1, pm25_2, humidity)
 {
     /*
     1. Apply the USNowCast Correction FormulaFor standard outdoor environments,
