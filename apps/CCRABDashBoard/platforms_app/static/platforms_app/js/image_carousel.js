@@ -329,12 +329,20 @@ function registerAlpineComponents() {
         }
         return String(sOrder);
       },
+      /**
+       * This function is used to style the data in the Current Data tables for the current, min and max
+       * values.
+       * @param obsName
+       * @param obsValue
+       * @returns {string}
+       */
       getClassForObs(obsName, obsValue)
       {
-        if(obsName === "pm2.5_EPAc")
-        {
-          var epaRange = getEPABreakpoint(obsValue);
-          return "{color: " + epaRange.color + "}";
+        if(obsValue !== undefined) {
+          if (obsName === "pm2.5_EPAc") {
+            var epaRange = getEPABreakpoint(obsValue);
+            return "{color: " + epaRange.color + "}";
+          }
         }
       }
     };
