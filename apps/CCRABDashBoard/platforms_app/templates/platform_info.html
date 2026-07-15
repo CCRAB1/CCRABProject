@@ -199,9 +199,15 @@
                                 x-text="obs_row.units">
                               </span>
                             </div>
-                            <div class="column" x-text="formatObservationValue(obs_row.stats?.most_recent.value)"></div>
-                            <div class="column" x-text="formatObservationValue(obs_row.stats?.min.value)"></div>
-                            <div class="column" x-text="formatObservationValue(obs_row.stats?.max.value)"></div>
+                            <div class="column"
+                                 :style="getClassForObs(obs_row.obsStandardName, obs_row.stats?.most_recent.value)"
+                                 x-text="formatObservationValue(obs_row.stats?.most_recent.value)"></div>
+                            <div class="column"
+                                :style="getClassForObs(obs_row.obsStandardName, obs_row.stats?.min.value)"
+                                 x-text="formatObservationValue(obs_row.stats?.min.value)"></div>
+                            <div class="column"
+                                :style="getClassForObs(obs_row.obsStandardName, obs_row.stats?.max.value)"
+                                 x-text="formatObservationValue(obs_row.stats?.max.value)"></div>
                     </div>
                     </template>
                 </template>

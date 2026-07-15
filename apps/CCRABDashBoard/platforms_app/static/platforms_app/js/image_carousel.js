@@ -5,6 +5,7 @@ import { registerGraphComponents } from "./graph.js";
 import { PlatformInfo } from "./platform_info.js";
 import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
 import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";
+import {getEPABreakpoint} from "./calculations.js";
 
 //const CCRAB_BASE_URL = window.CCRAB_BASE_URL || window.location.origin;
 let alpineComponentsRegistered = false;
@@ -327,8 +328,15 @@ function registerAlpineComponents() {
           return 'B';
         }
         return String(sOrder);
+      },
+      getClassForObs(obsName, obsValue)
+      {
+        if(obsName === "pm2.5_EPAc")
+        {
+          var epaRange = getEPABreakpoint(obsValue);
+          return "{color: " + epaRange.color + "}";
+        }
       }
-
     };
   });
 
