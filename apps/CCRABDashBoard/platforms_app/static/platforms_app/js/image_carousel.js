@@ -250,10 +250,17 @@ function registerAlpineComponents() {
             y: Number(record.value)});
         }
         var sensor = this.findSensor(obsStandardName, obsSOrder);
+        //If the user turned on the pm2.5 EPA Corrected channel, we want the graph coloration to use the
+        //EPA breakpoint function.
+        var useEPABreakpoints = false;
+        if(obsStandardName === "pm2.5_EPAc") {
+          useEPABreakpoints = this;
+        }
         return {
           id: seriesId,
           label: this.formatObservationLabel(obsStandardName, obsSOrder),
           data: graphData,
+          useEPABreakpoints: useEPABreakpoints
         };
       },
       findSensor(obsStandardName, obsSOrder) {

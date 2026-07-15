@@ -172,6 +172,16 @@ export function registerGraphComponents(Alpine) {
                     pointRadius: 0,
                     pointHoverRadius: 4,
                     tension: 0.25,
+                    segment: {
+                        borderColor: (chartPt) =>
+                        {
+                            if (dataset.useEPABreakpoints) {
+                                var epaRange = getEPABreakpoint(chartPt.p0.parsed.y);
+                                return epaRange.color;
+                            }
+                            return undefined;
+                        }
+                    }
                     //borderDash: borderDash
 
                 });
@@ -182,7 +192,11 @@ export function registerGraphComponents(Alpine) {
 
                 chart.update("none");
             },
-
+            /**
+             * When the user clicks on an observation that is currently displayed, this function will remove the dataset
+             * from the graph.
+             * @param id
+             */
             removeDataset(id) {
                 if (!chart) return;
 
