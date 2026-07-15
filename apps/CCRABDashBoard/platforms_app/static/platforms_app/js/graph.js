@@ -112,6 +112,7 @@ export function registerGraphComponents(Alpine) {
                 }
 
                 var canvas = this.$refs.canvas;
+                let lastTickDate = null;
                 if (!canvas) return;
                 chart = new window.Chart(this.$refs.canvas, {
                     type: this.chartType,
@@ -122,12 +123,22 @@ export function registerGraphComponents(Alpine) {
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: {
-                          x: {
-                            type: "category",
-                          },
-                        },
 
+                        scales: {
+                            x: {
+                              /*ticks: {
+                                callback: function(value, index) {
+                                    var tick_label = this.getLabelForValue(value);
+                                    var tick_label_parts = tick_label.split(" ", 2);
+                                    if(index === 0 || (index % 4) === 0)
+                                    {
+                                        return tick_label;
+                                    }
+                                    return tick_label_parts[1];
+                                }
+                              }*/
+                            }
+                        },
                     },
                 });
 

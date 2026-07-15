@@ -247,7 +247,7 @@ function registerAlpineComponents() {
         var graphData = [];
         for(const record of series._records) {
           var ts = DateTime.fromJSDate(record.timestamp);
-          graphData.push({x: ts.toFormat("yyyy-MM-dd hh:mm:ss a"),
+          graphData.push({x: ts.toFormat("MM-dd hh:mm a"),
             y: Number(record.value)});
         }
         var sensor = this.findSensor(obsStandardName, obsSOrder);
