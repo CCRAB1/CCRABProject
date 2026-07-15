@@ -192,7 +192,7 @@ export function registerGraphComponents(Alpine) {
                 var axisId = "y-" + id.replaceAll(" ", "-");
                 console.debug("Removing dataset id: " + id + "axis: " + axisId);
 
-                if (existingIndex) {
+                if (existingIndex >= 0) {
                     chart.data.datasets.splice(existingIndex, 1);
                 }
 
