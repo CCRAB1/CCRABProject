@@ -168,6 +168,7 @@ export function registerGraphComponents(Alpine) {
                     tension: 0.25,
 
                 });
+                currentColorIndex += 1;
                 if (chart.scales && chart.scales.y) {
                   delete chart.scales.y;
                 }
