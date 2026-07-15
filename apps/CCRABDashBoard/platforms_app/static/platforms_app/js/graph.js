@@ -193,7 +193,7 @@ export function registerGraphComponents(Alpine) {
                 console.debug("Removing dataset id: " + id + "axis: " + axisId);
 
                 if (existingIndex) {
-                    chart.data.datasets.splice(id, 1);
+                    chart.data.datasets.splice(existingIndex, 1);
                 }
 
                 var axisStillUsed = chart.data.datasets.some((item) => {
