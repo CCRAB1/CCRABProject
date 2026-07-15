@@ -1,6 +1,52 @@
-const backgroundColors = ['#36A2EB33', '#FF638433', '#FFCD5633', '#4BC0C033'];
-const borderColors = ['#36A2EB', '#FF6384', '#FFCD56', '#4BC0C0'];
+import {getEPABreakpoint} from "./calculations";
 
+const graphColors = [
+  {
+    name: "Ocean Blue",
+    borderColor: "#2563eb",
+    backgroundColor: "rgba(37, 99, 235, 0.12)",
+  },
+  {
+    name: "Deep Navy",
+    borderColor: "#1e3a8a",
+    backgroundColor: "rgba(30, 58, 138, 0.12)",
+  },
+  {
+    name: "Sky Blue",
+    borderColor: "#0284c7",
+    backgroundColor: "rgba(2, 132, 199, 0.12)",
+  },
+  {
+    name: "Cyan",
+    borderColor: "#0891b2",
+    backgroundColor: "rgba(8, 145, 178, 0.12)",
+  },
+  {
+    name: "Indigo",
+    borderColor: "#4f46e5",
+    backgroundColor: "rgba(79, 70, 229, 0.12)",
+  },
+  {
+    name: "Violet",
+    borderColor: "#7c3aed",
+    backgroundColor: "rgba(124, 58, 237, 0.12)",
+  },
+  {
+    name: "Purple",
+    borderColor: "#9333ea",
+    backgroundColor: "rgba(147, 51, 234, 0.12)",
+  },
+  {
+    name: "Slate",
+    borderColor: "#475569",
+    backgroundColor: "rgba(71, 85, 105, 0.12)",
+  },
+  {
+    name: "Cool Gray",
+    borderColor: "#64748b",
+    backgroundColor: "rgba(100, 116, 139, 0.12)",
+  },
+];
 
 
 export function registerGraphComponents(Alpine) {
@@ -105,15 +151,22 @@ export function registerGraphComponents(Alpine) {
                         drawOnChartArea: chart.data.datasets.length === 0,
                     },
                 };
-                if(currentColorIndex == 4) {
+                if(currentColorIndex == graphColors.length) {
                     currentColorIndex = 0;
                 }
+
                 chart.data.datasets.push({
                     id: dataset.id,
                     label: dataset.label,
                     data: dataset.data,
                     yAxisID: axisId,
-                    borderColor: borderColors[currentColorIndex++]
+                    borderColor: graphColors[currentColorIndex].borderColor,
+                    backgroundColor: graphColors[currentColorIndex].backgroundColor,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    tension: 0.25,
+
                 });
                 if (chart.scales && chart.scales.y) {
                   delete chart.scales.y;
