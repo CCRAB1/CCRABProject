@@ -19,7 +19,7 @@ function CalculateAqiPM25EPA(pm25_1, pm25_2, humidity)
  * @param {number} pm25 - The corrected PM2.5 concentration value (µg/m³).
  * @returns {Object|null} The breakpoint range parameters, or null if out of bounds.
  */
-function getEPABreakpoint(pm25) {
+export function getEPABreakpoint(pm25) {
   // Round to 1 decimal place to align with official EPA breakpoint precision
   const roundedPm = Math.round(pm25 * 10) / 10;
 
