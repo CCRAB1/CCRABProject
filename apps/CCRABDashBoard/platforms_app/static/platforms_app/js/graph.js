@@ -47,7 +47,12 @@ const graphColors = [
     backgroundColor: "rgba(100, 116, 139, 0.12)",
   },
 ];
-
+const lineStyles = [
+  [],
+  [6, 4],
+  [2, 4],
+  [10, 4, 2, 4],
+];
 
 export function registerGraphComponents(Alpine) {
     if (!Alpine.store("graph")) {
@@ -154,18 +159,20 @@ export function registerGraphComponents(Alpine) {
                 if(currentColorIndex == graphColors.length) {
                     currentColorIndex = 0;
                 }
-
+                var color = graphColors[currentColorIndex % graphColors.length];
+                var borderDash = lineStyles[currentColorIndex % lineStyles.length];
                 chart.data.datasets.push({
                     id: dataset.id,
                     label: dataset.label,
                     data: dataset.data,
                     yAxisID: axisId,
-                    borderColor: graphColors[currentColorIndex].borderColor,
-                    backgroundColor: graphColors[currentColorIndex].backgroundColor,
+                    borderColor: color.borderColor,
+                    backgroundColor: color.backgroundColor,
                     borderWidth: 2,
                     pointRadius: 0,
                     pointHoverRadius: 4,
                     tension: 0.25,
+                    borderDash: borderDash
 
                 });
                 currentColorIndex += 1;
