@@ -4,7 +4,7 @@ import { DateTime } from "../../vendor/luxon/3.7.2/luxon.min.js";
 import { registerGraphComponents } from "./graph.js";
 import { PlatformInfo } from "./platform_info.js";
 import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
-import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";;
+import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";
 
 //const CCRAB_BASE_URL = window.CCRAB_BASE_URL || window.location.origin;
 let alpineComponentsRegistered = false;

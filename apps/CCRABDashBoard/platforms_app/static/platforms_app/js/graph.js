@@ -1,4 +1,4 @@
-import {getEPABreakpoint} from "./calculations";
+import {getEPABreakpoint} from "./calculations.js";
 
 const graphColors = [
   {
