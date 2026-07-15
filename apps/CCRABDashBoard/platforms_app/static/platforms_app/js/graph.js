@@ -7,6 +7,11 @@ const graphColors = [
     backgroundColor: "rgba(37, 99, 235, 0.12)",
   },
   {
+    name: "Slate",
+    borderColor: "#475569",
+    backgroundColor: "rgba(71, 85, 105, 0.12)",
+  },
+  {
     name: "Deep Navy",
     borderColor: "#1e3a8a",
     backgroundColor: "rgba(30, 58, 138, 0.12)",
@@ -15,6 +20,11 @@ const graphColors = [
     name: "Sky Blue",
     borderColor: "#0284c7",
     backgroundColor: "rgba(2, 132, 199, 0.12)",
+  },
+  {
+    name: "Cool Gray",
+    borderColor: "#64748b",
+    backgroundColor: "rgba(100, 116, 139, 0.12)",
   },
   {
     name: "Cyan",
@@ -35,16 +45,6 @@ const graphColors = [
     name: "Purple",
     borderColor: "#9333ea",
     backgroundColor: "rgba(147, 51, 234, 0.12)",
-  },
-  {
-    name: "Slate",
-    borderColor: "#475569",
-    backgroundColor: "rgba(71, 85, 105, 0.12)",
-  },
-  {
-    name: "Cool Gray",
-    borderColor: "#64748b",
-    backgroundColor: "rgba(100, 116, 139, 0.12)",
   },
 ];
 const lineStyles = [
