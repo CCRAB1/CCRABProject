@@ -21,6 +21,10 @@ export function CalculateAqiPM25EPA(pm25_1, pm25_2, humidity)
  */
 export function getEPABreakpoint(pm25) {
   // Round to 1 decimal place to align with official EPA breakpoint precision
+  if(pm25 < 0)
+  {
+      pm25 = 0;
+  }
   const roundedPm = Math.round(pm25 * 10) / 10;
 
   const breakpoints = [
