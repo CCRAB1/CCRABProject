@@ -160,7 +160,7 @@ export function registerGraphComponents(Alpine) {
                     currentColorIndex = 0;
                 }
                 var color = graphColors[currentColorIndex % graphColors.length];
-                var borderDash = lineStyles[currentColorIndex % lineStyles.length];
+                //var borderDash = lineStyles[currentColorIndex % lineStyles.length];
                 chart.data.datasets.push({
                     id: dataset.id,
                     label: dataset.label,
@@ -172,7 +172,7 @@ export function registerGraphComponents(Alpine) {
                     pointRadius: 0,
                     pointHoverRadius: 4,
                     tension: 0.25,
-                    borderDash: borderDash
+                    //borderDash: borderDash
 
                 });
                 currentColorIndex += 1;
@@ -186,8 +186,8 @@ export function registerGraphComponents(Alpine) {
             removeDataset(id) {
                 if (!chart) return;
 
-                var existingIndex = chart.data.datasets.filter((dataset) => {
-                    return dataset.id !== id;
+                var existingIndex = chart.data.datasets.findIndex((dataset) => {
+                  return dataset.id === id;
                 });
                 var axisId = "y-" + id.replaceAll(" ", "-");
                 console.debug("Removing dataset id: " + id + "axis: " + axisId);
@@ -203,11 +203,6 @@ export function registerGraphComponents(Alpine) {
                 if (!axisStillUsed && chart.options.scales) {
                     console.log("Deleting chart scale: " + axisId);
                     delete chart.options.scales[axisId];
-                    if (chart.scales) {
-                      if(axisId in chart.scales) {
-                          delete chart.scales[axisId];
-                      }
-                    }
                 }
                 chart.update("none");
             },
