@@ -129,6 +129,7 @@ class SourceObservationMapConfigurationSerializer(serializers.ModelSerializer):
         fields = (
             "source_obs",
             "source_uom",
+            "source_identifier",
             "source_active",
             "target_obs",
             "target_uom",
