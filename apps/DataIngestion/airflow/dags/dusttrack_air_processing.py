@@ -18,7 +18,7 @@ from datautilities.environet_api.client import EnvironetAPIClient
 from datautilities.epa.epa_calculations import apply_epa_correction
 from packages.django_setup import setup_django, close_django_connections
 from datautilities.ccrab_api.client import CCRABRestClient, CCRABAuthenticationError
-from observationsdatabase.xenia_obs_map import Organization, Platform
+from datautilities.database.xenia_obs_map import Organization, Platform
 from packages.archiving import archive_file, zip_files
 from ioos_qc.config import QcConfig
 from ioos_qc.streams import PandasStream
@@ -60,11 +60,12 @@ def dusttrack_air_processing():
             #maybe_attach_debugger()
 
             logger.info("Retrieving configuration")
-            base_directory = Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / "dusttrack" / "config"
+            now_time = datetime.today()
+            base_directory = Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / Variable.get("ENVIRONET_WORKING_DIRECTORY") / "config"
             logger.info(f"Base directory: {base_directory}")
             #Make sure out destination directory exists.
             base_directory.mkdir(parents=True, exist_ok=True)
-            config_file_path = base_directory / "dusttrack_config.json"
+            config_file_path = base_directory / f"environet_config_{now_time.timestamp()}.json"
             ccrab_base_url = Variable.get("CCRAB_API_URL", None)
             ccrab_api = CCRABRestClient(base_url=ccrab_base_url,
                                         verify=get_requests_verify(ccrab_base_url)
@@ -79,7 +80,7 @@ def dusttrack_air_processing():
                     f"Unable to authenticate with CCRAB API. Attempting to create a new token."
                 )
                 ccrab_api.register_user(username=ccrab_user, password=ccrab_pwd)
-            organizations_setup = ccrab_api.platform_configuration(data_source='dusttrack')
+            organizations_setup = ccrab_api.platform_configuration(data_source='environet')
             json.dump(organizations_setup, open(config_file_path, "w"))
         except Exception as e:
             logger.exception(e)
@@ -103,12 +104,12 @@ def dusttrack_air_processing():
         #dag_conf_mode =
 
         base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-        local_path = base_dir / Path(Variable.get("DUSTTRACK_WORKING_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
+        local_path = base_dir / Path(Variable.get("ENVIRONET_WORKING_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
         # If user passes a conf via dag run, Airflow will pass it; we handle via Variable for now.
         if mode is not None:
             requested = mode.lower()
         else:
-            requested = Variable.get("DUSTTRACK_CSV_PIPELINE_MODE", "auto").lower()
+            requested = Variable.get("ENVIRONET_CSV_PIPELINE_MODE", "auto").lower()
         assert requested in ("auto", "local", "rest"), "mode must be 'auto', 'local', or 'rest'"
 
         local_path.mkdir(parents=True, exist_ok=True)
@@ -193,14 +194,13 @@ def dusttrack_air_processing():
                 org_list.append(Organization().from_dict(organization))
 
             base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-            data_directory = base_dir / Path(Variable.get("DUSTTRACK_WORKING_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
+            data_directory = base_dir / Path(Variable.get("ENVIRONET_WORKING_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
             data_directory = Path(data_directory)
             data_directory.mkdir(parents=True, exist_ok=True)
 
             last_retrieved_record_date = Variable.get("last_retrieved_record_date", "1900-01-01 00:00:00")
-            dusttrack_base_url = Variable.get("DUSTTRACK_API_BASE_URL", None)
-            dusttrack_api_key = Variable.get('DUSTTRACK_API_KEY', None)
-            purple_api = PurpleAirClient(api_key=dusttrack_api_key, base_url=dusttrack_base_url, timeout=30.0)
+            environet_air_api_key = Variable.get('ENVIRONET_AIR_API_KEY', None)
+            environet = EnvironetAPIClient(access_token=environet_air_api_key)
 
             platform_count = 0
 
@@ -230,27 +230,23 @@ def dusttrack_air_processing():
                         #Add a minute so we don't get the same record twice.'
                         start_date = latest_m_date + timedelta(minutes=1)
                     try:
-                        #These are the sensors we want to retrieve from PUrple Air API.
-                        fields = [obs['source_obs'] for obs in platform.observations if obs['source_active'] == 1]
+                        # These are the meausrement ids we want to retrieve from Environet API.
+                        measurement_ids = [obs['source_identifier'] for obs in platform.observations]
 
-                        logger.info(f"Getting sensor history for sensor_index {external_indentifier} Start: {start_date}"
-                                    f" End: {end_date} Fields: {fields}")
-                        results = purple_api.get_sensor_history(sensor_index=external_indentifier,
+                        logger.info(f"Getting sensor history for device id {external_indentifier} Start: {start_date}"
+                                    f" End: {end_date} MeasurementIDs: {measurement_ids}")
+                        results = environet.get_data_points(data_point_ids=measurement_ids,
                                                                      start_timestamp=start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                                                                      end_timestamp=end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                                                                     average=0,
-                                                                     fields=fields,
-                                                                     return_format="csv",
-                                                                     stream=True)
+                                                            )
                         file_platform_handle = platform_handle.replace(".", "_")
                         output_file = data_directory / (f"{file_platform_handle}-{external_indentifier}-"
                                                               f"{start_date.strftime('%Y%m%dT%H%M%S')}-"
-                                                              f"{end_date.strftime('%Y%m%dT%H%M%S')}.csv")
+                                                              f"{end_date.strftime('%Y%m%dT%H%M%S')}.json")
                         logger.info(f"Writing to {output_file}")
                         try:
                             with open(output_file, "w") as out_file_obj:
-                                for row in results:
-                                    out_file_obj.write(f"{row}\n")
+                                json.dump(results, out_file_obj)
                                 saved_data_files.append(str(output_file))
                         except Exception as e:
                             logger.error(f"Failed to write file: {output_file}")
@@ -261,10 +257,6 @@ def dusttrack_air_processing():
                         logger.error(f"Unable to retrieve data for platform: {platform_handle} ({external_indentifier})")
                         logger.exception(e)
                         #raise e
-            org_info = purple_api.get_organization()
-            logger.info(f"Purple Air API Remaining Points: {org_info['remaining_points']} Consumption Rate: {org_info['consumption_rate']} API Version: {org_info['api_version']}")
-            if org_info['remaining_points'] < 500000:
-                logger.warning(f"Purple Air API remaining points is low: {org_info['remaining_points']}")
             logger.info(f"Completed fetch_data_task in {time.perf_counter()-start_time} seconds for {platform_count} platforms")
 
         except Exception as e:
@@ -291,7 +283,7 @@ def dusttrack_air_processing():
             configuration_data = json.load(open(config_file_name))
 
             base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-            header_corrected_directory = base_directory / Path(Variable.get("DUSTTRACK_WORKING_DIRECTORY")) / Path(Variable.get("NORMALIZED_HEADER_DIRECTORY"))
+            header_corrected_directory = base_directory / Path(Variable.get("ENVIRONET_WORKING_DIRECTORY")) / Path(Variable.get("NORMALIZED_HEADER_DIRECTORY"))
             #Let's make sure the directory exists.
             header_corrected_directory.mkdir(parents=True, exist_ok=True)
 
@@ -343,7 +335,7 @@ def dusttrack_air_processing():
             configuration_data = json.load(open(config_file_name))
 
             base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
-            epa_corrected_directory = base_directory / Path(Variable.get("DUSTTRACK_WORKING_DIRECTORY")) / Path(Variable.get("EPA_CORRECTED_DIRECTORY"))
+            epa_corrected_directory = base_directory / Path(Variable.get("ENVIRONET_WORKING_DIRECTORY")) / Path(Variable.get("EPA_CORRECTED_DIRECTORY"))
             #Let's make sure the directory exists.
             epa_corrected_directory.mkdir(parents=True, exist_ok=True)
 
@@ -571,8 +563,8 @@ def dusttrack_air_processing():
     @task()
     def archive_task(config_file_name: Path, data_source_files: [], normalized_header_files: [], ancillary_calculations_data_files: []) :
         archive_all_files = Variable.get("ARCHIVE_ALL_FILES_IN_DIRECTORY")
-        archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("DUSTTRACK_WORKING_DIRECTORY", default="dusttrack")
-        base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / Path(Variable.get("DUSTTRACK_WORKING_DIRECTORY"))
+        archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("ENVIRONET_WORKING_DIRECTORY", default="dusttrack")
+        base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / Path(Variable.get("ENVIRONET_WORKING_DIRECTORY"))
 
         archive_directory.mkdir(parents=True, exist_ok=True)
         logger.info(f"Starting archive_task with config file.")
@@ -831,7 +823,7 @@ def dusttrack_air_processing():
 
     #Figure out how we are running. We could be fetching new data from the Purple AIr API, or
     #we could be processing previous files.
-    mode = Variable.get("DUSTTRACK_CSV_PIPELINE_MODE", None)
+    mode = Variable.get("ENVIRONET_CSV_PIPELINE_MODE", 'auto')
     run_config = decide_mode(mode)
 
     branch = branch_on_mode(run_config['mode'])
@@ -844,7 +836,7 @@ def dusttrack_air_processing():
     # Wire branch to both candidate tasks. Branch operator expects task ids returned above.
     branch >> local_file_list
     branch >> remote_file_list
-
+    '''
     # Merge results (merge task has TriggerRule so it runs even when a branch is skipped)
     csv_files_to_process = merge_file_lists(local_files=local_file_list, rest_files=remote_file_list)
 
@@ -859,8 +851,8 @@ def dusttrack_air_processing():
     archive = archive_task(configuration_file_path, csv_files_to_process,
                            normalized_header_data_files,
                            ancillary_calculations_data_files)
-
+    
     save_to_database >> archive
-
+    '''
 dusttrack_processing()
 
