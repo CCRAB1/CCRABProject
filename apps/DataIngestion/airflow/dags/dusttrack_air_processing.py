@@ -186,7 +186,7 @@ def dusttrack_air_processing():
             data_directory.mkdir(parents=True, exist_ok=True)
 
             last_retrieved_record_date = Variable.get("last_retrieved_record_date", "1900-01-01 00:00:00")
-            environet_air_api_key = Variable.get('ENVIRONET_AIR_API_KEY', None)
+            environet_air_api_key = Variable.get('ENVIRONET_API_KEY', None)
             environet = EnvironetAPIClient(access_token=environet_air_api_key)
 
             platform_count = 0
