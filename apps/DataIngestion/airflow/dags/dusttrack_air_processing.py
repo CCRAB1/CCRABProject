@@ -11,9 +11,10 @@ from pathlib import Path
 import json
 from urllib.parse import urlparse
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from django.db import IntegrityError, transaction
 from datautilities.environet_api.client import EnvironetAPIClient
+from datautilities.environet_api.models import DataPoint
 
 from datautilities.epa.epa_calculations import apply_epa_correction
 from packages.django_setup import setup_django, close_django_connections
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -155,26 +156,12 @@ def dusttrack_air_processing():
         local_csv_list = list(data_directory.glob("*.csv"))
         return [str(file_path) for file_path in local_csv_list]
 
-    @task(task_id="list_local")
-    def list_local_files(local_directory: str) -> []:
-        """
-        #### list_local_files task
-
-        Search the local_directory for all CSV files in the local directory.
-        Input is the local directory, the output is a list of CSV files in that directory.
-
-        **Inputs:** local_directory
-        **Outputs:** list[dict]
-        """
-        data_directory = Path(local_directory)
-        local_csv_list = list(data_directory.glob("*.csv"))
-        return [str(file_path) for file_path in local_csv_list]
 
     @task(task_id="fetch_rest")
     def fetch_data_task(config_file_name: Path) -> list[Any]:
         """
         #### fetch_data_task task
-        Using the Purple AIr API, this task retrieves the data for the platforms setup in the JSON config.
+        Using the Environet API, this task retrieves the data for the platforms setup in the JSON config.
 
         **Inputs:** config
         **Outputs:** list[]
@@ -236,18 +223,27 @@ def dusttrack_air_processing():
                         logger.info(f"Getting sensor history for device id {external_indentifier} Start: {start_date}"
                                     f" End: {end_date} MeasurementIDs: {measurement_ids}")
                         results = environet.get_data_points(data_point_ids=measurement_ids,
-                                                                     start_timestamp=start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                                                                     end_timestamp=end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                                                            )
+                                                            from_timestamp=start_date.timestamp() * 1000,
+                                                            to_timestamp=end_date.timestamp() * 1000)
                         file_platform_handle = platform_handle.replace(".", "_")
-                        output_file = data_directory / (f"{file_platform_handle}-{external_indentifier}-"
-                                                              f"{start_date.strftime('%Y%m%dT%H%M%S')}-"
-                                                              f"{end_date.strftime('%Y%m%dT%H%M%S')}.json")
-                        logger.info(f"Writing to {output_file}")
                         try:
-                            with open(output_file, "w") as out_file_obj:
-                                json.dump(results, out_file_obj)
-                                saved_data_files.append(str(output_file))
+                            #Let's write a file per observation out.
+                            for data_point in results:
+                                try:
+                                    #Validate the data.
+                                    datapoint_obj = DataPoint.model_validate(data_point)
+                                except Exception as e:
+                                    logger.exception(e)
+                                else:
+                                    output_file = data_directory / (f"{file_platform_handle}-"
+                                                                    f"{datapoint_obj.id}-"
+                                                                    f"{start_date.strftime('%Y%m%dT%H%M%S')}-"
+                                                                    f"{end_date.strftime('%Y%m%dT%H%M%S')}.json")
+                                    logger.info(f"Writing to {output_file}")
+
+                                    with open(output_file, "w") as out_file_obj:
+                                        json.dump(data_point, out_file_obj)
+                                        saved_data_files.append(str(output_file))
                         except Exception as e:
                             logger.error(f"Failed to write file: {output_file}")
 
@@ -301,6 +297,7 @@ def dusttrack_air_processing():
                 # The platform handle format we need is <org>.<platform name>.<platform type>. When
                 # we create the filename, we replace the "." with "_" to avoid any OS/Filesystem issues.
                 file_platform_handle = file_name_parts[0].replace("_", ".")
+                platform_nfo = None
                 for organization in org_list:
                     logger.info(
                         f"Check for platform: {file_platform_handle} in organization: {organization.short_name}")
@@ -309,19 +306,30 @@ def dusttrack_air_processing():
                         logger.error(f"Platform {file_platform_handle} not found in list.")
                     else:
                         break
-                corrected_file = header_corrected_directory / f"{file_path.stem}-corrected.csv"
-                logger.info(f"Reading source file: {file} Writing corrected file: {corrected_file}")
-                with open(file, "r") as csv_file_obj:
-                    csv_reader = csv.reader(csv_file_obj)
-                    with open(corrected_file, "w") as corrected_file_obj:
-                        csv_writer = csv.writer(corrected_file_obj)
-                        for row_number, row in enumerate(csv_reader):
-                            if row_number == 0:
-                                corrected_header = normalize_header(row, platform_nfo)
-                                csv_writer.writerow(corrected_header)
+                if platform_nfo:
+                    corrected_file = header_corrected_directory / f"{file_path.stem}-corrected.csv"
+                    logger.info(f"Reading source file: {file} Writing corrected file: {corrected_file}")
+                    with open(file, "r") as json_file_obj:
+                        json_data = json.load(json_file_obj)
+                        data_points = []
+                        header_row = []
+                        header_row.append('m_date')
+                        datapoint_obj = DataPoint.model_validate(json_data)
+                        data_points.append(datapoint_obj)
+                        header_row.append(normalize_header(datapoint_obj.name, platform_nfo))
+                        with open(corrected_file, "w") as corrected_file_obj:
+                            #Write normalized header.
+                            csv_writer = csv.writer(corrected_file_obj)
+                            csv_writer.writerow(header_row)
+                            if datapoint_obj and datapoint_obj.measurements:
+                                for measurement in datapoint_obj.measurements:
+                                    dt = datetime.fromtimestamp(measurement.timestamp / 1000.0, tz=timezone.utc)
+                                    dt = dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+                                    row = [dt,measurement.value]
+                                    csv_writer.writerow(row)
+                                corrected_file_list.append(str(corrected_file))
                             else:
-                                csv_writer.writerow(row)
-                    corrected_file_list.append(str(corrected_file))
+                                logger.error(f"No measurement data in: {file}")
         except Exception as e:
             raise e
         logger.info(f"Completed normalize_headers_task in {time.perf_counter()-start_time} seconds")
@@ -458,9 +466,9 @@ def dusttrack_air_processing():
     @task()
     def save_to_database_task(config_file_name: Path, file_list: []):
         #Grab the database connection parameters from the Airflow variables.
-        PURPLEAIR_TASK_LOG_INSERTS = Variable.get("PURPLEAIR_TASK_LOG_INSERTS", deserialize_json=True, default=0)
-        PURPLEAIR_BULK_INSERT_FILE_SIZE = Variable.get("PURPLEAIR_BULK_INSERT_FILE_SIZE", deserialize_json=True, default=1000000)
-        PURPLEAIR_CHUNK_SIZE = Variable.get("PURPLEAIR_CHUNK_SIZE", deserialize_json=True, default=1000)
+        TASK_LOG_INSERTS = Variable.get("ENVIRONET_TASK_LOG_INSERTS", deserialize_json=True, default=0)
+        BULK_INSERT_FILE_SIZE = Variable.get("ENVIRONET_BULK_INSERT_FILE_SIZE", deserialize_json=True, default=1000000)
+        CHUNK_SIZE = Variable.get("ENVIRONET_CHUNK_SIZE", deserialize_json=True, default=1000)
         try:
             setup_django()
 
@@ -484,9 +492,9 @@ def dusttrack_air_processing():
                     if platform_nfo is not None:
                         break
                 #Check the file size, if it exceeds
-                if file_path.stat().st_size >= PURPLEAIR_BULK_INSERT_FILE_SIZE:
+                if file_path.stat().st_size >= BULK_INSERT_FILE_SIZE:
                     #csv_file: Path, db: xenia_alchemy, platform_nfo: Platform, insert_chunk_size: int
-                    bulk_insert_to_database(file_path, platform_nfo, PURPLEAIR_CHUNK_SIZE)
+                    bulk_insert_to_database(file_path, platform_nfo, CHUNK_SIZE)
                 else:
 
                     with open(file_path, "r") as csv_file_obj:
@@ -513,7 +521,7 @@ def dusttrack_air_processing():
                                                 logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
                                                 logger.exception(e)
                                             else:
-                                                if PURPLEAIR_TASK_LOG_INSERTS:
+                                                if TASK_LOG_INSERTS:
                                                     #if row_ndx % 1000 == 0:
                                                     logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
                                                                 f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
@@ -787,18 +795,13 @@ def dusttrack_air_processing():
                 logger.info(f"Inserted {rows_inserted} rows into temp_multi_obs. "
                             f"Total skipped: {total_skipped} Total inserted: {total_inserted}")
 
-    def normalize_header(row: [], platform_nfo: Platform) -> []:
+    def normalize_header(source_obs_name, platform_nfo: Platform) -> list[Any]:
         corrected_header = []
-        for column in row:
-            if column == "time_stamp":
-                corrected_header.append("m_date")
-            else:
-                obs_record = platform_nfo.obs_map.get_by_source(column)
-                corrected_column = column
-                if obs_record is not None:
-                    corrected_column = f"{obs_record.target_obs}_{obs_record.s_order}"
-                corrected_header.append(corrected_column)
-        return corrected_header
+        obs_record = platform_nfo.obs_map.get_by_source(source_obs_name)
+        corrected_column = source_obs_name
+        if obs_record is not None:
+            corrected_column = f"{obs_record.target_obs}_{obs_record.s_order}"
+        return corrected_column
 
     def get_requests_verify(ccrab_url):
         value = os.getenv("CCRAB_API_VERIFY")
@@ -836,23 +839,22 @@ def dusttrack_air_processing():
     # Wire branch to both candidate tasks. Branch operator expects task ids returned above.
     branch >> local_file_list
     branch >> remote_file_list
-    '''
+
     # Merge results (merge task has TriggerRule so it runs even when a branch is skipped)
     csv_files_to_process = merge_file_lists(local_files=local_file_list, rest_files=remote_file_list)
 
     #We want to correct the headers from the Purple Air fields to our normalized names.
     normalized_header_data_files = normalize_headers_task(configuration_file_path, csv_files_to_process)
-
+    '''
     ancillary_calculations_data_files = ancillary_calculations(configuration_file_path, normalized_header_data_files)
-
+    '''
     #qaqcd_data = qaqc_task(CONFIG, normalized_header_data_files)
-    save_to_database = save_to_database_task(configuration_file_path, ancillary_calculations_data_files)
+    save_to_database = save_to_database_task(configuration_file_path, normalized_header_data_files)
 
     archive = archive_task(configuration_file_path, csv_files_to_process,
                            normalized_header_data_files,
-                           ancillary_calculations_data_files)
+                           [])
     
     save_to_database >> archive
-    '''
-dusttrack_processing()
+dusttrack_air_processing()
 
