@@ -25,6 +25,7 @@ from ioos_qc.config import QcConfig
 from ioos_qc.streams import PandasStream
 from ioos_qc.results import CollectedResult, collect_results
 import pandas as pd
+from pint import UnitRegistry
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
@@ -317,11 +318,17 @@ def dusttrack_air_processing():
                         datapoint_obj = DataPoint.model_validate(json_data)
                         data_points.append(datapoint_obj)
                         header_row.append(normalize_header(datapoint_obj.name, platform_nfo))
+                        #Let's determine if we need to convert units.
+                        obs_record = platform_nfo.obs_map.get_by_source(datapoint_obj.name)
+                        if obs_record.target_uom != obs_record.source_uom:
+                            obs_record
+
                         with open(corrected_file, "w") as corrected_file_obj:
                             #Write normalized header.
                             csv_writer = csv.writer(corrected_file_obj)
                             csv_writer.writerow(header_row)
                             if datapoint_obj and datapoint_obj.measurements:
+
                                 for measurement in datapoint_obj.measurements:
                                     dt = datetime.fromtimestamp(measurement.timestamp / 1000.0, tz=timezone.utc)
                                     dt = dt.strftime("%Y-%m-%dT%H:%M:%S%z")

@@ -20,6 +20,7 @@ dependencies = [
     "django-cors-headers>=4.9.0",
     "openpyxl>=3.1.5",
     "xlrd>=2.0.1",
+    "pint>=0.25.3",
 ]
 [tool.uv.sources]
 datautilities = { path = "../../packages/DataUtilities", editable = true }
