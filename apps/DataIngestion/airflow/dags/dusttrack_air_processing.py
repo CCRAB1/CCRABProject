@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -320,8 +320,9 @@ def dusttrack_air_processing():
                         header_row.append(normalize_header(datapoint_obj.name, platform_nfo))
                         #Let's determine if we need to convert units.
                         obs_record = platform_nfo.obs_map.get_by_source(datapoint_obj.name)
+                        units_reg = None
                         if obs_record.target_uom != obs_record.source_uom:
-                            obs_record
+                            units_reg = UnitRegistry()
 
                         with open(corrected_file, "w") as corrected_file_obj:
                             #Write normalized header.
@@ -332,7 +333,13 @@ def dusttrack_air_processing():
                                 for measurement in datapoint_obj.measurements:
                                     dt = datetime.fromtimestamp(measurement.timestamp / 1000.0, tz=timezone.utc)
                                     dt = dt.strftime("%Y-%m-%dT%H:%M:%S%z")
-                                    row = [dt,measurement.value]
+                                    try:
+                                        target_value = measurement.value
+                                        if units_reg:
+                                            target_value = units_reg.Quantity(measurement.value, obs_record.source_uom).to(obs_record.target_uom)
+                                    except Exception as e:
+                                        logger.exception(e)
+                                    row = [dt,target_value]
                                     csv_writer.writerow(row)
                                 corrected_file_list.append(str(corrected_file))
                             else:
