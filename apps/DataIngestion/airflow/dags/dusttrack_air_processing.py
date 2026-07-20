@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "True"
+remote_debug = "False"
 if remote_debug == "True":
     import pydevd_pycharm
 
