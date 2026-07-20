@@ -336,10 +336,11 @@ def dusttrack_air_processing():
                                     try:
                                         target_value = measurement.value
                                         if units_reg:
-                                            target_value = units_reg.Quantity(measurement.value, obs_record.source_uom).to(obs_record.target_uom)
+                                            target_value = units_reg.Quantity(measurement.value, obs_record.source_uom).to(obs_record.target_uom).magnitude
                                     except Exception as e:
                                         logger.exception(e)
-                                    row = [dt,target_value]
+                                    value_str = f"{target_value:.2f}"
+                                    row = [dt,value_str]
                                     csv_writer.writerow(row)
                                 corrected_file_list.append(str(corrected_file))
                             else:
