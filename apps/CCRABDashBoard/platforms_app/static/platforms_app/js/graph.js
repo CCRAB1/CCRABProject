@@ -180,8 +180,8 @@ export function registerGraphComponents(Alpine) {
                     borderColor: color.borderColor,
                     backgroundColor: color.backgroundColor,
                     borderWidth: 2,
-                    pointRadius: 0,
-                    pointHoverRadius: 4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
                     tension: 0.25,
                     segment: {
                         borderColor: (chartPt) =>
