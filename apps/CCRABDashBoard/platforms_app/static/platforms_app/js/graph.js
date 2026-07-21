@@ -179,7 +179,7 @@ export function registerGraphComponents(Alpine) {
                     yAxisID: axisId,
                     borderColor: color.borderColor,
                     backgroundColor: color.backgroundColor,
-                    borderWidth: 2
+                    borderWidth: 2,
                     pointStyle: "circle",
                     pointRadius: 4,
                     pointHoverRadius: 6,
