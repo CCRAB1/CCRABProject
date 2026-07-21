@@ -181,7 +181,7 @@ export function registerGraphComponents(Alpine) {
                     backgroundColor: color.backgroundColor,
                     borderWidth: 2,
                     pointStyle: "circle",
-                    pointRadius: 1,
+                    pointRadius: 0,
                     pointHoverRadius: 4,
                     tension: 0.25,
                     segment: {
