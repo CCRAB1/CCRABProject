@@ -10,7 +10,8 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 import json
 from urllib.parse import urlparse
-
+from math import floor as math_floor
+import pandas as pd
 from datetime import datetime, timedelta
 from django.db import IntegrityError, transaction
 from datautilities.purple_air_api.PurpleAPIWrapper import (
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -171,7 +172,7 @@ def purple_air_processing():
         return [str(file_path) for file_path in local_csv_list]
 
     @task(task_id="fetch_rest")
-    def fetch_data_task(config_file_name: Path) -> list[Any]:
+    def fetch_data_task(config_file_name: Path) -> Dict[str, Any]:
         """
         #### fetch_data_task task
         Using the Purple AIr API, this task retrieves the data for the platforms setup in the JSON config.
@@ -179,6 +180,7 @@ def purple_air_processing():
         **Inputs:** config
         **Outputs:** list[]
         """
+        platform_query_times = {}
         saved_data_files = []
         try:
             start_time = time.perf_counter()
@@ -216,7 +218,7 @@ def purple_air_processing():
                 for platform_handle in platform_handles:
                     platform = organization.get_platform(platform_handle)
                     external_indentifier = platform.properties['external_identifier']
-                    #Let's the the latest date in the database then build our start/end dates for query from there.
+                    #Let's get the latest date in the database then build our start/end dates for query from there.
                     latest_m_date = (
                         Multi_obs.objects
                         .filter(
@@ -227,10 +229,12 @@ def purple_air_processing():
                         .values_list("m_date", flat=True)
                         .first()
                     )
-                    if latest_m_date is not None:
+                    #if latest_m_date is not None:
                         #Add a minute so we don't get the same record twice.'
-                        start_date = latest_m_date + timedelta(minutes=1)
+                    #    start_date = latest_m_date + timedelta(minutes=1)
                     try:
+                        platform_query_times[platform_handle] = {'start_date': start_date.timestamp(),
+                                                                 'end_date': end_date.timestamp()}
                         #These are the sensors we want to retrieve from PUrple Air API.
                         fields = [obs['source_obs'] for obs in platform.observations if obs['source_active'] == 1]
 
@@ -257,7 +261,7 @@ def purple_air_processing():
                             logger.error(f"Failed to write file: {output_file}")
 
                             raise e
-
+                        break
                     except Exception as e:
                         logger.error(f"Unable to retrieve data for platform: {platform_handle} ({external_indentifier})")
                         logger.exception(e)
@@ -273,12 +277,16 @@ def purple_air_processing():
             raise e
         finally:
             close_django_connections()
-
-        return saved_data_files
+        return_data = {
+            "start_timestamp": start_date.timestamp(),
+            "end_timestamp": end_date.timestamp(),
+            "saved_data_files": saved_data_files
+        }
+        return return_data
 
 
     @task()
-    def normalize_headers_task(config_file_name: Path, uncorrected_data_files: []) -> list[Any]:
+    def normalize_headers_task(config_file_name: Path, uncorrected_data_files: List[Any]) -> list[Any]:
         """
         #### normalize_headers_task
         Given a list of the data files, this task normalizes the header columns.
@@ -305,6 +313,7 @@ def purple_air_processing():
 
             #The file names are platform_handle-sensor_id-start_date-end_date.csv
             for file in uncorrected_data_files:
+                platform_nfo = None
                 file_path = Path(file)
                 file_name_parts = file_path.stem.split("-")
                 # The platform handle format we need is <org>.<platform name>.<platform type>. When
@@ -318,8 +327,29 @@ def purple_air_processing():
                         logger.error(f"Platform {file_platform_handle} not found in list.")
                     else:
                         break
-                corrected_file = header_corrected_directory / f"{file_path.stem}-corrected.csv"
+                corrected_file = header_corrected_directory / f"{file_path.stem}-unsorted-corrected.csv"
                 logger.info(f"Reading source file: {file} Writing corrected file: {corrected_file}")
+                if platform_nfo:
+                    try:
+                        platform_file_df = pd.read_csv(file)
+                        # The files aren't sorted by date/time from the API. We'll do that here.
+                        platform_file_df['DateTimeStamp'] = pd.to_datetime(platform_file_df['time_stamp'],
+                                                                         #2026-07-22T13:23:54Z
+                                                                         format="%Y-%m-%dT%H:%M:%SZ")
+                        platform_file_df.sort_values(by='DateTimeStamp', inplace=True)
+                        platform_file_df.drop(columns='DateTimeStamp', inplace=True)
+                        #Now we'll normalize the column names.
+                        pa_columns = platform_file_df.columns.to_list()
+                        normalized_header_name = normalize_header(pa_columns, platform_nfo)
+                        #normalized_header_name = [normalize_header(pa_col, platform_nfo) for pa_col in pa_columns]
+                        platform_file_df.to_csv(corrected_file, index=False, float_format='%.2f', header=normalized_header_name)
+
+                    except Exception as e:
+                        logger.exception(e)
+                    else:
+                        corrected_file_list.append(str(corrected_file))
+
+                """   
                 with open(file, "r") as csv_file_obj:
                     csv_reader = csv.reader(csv_file_obj)
                     with open(corrected_file, "w") as corrected_file_obj:
@@ -330,7 +360,7 @@ def purple_air_processing():
                                 csv_writer.writerow(corrected_header)
                             else:
                                 csv_writer.writerow(row)
-                    corrected_file_list.append(str(corrected_file))
+                """
         except Exception as e:
             raise e
         logger.info(f"Completed normalize_headers_task in {time.perf_counter()-start_time} seconds")
@@ -381,6 +411,9 @@ def purple_air_processing():
                         with open(corrected_file, "w") as corrected_file_obj:
                             csv_writer = csv.writer(corrected_file_obj)
                             humidity_a_ndx = humidity_b_ndx = pm25_cf1_a_ndx = pm25_cf1_b_ndx = None
+                            window_buffer = []
+                            start_window_dt = None
+                            end_window_dt = None
                             for row_number, row in enumerate(csv_reader):
                                 if row_number == 0:
                                     #Get the column indexes for the pm2.5 cf obs and humidty so we can calc the
@@ -399,17 +432,35 @@ def purple_air_processing():
                                     csv_writer.writerow(row)
 
                                 else:
-                                    if humidity_a_ndx and pm25_cf1_a_ndx:
-                                        humidity_b = pm25_cf1_b = None
-                                        humidity_a = float(row[humidity_a_ndx])
-                                        pm25_cf1_a = float(row[pm25_cf1_a_ndx])
-                                        if humidity_b_ndx and pm25_cf1_b_ndx:
-                                            humidity_b = float(row[humidity_b_ndx])
-                                            pm25_cf1_b = float(row[pm25_cf1_b_ndx])
-                                        epa_corrected = apply_epa_correction(pm25_cf1_a, humidity_a, pm25_cf1_b, humidity_b)
-                                        row.append(f"{epa_corrected:.2f}")
+                                    row_dt = datetime.strptime(row[0], "%Y-%m-%dT%H:%M:%SZ")
+                                    if start_window_dt is None:
+                                        start_window_dt = row_dt
+                                        end_window_dt = start_window_dt + timedelta(minutes=15)
+                                    if row_dt >= end_window_dt:
+                                        if humidity_a_ndx and pm25_cf1_a_ndx:
+                                            humidity_b = pm25_cf1_b = None
+                                            humidity_a = sum(
+                                                float(row[humidity_a_ndx]) for row in window_buffer) / len(
+                                                window_buffer)
+                                            pm25_cf1_a = sum(
+                                                float(row[pm25_cf1_a_ndx]) for row in window_buffer) / len(
+                                                window_buffer)
+                                            if humidity_b_ndx and pm25_cf1_b_ndx:
+                                                humidity_a = sum(
+                                                    float(row[humidity_b_ndx]) for row in window_buffer) / len(
+                                                    window_buffer)
+                                                pm25_cf1_a = sum(
+                                                    float(row[pm25_cf1_b_ndx]) for row in window_buffer) / len(
+                                                    window_buffer)
+                                            epa_corrected = apply_epa_correction(pm25_cf1_a, humidity_a, pm25_cf1_b,
+                                                                                 humidity_b)
+                                            row.append(f"{epa_corrected:.2f}")
+                                        else:
+                                            row.append("")
+
+                                        del window_buffer[:]
                                     else:
-                                        row.append("")
+                                        window_buffer.append(row)
                                     csv_writer.writerow(row)
                         corrected_file_list.append(str(corrected_file))
             logger.info(f"Finished ancillary_calculations in {time.perf_counter()-start_time} seconds")
@@ -465,7 +516,7 @@ def purple_air_processing():
         return qaqcd_files
 
     @task()
-    def save_to_database_task(config_file_name: Path, file_list: []):
+    def save_to_database_task(run_label: str, config_file_name: Path, file_list: []):
         #Grab the database connection parameters from the Airflow variables.
         PURPLEAIR_TASK_LOG_INSERTS = Variable.get("PURPLEAIR_TASK_LOG_INSERTS", deserialize_json=True, default=0)
         PURPLEAIR_BULK_INSERT_FILE_SIZE = Variable.get("PURPLEAIR_BULK_INSERT_FILE_SIZE", deserialize_json=True, default=1000000)
@@ -474,11 +525,8 @@ def purple_air_processing():
             setup_django()
 
             from platforms_app.models import Multi_obs
-            configuration_data = json.load(open(config_file_name))
-            organizations_setup = []
             # Build our org and platform objects.
-            for organization in configuration_data['organizations']:
-                organizations_setup.append(Organization().from_dict(organization))
+            organizations_setup = load_config_file(config_file_name)
 
             for file in file_list:
                 logger.info(f"Processing file: {file} into the database")
@@ -545,7 +593,7 @@ def purple_air_processing():
                                                     logger.exception(e)
                                                     insert_exception_count += 1
                                     else:
-                                        logger.error(f"Column: {column_name} not found in row_ndx: {row_ndx}")
+                                        logger.info(f"Column: {column_name} not found in row_ndx: {row_ndx}")
                                 except Exception as e:
                                     close_django_connections()
                                     raise e
@@ -568,6 +616,204 @@ def purple_air_processing():
         chosen = local_files or rest_files or []
         # make sure it's a list (not None)
         return chosen
+
+    @task()
+    def ancillary_calculations_post_db_save(config_file_name: Path, start_timestamp: float, end_timestamp: float) -> list[Any]:
+        start_proc_time = time.perf_counter()
+
+        #Create the datetime object from the timestamps.
+        start_date_time = datetime.fromtimestamp(start_timestamp)
+        end_date_time = datetime.fromtimestamp(end_timestamp)
+
+        logger.info(f"Starting ancillary_calculations_post_db_save with config file: {config_file_name} "
+                    f"Start: {start_date_time} End: {end_date_time}")
+        try:
+
+            base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
+            epa_corrected_directory = base_directory / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY")) / Path(
+                Variable.get("EPA_CORRECTED_DIRECTORY"))
+            # Let's make sure the directory exists.
+            epa_corrected_directory.mkdir(parents=True, exist_ok=True)
+
+            organizations_setup = load_config_file(config_file_name)
+
+            corrected_file_list = []
+
+            setup_django()
+
+            from platforms_app.models import Multi_obs
+
+            #These are the columns we want to calculate the EPA correction. It is a list of
+            #tuples that consist of column names and their sensor order. The older Purple Air monitors
+            #won't have the sensor order 2 parameters.
+            epa_corrected_columns = ["relative_humidity","pm2.5_cf_1"]
+            for organization in organizations_setup:
+                platform_handles = organization.list_platform_handles()
+                for platform_handle in platform_handles:
+                    platform = organization.get_platform(platform_handle)
+
+                    # These are the columns ids we want to retrieve from the database.
+                    query_obs = [obs for obs in platform.observations
+                                       if obs['target_obs'] in epa_corrected_columns]
+                    column_name_mapping = dict([(obs['sensor_id'], f"{obs['target_obs']}_{obs['s_order']}") for obs in query_obs])
+                    required_type_ids = [obs['m_type_id'] for obs in query_obs]
+                    required_sensor_ids = [obs['sensor_id'] for obs in query_obs]
+                    try:
+                        obs_recs = (
+                            Multi_obs.objects
+                            .filter(
+                                m_date__gte=start_date_time,
+                                m_date__lt=end_date_time,
+                                m_type_id__in=required_type_ids,
+                                sensor_id__in=required_sensor_ids,
+                            )
+                            .values(
+                                "platform_handle",
+                                "m_date",
+                                "m_value",
+                                "sensor_id",
+                                "m_type_id",
+                            )
+                        )
+                    except Exception as e:
+                        logger.exception(e)
+                        raise e
+                    if len(obs_recs):
+                        df = pd.DataFrame.from_records(obs_recs)
+                        df["m_date"] = pd.to_datetime(
+                            df["m_date"],
+                            utc=True,
+                            errors="coerce",
+                        )
+
+                        df["m_value"] = pd.to_numeric(
+                            df["m_value"],
+                            errors="coerce",
+                        )
+
+                        # Translate each sensor ID into its output column name.
+                        df["measurement_name"] = (
+                            df["sensor_id"].map(column_name_mapping)
+                        )
+                        df["window_start"] = df["m_date"].dt.floor("15min")
+                        df["window_end"] = (
+                                df["window_start"] + pd.Timedelta(minutes=15)
+                        )
+                        file_platform_handle = platform_handle.replace('.', '_')
+                        intermediate_director = epa_corrected_directory / Path('initial_query')
+                        intermediate_director.mkdir(parents=True, exist_ok=True)
+                        output_file = intermediate_director / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
+                                                              f"{start_date_time.strftime('%Y%m%dT%H%M%S')}-"
+                                                              f"{end_date_time.strftime('%Y%m%dT%H%M%S')}.csv")
+                        try:
+                            logger.info(f"Writing to file: {output_file}")
+                            df.to_csv(output_file, index=False)
+                        except Exception as e:
+                            logger.error(f"Error writing to file: {output_file}")
+                            logger.exception(e)
+
+                        #Create the means for the columns.
+                        interval_sensor_means = (
+                            df
+                            .groupby(
+                                [
+                                    "platform_handle",
+                                    "window_start",
+                                    "window_end",
+                                    "measurement_name",
+                                ],
+                                as_index=False,
+                            )
+                            .agg(
+                                interval_mean=("m_value", "mean"),
+                                sample_count=("m_value", "count"),
+                            )
+                        )
+                        interval_values = (
+                            interval_sensor_means
+                            .pivot(
+                                index=[
+                                    "platform_handle",
+                                    "window_start",
+                                    "window_end",
+                                ],
+                                columns="measurement_name",
+                                values="interval_mean",
+                            )
+                            .reset_index()
+                            .rename_axis(columns=None)
+                        )
+                        interval_counts = (
+                            interval_sensor_means
+                            .pivot(
+                                index=[
+                                    "platform_handle",
+                                    "window_start",
+                                    "window_end",
+                                ],
+                                columns="measurement_name",
+                                values="sample_count",
+                            )
+                            .add_suffix("_count")
+                            .reset_index()
+                            .rename_axis(columns=None)
+                        )
+
+                        intervals = interval_values.merge(
+                            interval_counts,
+                            on=[
+                                "platform_handle",
+                                "window_start",
+                                "window_end",
+                            ],
+                            how="left",
+                        )
+                        intermediate_director = epa_corrected_directory / Path('intervals_means')
+                        intermediate_director.mkdir(parents=True, exist_ok=True)
+                        output_file = intermediate_director / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
+                                                              f"{start_date_time.strftime('%Y%m%dT%H%M%S')}-"
+                                                              f"{end_date_time.strftime('%Y%m%dT%H%M%S')}.csv")
+                        try:
+                            logger.info(f"Writing to file: {output_file}")
+                            intervals.to_csv(output_file, index=False)
+                        except Exception as e:
+                            logger.error(f"Error writing to file: {output_file}")
+                            logger.exception(e)
+
+                        intervals["pm2.5_EPAc_1"] = intervals.apply(
+                            lambda row: apply_epa_correction(
+                                row.get("pm2.5_cf_1_1"),
+                                row.get("relative_humidity_1"),
+                                row.get("pm2.5_cf_1_2"),
+                                row.get("relative_humidity_2")
+                            ),
+                            axis=1,
+                        )
+                        intervals["pm2.5_EPAc_1"] = intervals["pm2.5_EPAc_1"].round(1)
+                        #We want the m_date to be the window start columns
+                        intervals['m_date'] = intervals['window_start']
+                        #Now, let's drop columns from the data frame we don't want saved in the file.
+                        intervals.drop(columns=['window_start', 'window_end', 'pm2.5_cf_1_1', 'pm2.5_cf_1_2',
+                                                'relative_humidity_1', 'relative_humidity_2', 'pm2.5_cf_1_1_count',
+                                                'pm2.5_cf_1_2_count', 'relative_humidity_1_count',
+                                                'relative_humidity_2_count'], inplace=True, axis=1)
+                        file_platform_handle = platform_handle.replace('.', '_')
+                        output_file = epa_corrected_directory / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
+                                                              f"{start_date_time.strftime('%Y%m%dT%H%M%S')}-"
+                                                              f"{end_date_time.strftime('%Y%m%dT%H%M%S')}.csv")
+                        try:
+                            logger.info(f"Writing to file: {output_file}")
+                            intervals.to_csv(output_file, index=False)
+                            corrected_file_list.append(str(output_file))
+                        except Exception as e:
+                            logger.error(f"Error writing to file: {output_file}")
+                            logger.exception(e)
+        except Exception as e:
+            raise e
+
+        logger.info(f"Finished ancillary_calculations_post_db_save in {time.perf_counter()-start_proc_time} seconds")
+
+        return corrected_file_list
 
     @task()
     def archive_task(config_file_name: Path, data_source_files: [], normalized_header_files: [], ancillary_calculations_data_files: []) :
@@ -604,37 +850,6 @@ def purple_air_processing():
             files_to_archive = data_directory.glob("*.*")
         archive_and_zip(files_to_archive, anicllary_data_archive_directory, archive_directory, process_run_time)
 
-        '''
-        logger.info(f"Archiving raw data files: {raw_data_archive_directory}")
-
-        for file in data_source_files:
-            logger.info(f"Archiving file: {file}")
-            try:
-                archive_file(Path(file), raw_data_archive_directory, process_run_time)
-            except Exception as e:
-                logger.error(f"Unable to archive file: {file}")
-        logger.info(f"Zipping directory: {archive_directory}")
-        try:
-            zip_files(raw_data_archive_directory)
-        except Exception as e:
-            logger.error(f"Unable to zip directory: {archive_directory}")
-        
-        normalized_data_archive_directory = archive_directory / Variable.get("NORMALIZED_HEADER_DIRECTORY")
-        normalized_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Archiving normalized data files: {normalized_data_archive_directory}")
-
-        for file in normalized_header_files:
-            logger.info(f"Archiving file: {file}")
-            try:
-                archive_file(Path(file), normalized_data_archive_directory, process_run_time)
-            except Exception as e:
-                logger.error(f"Unable to archive file: {file}")
-        logger.info(f"Zipping directory: {archive_directory}")
-        try:
-            zip_files(normalized_data_archive_directory)
-        except Exception as e:
-            logger.error(f"Unable to zip directory: {archive_directory}")
-        '''
         logger.info(f"Completed archiving data files.")
         return
 
@@ -828,7 +1043,21 @@ def purple_air_processing():
             return True
         return value
 
+    def load_config_file(configuration_file: Path) -> List[Any]:
+        configuration_data = json.load(open(configuration_file))
+        organizations_setup = []
+        # Build our org and platform objects.
+        for organization in configuration_data['organizations']:
+            organizations_setup.append(Organization().from_dict(organization))
+
+        return organizations_setup
+
+    def round_down_dt(dt, round_to):
+        delta = timedelta(minutes=round_to)
+        return datetime.min + math_floor((dt - datetime.min) / delta) * delta
+
     configuration_file_path = get_configuration()
+    configuration_file_path= configuration_file_path
 
     #Figure out how we are running. We could be fetching new data from the Purple AIr API, or
     #we could be processing previous files.
@@ -841,7 +1070,11 @@ def purple_air_processing():
 
     #local_file_list = []
     local_file_list = list_local_files(run_config['directory_to_process'])
-    remote_file_list = fetch_data_task(configuration_file_path)
+    fetched_data = fetch_data_task(configuration_file_path)
+    remote_file_list = fetched_data['saved_data_files']
+    start_timestamp = fetched_data['start_timestamp']
+    end_timestamp = fetched_data['end_timestamp']
+    #remote_file_list = fetch_data_task(configuration_file_path)
     # Wire branch to both candidate tasks. Branch operator expects task ids returned above.
     branch >> local_file_list
     branch >> remote_file_list
@@ -852,16 +1085,22 @@ def purple_air_processing():
     #We want to correct the headers from the Purple Air fields to our normalized names.
     normalized_header_data_files = normalize_headers_task(configuration_file_path, csv_files_to_process)
 
-    ancillary_calculations_data_files = ancillary_calculations(configuration_file_path, normalized_header_data_files)
+    #Let's now perform any other calculations we need to. We do this after saving to the database because
+    #the Purple Air does not return ordered data.
+    #ancillary_calculations_data_files = ancillary_calculations(configuration_file_path, normalized_header_data_files)
 
     #qaqcd_data = qaqc_task(CONFIG, normalized_header_data_files)
-    save_to_database = save_to_database_task(configuration_file_path, ancillary_calculations_data_files)
+    initial_data_save_to_database = save_to_database_task('initial_data_save', configuration_file_path, normalized_header_data_files)
+
+    ancillary_calculations_data_files = ancillary_calculations_post_db_save(configuration_file_path, start_timestamp, end_timestamp)
+
+    ancillary_calculations_data_save_to_database = save_to_database_task('ancillary_calculations_data_save', configuration_file_path, ancillary_calculations_data_files)
 
     archive = archive_task(configuration_file_path, csv_files_to_process,
                            normalized_header_data_files,
                            ancillary_calculations_data_files)
 
-    save_to_database >> archive
+    initial_data_save_to_database >> ancillary_calculations_data_files >> ancillary_calculations_data_save_to_database >> archive
 
 purple_air_processing()
 
