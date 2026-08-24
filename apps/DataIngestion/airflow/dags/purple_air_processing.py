@@ -216,6 +216,10 @@ def purple_air_processing():
                     if latest_m_date is not None:
                         #Add a minute so we don't get the same record twice.'
                         start_date = latest_m_date + timedelta(minutes=1)
+                        #If the delta between start and end is more than 30 days, cut it to 30 days.
+                        if (end_date - start_date) > timedelta(days=30):
+                            start_date = end_date - timedelta(days=30)
+
                     try:
                         platform_query_times[platform_handle] = {'start_date': start_date.timestamp(),
                                                                  'end_date': end_date.timestamp()}
