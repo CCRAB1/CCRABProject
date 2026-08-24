@@ -26,6 +26,15 @@ x-airflow-common: &airflow_common
     AIRFLOW_PROCESSING_DIRECTORY: /opt/ccrab/processing
     AIRFLOW_VAR_BASE_WORKING_DIRECTORY: /opt/ccrab/processing
     AIRFLOW_VAR_CCRAB_DJANGO_PROJECT_PATH: /opt/ccrab/dashboard
+    # SMTP / Email Configurations
+    AIRFLOW__SMTP__SMTP_HOST: ${AIRFLOW__SMTP__SMTP_HOST}
+    AIRFLOW__SMTP__SMTP_STARTTLS: ${AIRFLOW__SMTP__SMTP_STARTTLS}
+    AIRFLOW__SMTP__SMTP_SSL: ${AIRFLOW__SMTP__SMTP_SSL}
+    AIRFLOW__SMTP__SMTP_USER: ${AIRFLOW__SMTP__SMTP_USER}
+    AIRFLOW__SMTP__SMTP_PASSWORD: ${AIRFLOW__SMTP__SMTP_PASSWORD}
+    AIRFLOW__SMTP__SMTP_PORT: ${AIRFLOW__SMTP__SMTP_PORT}
+    AIRFLOW__SMTP__SMTP_MAIL_FROM: ${AIRFLOW__SMTP__SMTP_MAIL_FROM}
+
     CCRAB_DJANGO_PROJECT_PATH: /opt/ccrab/dashboard
   volumes:
     - ../apps/DataIngestion/airflow/dags:/opt/airflow/dags:ro
