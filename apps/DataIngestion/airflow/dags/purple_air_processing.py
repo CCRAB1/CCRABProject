@@ -245,7 +245,7 @@ def purple_air_processing():
                             logger.error(f"Failed to write file: {output_file}")
 
                             raise e
-                        break
+
                     except Exception as e:
                         logger.error(f"Unable to retrieve data for platform: {platform_handle} ({external_indentifier})")
                         logger.exception(e)
