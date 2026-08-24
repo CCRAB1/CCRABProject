@@ -5,8 +5,7 @@ import csv
 import time
 from io import StringIO
 from airflow.sdk import dag, task, Variable
-from airflow.task.trigger_rule import TriggerRule
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from pathlib import Path
 import json
 from urllib.parse import urlparse
@@ -90,7 +89,7 @@ def purple_air_processing():
 
 
     @task()
-    def decide_mode(mode: str) -> Dict:
+    def decide_mode() -> Dict:
         """
         #### decide_mode task
 
@@ -98,7 +97,7 @@ def purple_air_processing():
         mode can be provided as DAG conf, Airflow Variable, or left None to run 'auto' detection.
         Returns a small config dict with resolved_mode and useful paths.
 
-        **Inputs:** mode
+        **Inputs:** None
         **Outputs:** dict
         """
         # precedence: dagrun.conf -> supplied arg -> Variable -> auto
@@ -107,10 +106,7 @@ def purple_air_processing():
         base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
         local_path = base_dir / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY")) / Path(Variable.get("RAW_DATA_DIRECTORY"))
         # If user passes a conf via dag run, Airflow will pass it; we handle via Variable for now.
-        if mode is not None:
-            requested = mode.lower()
-        else:
-            requested = Variable.get("PURPLE_AIR_CSV_PIPELINE_MODE", "auto").lower()
+        requested = Variable.get("PURPLE_AIR_CSV_PIPELINE_MODE", "auto").lower()
         assert requested in ("auto", "local", "rest"), "mode must be 'auto', 'local', or 'rest'"
 
         local_path.mkdir(parents=True, exist_ok=True)
@@ -126,52 +122,40 @@ def purple_air_processing():
 
         return {"mode": resolved_mode, "directory_to_process": str(local_path)}
 
-    @task.branch()
-    def branch_on_mode(mode: str) -> str:
+    def list_local_files(local_directory: str) -> Dict[str, Any]:
         """
-        #### branch_on_mode task
-        Branch to task_id "list_local" or "fetch_rest".
-        Must return the *task_id* (string) of the next task to run.
-
-        **Inputs:** cfg
-        **Outputs:** string
-        """
-        if mode == "local":
-            return "list_local"     # task_id of the local-listing task
-        else:
-            return "fetch_rest"     # task_id of the REST-fetching task
-
-    @task(task_id="list_local")
-    def list_local_files(local_directory: str) -> []:
-        """
-        #### list_local_files task
+        #### list_local_files helper
 
         Search the local_directory for all CSV files in the local directory.
         Input is the local directory, the output is a list of CSV files in that directory.
 
         **Inputs:** local_directory
-        **Outputs:** list[dict]
+        **Outputs:** run manifest
         """
         data_directory = Path(local_directory)
         local_csv_list = list(data_directory.glob("*.csv"))
-        return [str(file_path) for file_path in local_csv_list]
+        if not local_csv_list:
+            raise FileNotFoundError(f"No CSV files found in {data_directory}")
 
-    @task(task_id="list_local")
-    def list_local_files(local_directory: str) -> []:
-        """
-        #### list_local_files task
+        start_dates = []
+        end_dates = []
+        for file_path in local_csv_list:
+            file_name_parts = file_path.stem.split("-")
+            try:
+                start_dates.append(datetime.strptime(file_name_parts[-2], "%Y%m%dT%H%M%S"))
+                end_dates.append(datetime.strptime(file_name_parts[-1], "%Y%m%dT%H%M%S"))
+            except (IndexError, ValueError) as exc:
+                raise ValueError(
+                    f"Unable to determine the processing interval from local file name: {file_path.name}"
+                ) from exc
 
-        Search the local_directory for all CSV files in the local directory.
-        Input is the local directory, the output is a list of CSV files in that directory.
+        return {
+            "source": "local",
+            "saved_data_files": [str(file_path) for file_path in local_csv_list],
+            "start_timestamp": min(start_dates).timestamp(),
+            "end_timestamp": max(end_dates).timestamp(),
+        }
 
-        **Inputs:** local_directory
-        **Outputs:** list[dict]
-        """
-        data_directory = Path(local_directory)
-        local_csv_list = list(data_directory.glob("*.csv"))
-        return [str(file_path) for file_path in local_csv_list]
-
-    @task(task_id="fetch_rest")
     def fetch_data_task(config_file_name: Path) -> Dict[str, Any]:
         """
         #### fetch_data_task task
@@ -278,11 +262,20 @@ def purple_air_processing():
         finally:
             close_django_connections()
         return_data = {
+            "source": "rest",
             "start_timestamp": start_date.timestamp(),
             "end_timestamp": end_date.timestamp(),
             "saved_data_files": saved_data_files
         }
         return return_data
+
+    @task(multiple_outputs=True)
+    def acquire_data(config_file_name: str, run_config: Dict[str, str]) -> Dict[str, Any]:
+        """Acquire input files and return one manifest for either supported mode."""
+        if run_config["mode"] == "local":
+            return list_local_files(run_config["directory_to_process"])
+
+        return fetch_data_task(Path(config_file_name))
 
 
     @task()
@@ -605,18 +598,6 @@ def purple_air_processing():
             raise e
         finally:
             close_django_connections()
-    # Merge / join task
-    @task(task_id="merge_file_lists", trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-    def merge_file_lists(local_files: Optional[List[str]] = None, rest_files: Optional[List[str]] = None) -> List[str]:
-        """
-        After branching, only one of local_files/rest_files will be present.
-        This merge returns whichever is not None/empty.
-        Trigger rule ensures it runs even if one upstream was skipped.
-        """
-        chosen = local_files or rest_files or []
-        # make sure it's a list (not None)
-        return chosen
-
     @task()
     def ancillary_calculations_post_db_save(config_file_name: Path, start_timestamp: float, end_timestamp: float) -> list[Any]:
         start_proc_time = time.perf_counter()
@@ -700,16 +681,16 @@ def purple_air_processing():
                                 df["window_start"] + pd.Timedelta(minutes=15)
                         )
                         file_platform_handle = platform_handle.replace('.', '_')
-                        intermediate_director = epa_corrected_directory / Path('initial_query')
-                        intermediate_director.mkdir(parents=True, exist_ok=True)
-                        output_file = intermediate_director / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
+                        #intermediate_director = epa_corrected_directory / Path('initial_query')
+                        #intermediate_director.mkdir(parents=True, exist_ok=True)
+                        initial_output_file = epa_corrected_directory / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
                                                               f"{start_date_time.strftime('%Y%m%dT%H%M%S')}-"
-                                                              f"{end_date_time.strftime('%Y%m%dT%H%M%S')}.csv")
+                                                              f"{end_date_time.strftime('%Y%m%dT%H%M%S')}-initial-query.csv")
                         try:
-                            logger.info(f"Writing to file: {output_file}")
-                            df.to_csv(output_file, index=False)
+                            logger.info(f"Writing to file: {initial_output_file}")
+                            df.to_csv(initial_output_file, index=False)
                         except Exception as e:
-                            logger.error(f"Error writing to file: {output_file}")
+                            logger.error(f"Error writing to file: {initial_output_file}")
                             logger.exception(e)
 
                         #Create the means for the columns.
@@ -768,16 +749,16 @@ def purple_air_processing():
                             ],
                             how="left",
                         )
-                        intermediate_director = epa_corrected_directory / Path('intervals_means')
-                        intermediate_director.mkdir(parents=True, exist_ok=True)
-                        output_file = intermediate_director / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
+                        #intermediate_director = epa_corrected_directory / Path('intervals_means')
+                        #intermediate_director.mkdir(parents=True, exist_ok=True)
+                        intervals_output_file = epa_corrected_directory / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
                                                               f"{start_date_time.strftime('%Y%m%dT%H%M%S')}-"
-                                                              f"{end_date_time.strftime('%Y%m%dT%H%M%S')}.csv")
+                                                              f"{end_date_time.strftime('%Y%m%dT%H%M%S')}-intervals.csv")
                         try:
-                            logger.info(f"Writing to file: {output_file}")
-                            intervals.to_csv(output_file, index=False)
+                            logger.info(f"Writing to file: {intervals_output_file}")
+                            intervals.to_csv(intervals_output_file, index=False)
                         except Exception as e:
-                            logger.error(f"Error writing to file: {output_file}")
+                            logger.error(f"Error writing to file: {intervals_output_file}")
                             logger.exception(e)
 
                         intervals["pm2.5_EPAc_1"] = intervals.apply(
@@ -804,6 +785,7 @@ def purple_air_processing():
                         try:
                             logger.info(f"Writing to file: {output_file}")
                             intervals.to_csv(output_file, index=False)
+
                             corrected_file_list.append(str(output_file))
                         except Exception as e:
                             logger.error(f"Error writing to file: {output_file}")
@@ -816,7 +798,10 @@ def purple_air_processing():
         return corrected_file_list
 
     @task()
-    def archive_task(config_file_name: Path, data_source_files: [], normalized_header_files: [], ancillary_calculations_data_files: []) :
+    def archive_task(config_file_name: Path,
+                     data_source_files: [],
+                     normalized_header_files: [],
+                     ancillary_calculations_data_files: []) :
         archive_all_files = Variable.get("ARCHIVE_ALL_FILES_IN_DIRECTORY")
         archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY", default="purple_air")
         base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY"))
@@ -830,7 +815,7 @@ def purple_air_processing():
         files_to_archive = data_source_files
         if archive_all_files:
             data_directory = base_dir / Path(Variable.get("RAW_DATA_DIRECTORY"))
-            files_to_archive = data_directory.glob("*.*")
+            files_to_archive = data_directory.rglob("*.*")
         archive_and_zip(files_to_archive, raw_data_archive_directory, archive_directory, process_run_time)
 
         normalized_data_archive_directory = archive_directory / Variable.get("NORMALIZED_HEADER_DIRECTORY")
@@ -838,22 +823,35 @@ def purple_air_processing():
         files_to_archive = normalized_header_files
         if archive_all_files:
             data_directory = base_dir / Path(Variable.get("NORMALIZED_HEADER_DIRECTORY"))
-            files_to_archive = data_directory.glob("*.*")
+            files_to_archive = data_directory.rglob("*.*")
 
         archive_and_zip(files_to_archive, normalized_data_archive_directory, archive_directory, process_run_time)
-
+        #Ancillary data has 3 steps of file creation, the queried data, the 15 minute interval creation then
+        #finally the ancillary calculations data.
         anicllary_data_archive_directory = archive_directory / Variable.get("EPA_CORRECTED_DIRECTORY")
         anicllary_data_archive_directory.mkdir(parents=True, exist_ok=True)
         files_to_archive = ancillary_calculations_data_files
         if archive_all_files:
             data_directory = base_dir / Path(Variable.get("EPA_CORRECTED_DIRECTORY"))
-            files_to_archive = data_directory.glob("*.*")
+            files_to_archive = data_directory.rglob("*.*")
         archive_and_zip(files_to_archive, anicllary_data_archive_directory, archive_directory, process_run_time)
 
         logger.info(f"Completed archiving data files.")
         return
 
-    def archive_and_zip(file_list: [], directory_to_process: Path, archive_directory: Path, process_run_time: datetime) -> None:
+    def archive_and_zip(file_list: [],
+                        directory_to_process: Path,
+                        archive_directory: Path,
+                        process_run_time: datetime) -> None:
+        """
+        Archive and zip files in the specified directory.
+
+        Args:
+            file_list (list): List of files to archive.
+            directory_to_process (Path): Directory containing files to archive.
+            archive_directory (Path): Directory to store the zipped archive.
+            process_run_time (datetime): Timestamp of the processing run.
+        """
         logger.info(f"Archiving data files: {directory_to_process}")
 
         for file in file_list:
@@ -1057,30 +1055,12 @@ def purple_air_processing():
         return datetime.min + math_floor((dt - datetime.min) / delta) * delta
 
     configuration_file_path = get_configuration()
-    configuration_file_path= configuration_file_path
 
-    #Figure out how we are running. We could be fetching new data from the Purple AIr API, or
-    #we could be processing previous files.
-    mode = Variable.get("PURPLE_AIR_CSV_PIPELINE_MODE", None)
-    run_config = decide_mode(mode)
-
-    branch = branch_on_mode(run_config['mode'])
-
-    configuration_file_path >> run_config >> branch
-
-    #local_file_list = []
-    local_file_list = list_local_files(run_config['directory_to_process'])
-    fetched_data = fetch_data_task(configuration_file_path)
-    remote_file_list = fetched_data['saved_data_files']
-    start_timestamp = fetched_data['start_timestamp']
-    end_timestamp = fetched_data['end_timestamp']
-    #remote_file_list = fetch_data_task(configuration_file_path)
-    # Wire branch to both candidate tasks. Branch operator expects task ids returned above.
-    branch >> local_file_list
-    branch >> remote_file_list
-
-    # Merge results (merge task has TriggerRule so it runs even when a branch is skipped)
-    csv_files_to_process = merge_file_lists(local_files=local_file_list, rest_files=remote_file_list)
+    # Resolve the mode at task runtime, then produce the same manifest shape for
+    # either locally supplied files or files fetched from the PurpleAir API.
+    run_config = decide_mode()
+    run_manifest = acquire_data(configuration_file_path, run_config)
+    csv_files_to_process = run_manifest["saved_data_files"]
 
     #We want to correct the headers from the Purple Air fields to our normalized names.
     normalized_header_data_files = normalize_headers_task(configuration_file_path, csv_files_to_process)
@@ -1090,17 +1070,27 @@ def purple_air_processing():
     #ancillary_calculations_data_files = ancillary_calculations(configuration_file_path, normalized_header_data_files)
 
     #qaqcd_data = qaqc_task(CONFIG, normalized_header_data_files)
-    initial_data_save_to_database = save_to_database_task('initial_data_save', configuration_file_path, normalized_header_data_files)
+    initial_data_save_to_database = save_to_database_task.override(
+        task_id="save_initial_data"
+    )("initial_data_save", configuration_file_path, normalized_header_data_files)
 
-    ancillary_calculations_data_files = ancillary_calculations_post_db_save(configuration_file_path, start_timestamp, end_timestamp)
+    ancillary_calculations_data_files = ancillary_calculations_post_db_save(
+        configuration_file_path,
+        run_manifest["start_timestamp"],
+        run_manifest["end_timestamp"],
+    )
 
-    ancillary_calculations_data_save_to_database = save_to_database_task('ancillary_calculations_data_save', configuration_file_path, ancillary_calculations_data_files)
+    ancillary_calculations_data_save_to_database = save_to_database_task.override(
+        task_id="save_ancillary_data"
+    )("ancillary_calculations_data_save", configuration_file_path, ancillary_calculations_data_files)
 
     archive = archive_task(configuration_file_path, csv_files_to_process,
                            normalized_header_data_files,
                            ancillary_calculations_data_files)
 
-    initial_data_save_to_database >> ancillary_calculations_data_files >> ancillary_calculations_data_save_to_database >> archive
+    # These are control dependencies: neither downstream task consumes the
+    # upstream task's return value, so TaskFlow cannot infer them from arguments.
+    initial_data_save_to_database >> ancillary_calculations_data_files
+    ancillary_calculations_data_save_to_database >> archive
 
 purple_air_processing()
-
