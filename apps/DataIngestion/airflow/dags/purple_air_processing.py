@@ -11,7 +11,8 @@ import json
 from urllib.parse import urlparse
 from math import floor as math_floor
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
+import pytz
 from django.db import IntegrityError, transaction
 from datautilities.purple_air_api.PurpleAPIWrapper import (
     PurpleAirClient,
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -192,6 +193,7 @@ def purple_air_processing():
             platform_count = 0
 
             end_date = datetime.now()
+            end_date = pytz.utc.localize(end_date)
             start_date = end_date - timedelta(hours=1)
 
             for organization in org_list:
@@ -217,8 +219,8 @@ def purple_air_processing():
                         #Add a minute so we don't get the same record twice.'
                         start_date = latest_m_date + timedelta(minutes=1)
                         #If the delta between start and end is more than 30 days, cut it to 30 days.
-                        #if (end_date - start_date) > timedelta(days=30):
-                        #    start_date = end_date - timedelta(days=30)
+                        if (end_date - start_date) > timedelta(days=30):
+                            start_date = end_date - timedelta(days=30)
 
                     try:
                         platform_query_times[platform_handle] = {'start_date': start_date.timestamp(),
