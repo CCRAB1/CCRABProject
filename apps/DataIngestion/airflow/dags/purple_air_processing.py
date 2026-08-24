@@ -213,9 +213,9 @@ def purple_air_processing():
                         .values_list("m_date", flat=True)
                         .first()
                     )
-                    #if latest_m_date is not None:
+                    if latest_m_date is not None:
                         #Add a minute so we don't get the same record twice.'
-                    #    start_date = latest_m_date + timedelta(minutes=1)
+                        start_date = latest_m_date + timedelta(minutes=1)
                     try:
                         platform_query_times[platform_handle] = {'start_date': start_date.timestamp(),
                                                                  'end_date': end_date.timestamp()}
