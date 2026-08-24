@@ -774,10 +774,12 @@ def purple_air_processing():
                         #We want the m_date to be the window start columns
                         intervals['m_date'] = intervals['window_start']
                         #Now, let's drop columns from the data frame we don't want saved in the file.
+                        #relative_humidity_2 and pm2.5_cf_1_2 along with the count columns might not exist, so we set
+                        #errors = ignore
                         intervals.drop(columns=['window_start', 'window_end', 'pm2.5_cf_1_1', 'pm2.5_cf_1_2',
                                                 'relative_humidity_1', 'relative_humidity_2', 'pm2.5_cf_1_1_count',
                                                 'pm2.5_cf_1_2_count', 'relative_humidity_1_count',
-                                                'relative_humidity_2_count'], inplace=True, axis=1)
+                                                'relative_humidity_2_count'], inplace=True, axis=1, errors='ignore')
                         file_platform_handle = platform_handle.replace('.', '_')
                         output_file = epa_corrected_directory / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
                                                               f"{start_date_time.strftime('%Y%m%dT%H%M%S')}-"
