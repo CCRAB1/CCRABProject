@@ -245,8 +245,13 @@ function registerAlpineComponents() {
           return null;
         }
         var graphData = [];
+        var lastTS = null;
         for(const record of series._records) {
           var ts = DateTime.fromJSDate(record.timestamp);
+          if(lastTS !== null) {
+            var delta = ts.diff(lastTS, "minutes");
+          }
+          lastTS = ts;
           graphData.push({x: ts.toFormat("MM-dd hh:mm a"),
             y: Number(record.value)});
         }
@@ -254,8 +259,11 @@ function registerAlpineComponents() {
         //If the user turned on the pm2.5 EPA Corrected channel, we want the graph coloration to use the
         //EPA breakpoint function.
         var useEPABreakpoints = false;
+        var addNewXAxis = false;
         if(obsStandardName === "pm2.5_EPAc") {
           useEPABreakpoints = this;
+          //The EPA corrected data is 15 minute intervals, so we need to add a new x-axis.
+          addNewXAxis = true;
         }
         return {
           id: seriesId,
