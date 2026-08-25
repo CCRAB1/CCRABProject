@@ -249,7 +249,7 @@ function registerAlpineComponents() {
         for(const record of series._records) {
           var ts = DateTime.fromJSDate(record.timestamp);
           if(lastTS !== null) {
-            var delta = ts.diff(lastTS, "minutes");
+            var delta = ts.diff(lastTS, "seconds");
           }
           lastTS = ts;
           graphData.push({x: ts.toFormat("MM-dd hh:mm a"),
