@@ -1,10 +1,17 @@
-import { CCRABRestClient } from "../../js/CCRABApiClient/src/index.js";
-import Alpine from "../../vendor/alpinejs/3.15.12/module.esm.min.js";
-import { DateTime } from "../../vendor/luxon/3.7.2/luxon.min.js";
+//import Alpine from "../../vendor/alpinejs/3.15.12/module.esm.min.js";
+//import { DateTime } from "../../vendor/luxon/3.7.2/luxon.min.js";
+import Alpine from "alpinejs";
+import {DateTime} from "luxon";
+
+import { CCRABRestClient, DEFAULT_BASE_URL }
+  from "../../../../static/js/CCRABApiClient/src/index.js";
+import { StatsJtsDocument }
+  from "../../../../static/js/StatsTimeSeries/src/index.js";
+//import { CCRABRestClient } from "../../js/CCRABApiClient/src/index.js";
 import { registerGraphComponents } from "./graph.js";
 import { PlatformInfo } from "./platform_info.js";
-import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
-import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";
+//import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
+//import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";
 import {getEPABreakpoint} from "./calculations.js";
 
 //const CCRAB_BASE_URL = window.CCRAB_BASE_URL || window.location.origin;
@@ -216,16 +223,16 @@ function registerAlpineComponents() {
       graphObservationClicked(obsStandardName, obsSOrder) {
         console.log("Toggling observation: " + obsStandardName + " Order: " + obsSOrder);
         var seriesId = this.observationSeriesId(obsStandardName, obsSOrder);
-        if (Alpine.store("graph").has(seriesId))
+        if (Alpine.store("graphInfo").has(seriesId))
         {
           console.log("Removing seriesID: " + seriesId + " from graph")
-          Alpine.store("graph").remove(seriesId);
+          Alpine.store("graphInfo").remove(seriesId);
           window.dispatchEvent(new CustomEvent("graph:remove-dataset", {
             detail: seriesId,
           }));
         }
         else {
-          Alpine.store("graph").add(seriesId);
+          Alpine.store("graphInfo").add_id(seriesId);
           // build data and dispatch add event
           var payload = this.buildChartSeriesPayload(obsStandardName, obsSOrder);
           if (!payload) return;
@@ -246,30 +253,36 @@ function registerAlpineComponents() {
         }
         var graphData = [];
         var lastTS = null;
+        var tsInterval = null;
         for(const record of series._records) {
           var ts = DateTime.fromJSDate(record.timestamp);
           if(lastTS !== null) {
-            var delta = ts.diff(lastTS, "seconds");
+            tsInterval = ts.diff(lastTS, "seconds");
           }
           lastTS = ts;
-          graphData.push({x: ts.toFormat("MM-dd hh:mm a"),
+          graphData.push({x: record.timestamp.toISOString(),
             y: Number(record.value)});
         }
         var sensor = this.findSensor(obsStandardName, obsSOrder);
         //If the user turned on the pm2.5 EPA Corrected channel, we want the graph coloration to use the
         //EPA breakpoint function.
         var useEPABreakpoints = false;
-        var addNewXAxis = false;
+        var timeSeriesIntervalSeconds = tsInterval.seconds;
         if(obsStandardName === "pm2.5_EPAc") {
-          useEPABreakpoints = this;
-          //The EPA corrected data is 15 minute intervals, so we need to add a new x-axis.
-          addNewXAxis = true;
+          useEPABreakpoints = true;
         }
         return {
           id: seriesId,
           label: this.formatObservationLabel(obsStandardName, obsSOrder),
           data: graphData,
-          useEPABreakpoints: useEPABreakpoints
+          useEPABreakpoints: useEPABreakpoints,
+          timeSeriesIntervalSeconds: timeSeriesIntervalSeconds,
+          xAxis: {
+            key: "observation-time",
+            type: "time",
+            unit: "minute",       // display preference, not sampling truth
+            tooltipFormat: "MMM d, yyyy h:mm a"
+          },
         };
       },
       findSensor(obsStandardName, obsSOrder) {

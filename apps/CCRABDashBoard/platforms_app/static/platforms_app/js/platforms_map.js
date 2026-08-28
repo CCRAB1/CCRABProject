@@ -1,4 +1,4 @@
-import Alpine from "../../vendor/alpinejs/3.15.12/module.esm.min.js";
+import Alpine from "alpinejs";
 
 const DEFAULT_CENTER = [32.7765, -79.9311];
 const DEFAULT_ZOOM = 10;

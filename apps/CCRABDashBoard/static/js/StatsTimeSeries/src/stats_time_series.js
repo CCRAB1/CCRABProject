@@ -1,5 +1,4 @@
-import { TimeSeries } from "../../../vendor/timeseries-ts/1.0.7/index.js";
-
+import { JtsDocument, TimeSeries } from "@eagle-io/timeseries";
 
 export class StatsTimeSeries extends TimeSeries {
   constructor(props = {}) {

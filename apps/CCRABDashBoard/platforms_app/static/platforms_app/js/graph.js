@@ -53,8 +53,46 @@ const lineStyles = [
   [2, 4],
   [10, 4, 2, 4],
 ];
+class graphSetupInfo {
+    constructor(id, yAxisID, xAxisID, timeSeriesIntervalSeconds, useEPABreakpoints) {
+        this.id = id;
+        this.yAxisID = yAxisID ?? null;
+        this.xAxisID = xAxisID ?? null;
+        this.timeSeriesIntervalSeconds = timeSeriesIntervalSeconds ?? null;
+        this.useEPABreakpoints = useEPABreakpoints ?? false;
+    }
+};
 
 export function registerGraphComponents(Alpine) {
+    if (!Alpine.store("graphInfo")) {
+        Alpine.store("graphInfo", {
+            graphInfo: [],
+
+            has(id) {
+                 return this.graphInfo.find(nfo => nfo.id === id);
+            },
+
+            add_id(id) {
+                if (!this.has(id)) {
+                    console.log("Adding id: " + id + " to graphInfo.")
+                    var graphInfo = new graphSetupInfo(id)
+                    this.graphInfo.push(graphInfo);
+                }
+            },
+            remove(id) {
+                console.log("Removing id: " + id + " from graphInfo")
+                // Find the index of the object to remove.
+                let index = this.graphInfo.findIndex(nfo => nfo.id === id);
+
+                // If the object exists, remove exactly 1 item at that index
+                if (index !== -1) {
+                  this.graphInfo.splice(index, 1);
+                }
+                //let updatedNfo = this.graphInfo.filter(nfo => nfo.id === id);
+            }
+        })
+    }
+    /*
     if (!Alpine.store("graph")) {
         Alpine.store("graph", {
             plottedIds: [],
@@ -78,6 +116,7 @@ export function registerGraphComponents(Alpine) {
             },
         });
     }
+    */
     Alpine.data("chartComponent", function (options) {
         var config = options || {};
         var chart = null;
@@ -114,7 +153,7 @@ export function registerGraphComponents(Alpine) {
                 var canvas = this.$refs.canvas;
                 let lastTickDate = null;
                 if (!canvas) return;
-                chart = new window.Chart(this.$refs.canvas, {
+                chart = new Chart(this.$refs.canvas, {
                     type: this.chartType,
                     data: {
                         labels: [],
@@ -149,9 +188,21 @@ export function registerGraphComponents(Alpine) {
                     console.warn("Invalid graph dataset payload", dataset);
                     return;
                 }
+                var graphInfo = Alpine.store("graphInfo").has(dataset.id);
                 var axisId = "y-" + dataset.id.replaceAll(" ", "-");
+                graphInfo.yAxisID = axisId;
                 console.debug("Adding dataset id: " + dataset.id + "axis: " + axisId);
-                //chart.options.scales = chart.options.scales || {};
+                var xAxisKey = "x-" + dataset.xAxis.key;
+                if(!(xAxisKey in chart.options.scales))
+                {
+                    chart.options.scales[xAxisKey] = {};
+                }
+                chart.options.scales[xAxisKey] = {
+                    type: dataset.xAxis.type || "time",
+                    time: {
+                        unit: dataset.xAxis.unit || "minute",
+                    },
+                }
                 if(!(axisId in chart.options.scales))
                 {
                     chart.options.scales[axisId] = {};
@@ -187,7 +238,8 @@ export function registerGraphComponents(Alpine) {
                     segment: {
                         borderColor: (chartPt) =>
                         {
-                            if (dataset.useEPABreakpoints) {
+                            var useEPABreakpoints = Alpine.store("graphInfo").has(dataset.id).useEPABreakpoints;
+                            if (useEPABreakpoints) {
                                 var epaRange = getEPABreakpoint(chartPt.p0.parsed.y);
                                 return epaRange.color;
                             }

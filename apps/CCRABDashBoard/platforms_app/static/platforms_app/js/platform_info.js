@@ -1,4 +1,4 @@
-import { DateTime } from "../../vendor/luxon/3.7.2/luxon.min.js";
+import { DateTime } from "luxon";
 
 export class PlatformInfo {
   constructor(serializedPayload) {

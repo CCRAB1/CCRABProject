@@ -1,4 +1,4 @@
-import { DateTime } from "../../../vendor/luxon/3.7.2/luxon.min.js";
+import { DateTime } from "luxon";
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const API_DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";

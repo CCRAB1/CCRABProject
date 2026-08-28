@@ -1,4 +1,4 @@
-import { JtsDocument } from "../../../vendor/timeseries-ts/1.0.7/index.js";
+import { JtsDocument } from "@eagle-io/timeseries";
 import { StatsTimeSeries } from "./stats_time_series.js";
 
 export class StatsJtsDocument extends JtsDocument {

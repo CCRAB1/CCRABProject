@@ -1,3 +1,16 @@
+# Build browser assets (requires package.json and package-lock.json
+# in apps/CCRABDashBoard).
+FROM node:22-slim AS frontend
+
+WORKDIR /frontend
+
+COPY apps/CCRABDashBoard/package.json \
+     apps/CCRABDashBoard/package-lock.json ./
+RUN npm ci
+
+COPY apps/CCRABDashBoard/ ./
+RUN npm run build
+
 FROM python:3.11-slim
 
 ARG APP_UID=10001
@@ -38,6 +51,11 @@ COPY infra/docker/dashboard/entrypoint.sh /usr/local/bin/entrypoint
 RUN chmod +x /usr/local/bin/entrypoint
 
 COPY --chown=django:django apps/CCRABDashBoard /app
+
+# Makes the final image depend on the frontend build stage.
+COPY --from=frontend --chown=django:django \
+    /frontend/static/build/ /app/static/build/
+
 RUN mkdir -p /app/staticfiles /app/media \
     && chown django:django /app/staticfiles /app/media
 
