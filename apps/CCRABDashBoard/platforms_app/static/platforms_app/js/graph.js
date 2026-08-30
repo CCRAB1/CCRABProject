@@ -161,23 +161,7 @@ export function registerGraphComponents(Alpine) {
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false,
-
-                        scales: {
-                            x: {
-                              /*ticks: {
-                                callback: function(value, index) {
-                                    var tick_label = this.getLabelForValue(value);
-                                    var tick_label_parts = tick_label.split(" ", 2);
-                                    if(index === 0 || (index % 4) === 0)
-                                    {
-                                        return tick_label;
-                                    }
-                                    return tick_label_parts[1];
-                                }
-                              }*/
-                            }
-                        },
+                        maintainAspectRatio: false
                     },
                 });
 
@@ -189,25 +173,27 @@ export function registerGraphComponents(Alpine) {
                     return;
                 }
                 var graphInfo = Alpine.store("graphInfo").has(dataset.id);
-                var axisId = "y-" + dataset.id.replaceAll(" ", "-");
-                graphInfo.yAxisID = axisId;
-                console.debug("Adding dataset id: " + dataset.id + "axis: " + axisId);
+                var yAxisId = "y-" + dataset.id.replaceAll(" ", "-");
+                graphInfo.yAxisID = yAxisId;
+                console.debug("Adding dataset id: " + dataset.id + "axis: " + yAxisId);
                 var xAxisKey = "x-" + dataset.xAxis.key;
                 if(!(xAxisKey in chart.options.scales))
                 {
                     chart.options.scales[xAxisKey] = {};
                 }
+                chart.options.scales[xAxisKey] = dataset.xAxis;
+                /*
                 chart.options.scales[xAxisKey] = {
                     type: dataset.xAxis.type || "time",
                     time: {
                         unit: dataset.xAxis.unit || "minute",
                     },
-                }
-                if(!(axisId in chart.options.scales))
+                }*/
+                if(!(yAxisId in chart.options.scales))
                 {
-                    chart.options.scales[axisId] = {};
+                    chart.options.scales[yAxisId] = {};
                 }
-                chart.options.scales[axisId] = {
+                chart.options.scales[yAxisId] = {
                     type: "linear",
                     position: chart.data.datasets.length % 2 === 0 ? "left" : "right",
                     title: {
@@ -227,7 +213,7 @@ export function registerGraphComponents(Alpine) {
                     id: dataset.id,
                     label: dataset.label,
                     data: dataset.data,
-                    yAxisID: axisId,
+                    yAxisID: yAxisId,
                     borderColor: color.borderColor,
                     backgroundColor: color.backgroundColor,
                     borderWidth: 2,
@@ -238,8 +224,10 @@ export function registerGraphComponents(Alpine) {
                     segment: {
                         borderColor: (chartPt) =>
                         {
-                            var useEPABreakpoints = Alpine.store("graphInfo").has(dataset.id).useEPABreakpoints;
-                            if (useEPABreakpoints) {
+                            //console.log("chartPt: " + JSON.stringify(chartPt));
+                            //var useEPABreakpoints = Alpine.store("graphInfo").has(dataset.id).useEPABreakpoints;
+                            //if (useEPABreakpoints) {
+                            if(dataset.EPABreakpoints) {
                                 var epaRange = getEPABreakpoint(chartPt.p0.parsed.y);
                                 return epaRange.color;
                             }

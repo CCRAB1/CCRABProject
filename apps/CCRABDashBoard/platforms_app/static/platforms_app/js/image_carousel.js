@@ -275,13 +275,18 @@ function registerAlpineComponents() {
           id: seriesId,
           label: this.formatObservationLabel(obsStandardName, obsSOrder),
           data: graphData,
-          useEPABreakpoints: useEPABreakpoints,
+          EPABreakpoints: useEPABreakpoints,
           timeSeriesIntervalSeconds: timeSeriesIntervalSeconds,
           xAxis: {
             key: "observation-time",
             type: "time",
             unit: "minute",       // display preference, not sampling truth
-            tooltipFormat: "MMM d, yyyy h:mm a"
+            tooltipFormat: "yyyy-MMM-d,  h:mm a",
+            maxTicksLimit: 10, // Limits maximum number of labels shown on screen
+            displayFormats: {
+               'hour': 'HH:MM',
+            }
+
           },
         };
       },

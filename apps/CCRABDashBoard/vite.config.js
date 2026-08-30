@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 export default defineConfig({
   build: {
     outDir: resolve(__dirname, "static/build"),
+    minify: false,
     emptyOutDir: true,
     rollupOptions: {
       input: resolve(__dirname, "frontend/platform_frontend.js"),

@@ -34,7 +34,8 @@ x-airflow-common: &airflow_common
     AIRFLOW__SMTP__SMTP_PASSWORD: ${AIRFLOW__SMTP__SMTP_PASSWORD}
     AIRFLOW__SMTP__SMTP_PORT: ${AIRFLOW__SMTP__SMTP_PORT}
     AIRFLOW__SMTP__SMTP_MAIL_FROM: ${AIRFLOW__SMTP__SMTP_MAIL_FROM}
-
+    AIRFLOW_CONN_SMTP_DEFAULT: ${AIRFLOW_CONN_SMTP_DEFAULT}
+    
     CCRAB_DJANGO_PROJECT_PATH: /opt/ccrab/dashboard
   volumes:
     - ../apps/DataIngestion/airflow/dags:/opt/airflow/dags:ro

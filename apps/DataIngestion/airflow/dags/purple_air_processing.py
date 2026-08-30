@@ -44,14 +44,21 @@ if remote_debug == "True":
         suspend=os.getenv("PYDEVD_SUSPEND", "False").lower() in {"1", "true", "yes"},
     )
 
+default_args = {
+    'owner': 'airflow',
+    'email': ['ChiefDan@gmail.com'],
+    'email_on_failure': True,
+    'email_on_retry': False,
+    'start_date': pendulum.datetime(2026, 1, 1, tz="UTC")
+}
 
 @dag(
     dag_id="purple_air_processing",
     schedule="*/30 * * * *",
     max_active_runs=1,
-    start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     catchup=False,
     tags=["purpleair","ccrab"],
+    default_args=default_args,
 )
 def purple_air_processing():
 
