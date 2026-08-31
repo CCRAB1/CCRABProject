@@ -175,7 +175,7 @@ function registerAlpineComponents() {
             if (series !== undefined) {
               //Get the start/end date from the series.
               var oldestRec = series.getOldestRecord();
-              if(oldestRec !== null) {
+              if(oldestRec !== undefined) {
                 this.startDateTime = this.formatDateTimeStr(oldestRec.timestamp);
               }
               else
