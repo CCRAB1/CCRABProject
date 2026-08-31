@@ -174,8 +174,22 @@ function registerAlpineComponents() {
             var series = this.observationTimeSeriesDoc.getSeries(timeseries_id);
             if (series !== undefined) {
               //Get the start/end date from the series.
-              this.startDateTime = this.formatDateTimeStr(series.getOldestRecord().timestamp);
-              this.endDateTime = this.formatDateTimeStr(series.getLatestRecord().timestamp);
+              var oldestRec = series.getOldestRecord();
+              if(oldestRec !== undefined) {
+                this.startDateTime = this.formatDateTimeStr(oldestRec.timestamp);
+              }
+              else
+              {
+                console.error("No oldest record found for timeseries: " + timeseries_id);
+              }
+              var latestRec = series.getLatestRecord();
+              if(latestRec !== undefined) {
+                this.endDateTime = this.formatDateTimeStr(latestRec.timestamp);
+              }
+              else
+              {
+                console.error("No latest record found for timeseries: " + timeseries_id);
+              }
               //stats = series.getStats();
               stats = {
                 min: series.min_record,
