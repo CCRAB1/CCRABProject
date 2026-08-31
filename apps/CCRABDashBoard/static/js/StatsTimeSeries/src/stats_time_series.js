@@ -35,7 +35,7 @@ export class StatsTimeSeries extends TimeSeries {
     * @returns {{}} An object that the most recent date/time in the series.
     */
   getLatestRecord() {
-    var value = null;
+    var value = undefined;
     if(this._records.length) {
       value = this._records[this._records.length-1];
     }
@@ -48,7 +48,7 @@ export class StatsTimeSeries extends TimeSeries {
     * @returns {{}} An object that the most oldest date/time in the series.
     */
   getOldestRecord() {
-    var value = null;
+    var value = undefined;
     if(this._records.length) {
       value = this._records[0];
     }
