@@ -228,6 +228,7 @@ def purple_air_processing():
                         #If the delta between start and end is more than 30 days, cut it to 30 days.
                         if (end_date - start_date) > timedelta(days=30):
                             start_date = end_date - timedelta(days=30)
+                            logger.warning(f"Latest Date: {latest_m_date} great than 30 days. Cutting start date to {start_date} for platform {platform_handle}")
 
                     try:
                         platform_query_times[platform_handle] = {'start_date': start_date.timestamp(),
@@ -251,8 +252,10 @@ def purple_air_processing():
                         logger.info(f"Writing to {output_file}")
                         try:
                             with open(output_file, "w") as out_file_obj:
-                                for row in results:
+
+                                for ndx, row in enumerate(results):
                                     out_file_obj.write(f"{row}\n")
+                                logger.info(f"Wrote {ndx+1} rows to {output_file}")
                                 saved_data_files.append(str(output_file))
                         except Exception as e:
                             logger.error(f"Failed to write file: {output_file}")
