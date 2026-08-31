@@ -75,7 +75,7 @@ def purple_air_processing():
             base_directory.mkdir(parents=True, exist_ok=True)
             config_file_path = base_directory / "purple_air_config.json"
             ccrab_base_url = Variable.get("CCRAB_API_URL", None)
-            ccrab_api = CCRABRestClient(base_url=ccrab_base_url,
+            ccrab_api = CCRABRestClient(base_url=ccrab_base_ur,
                                         verify=get_requests_verify(ccrab_base_url)
                                         )
             ccrab_user = Variable.get("CCRAB_API_USERNAME", None)
