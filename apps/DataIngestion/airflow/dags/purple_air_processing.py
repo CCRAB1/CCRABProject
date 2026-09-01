@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -534,8 +534,28 @@ def purple_air_processing():
             setup_django()
 
             from platforms_app.models import Multi_obs
+
+            def flush_pending_records():
+                nonlocal attempted_records
+
+                if not pending_records:
+                    return
+
+                count = len(pending_records)
+                with transaction.atomic():
+                    Multi_obs.objects.bulk_create(
+                        pending_records,
+                        batch_size=count,
+                        ignore_conflicts=True,
+                    )
+
+                attempted_records += count
+                pending_records.clear()
+
             # Build our org and platform objects.
             organizations_setup = load_config_file(config_file_name)
+
+            batch_size = max(1, int(PURPLEAIR_CHUNK_SIZE))
 
             for file in file_list:
                 logger.info(f"Processing file: {file} into the database")
@@ -545,77 +565,91 @@ def purple_air_processing():
                 # we create the filename, we replace the "." with "_" to avoid any OS/Filesystem issues.
                 file_platform_handle = file_name_parts[0].replace("_", ".")
 
+                platform_nfo = None
                 for organization_nfo in organizations_setup:
                     platform_nfo = organization_nfo.get_platform(file_platform_handle)
                     if platform_nfo is not None:
                         break
-                #Check the file size, if it exceeds
-                if file_path.stat().st_size >= PURPLEAIR_BULK_INSERT_FILE_SIZE:
-                    #csv_file: Path, db: xenia_alchemy, platform_nfo: Platform, insert_chunk_size: int
-                    bulk_insert_to_database(file_path, platform_nfo, PURPLEAIR_CHUNK_SIZE)
-                else:
-
+                if platform_nfo is not None:
                     with open(file_path, "r") as csv_file_obj:
                         file_start_time = time.perf_counter()
                         row_entry_date = datetime.now()
                         csv_reader = csv.DictReader(csv_file_obj)
                         duplicate_row_count = 0
                         insert_exception_count = 0
+                        pending_records = []
+                        attempted_records = 0
+                        invalid_value_count = 0
 
+                        logged_missed_observations = set()
+                        #Build a list of the observations that should be in the file.
+                        active_observations = [
+                            (f"{obs.target_obs}_{obs.s_order}", obs)
+                            for obs in platform_nfo.obs_map
+                            if obs.target_active == 1
+                        ]
                         for row_ndx, row in enumerate(csv_reader):
-                            for obs_info in platform_nfo.obs_map:
-                                #We build the name for each column we want which is >target_obs>_<s_order>. The date
-                                #column has been renamed m_date during the normalize task.
-                                try:
-                                    column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
-                                    if column_name in row:
-                                        if obs_info.target_active == 1:
-                                            m_date = row['m_date']
-                                            try:
-                                                val = None
-                                                if len(row[column_name]):
-                                                    val = float(row[column_name])
-                                            except (ValueError, TypeError) as e:
-                                                logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
-                                                logger.exception(e)
-                                            else:
-                                                if PURPLEAIR_TASK_LOG_INSERTS:
-                                                    #if row_ndx % 1000 == 0:
-                                                    logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
-                                                                f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
-                                                                f"{obs_info.target_uom}({obs_info.m_type_id}) SOrder: {obs_info.s_order}")
-                                                try:
-                                                    with transaction.atomic():
-                                                        obs_rec = Multi_obs.objects.create(row_entry_date=row_entry_date,
-                                                                            platform_handle=platform_nfo.platform_handle,
-                                                                            m_date=m_date,
-                                                                            m_value=val,
-                                                                            sensor_id_id=obs_info.sensor_id,
-                                                                            m_type_id_id=obs_info.m_type_id,
-                                                                            m_lon=platform_nfo.longitude,
-                                                                            m_lat=platform_nfo.latitude)
-                                                except IntegrityError as e:
-                                                    logger.error(f"Record already exists: {e}")
-                                                    duplicate_row_count += 1
-                                                except Exception as e:
-                                                    logger.error(f"Error adding record: {e}")
-                                                    logger.exception(e)
-                                                    insert_exception_count += 1
-                                    else:
-                                        logger.info(f"Column: {column_name} not found in row_ndx: {row_ndx}")
-                                except Exception as e:
-                                    close_django_connections()
-                                    raise e
-                            logger.info(f"Processed {row_ndx} rows from file: {file} into the database in: "
-                                        f"{time.perf_counter()-file_start_time} seconds")
+                            m_date = row["m_date"]
 
+                            for column_name, obs_info in active_observations:
+                                if column_name not in row:
+                                    if column_name not in logged_missed_observations:
+                                        logger.warning(
+                                            "Column %s not found in row %s of %s",
+                                            column_name,
+                                            row_ndx,
+                                            file,
+                                        )
+                                        logged_missed_observations.add(column_name)
+                                    continue
+
+                                try:
+                                    raw_value = row[column_name]
+                                    val = float(raw_value)
+                                except (ValueError, TypeError) as e:
+                                    logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
+                                    logger.exception(e)
+
+                                    continue
+                                #Build the records for the bulk insert.
+                                pending_records.append(
+                                    Multi_obs(row_entry_date=row_entry_date,
+                                                             platform_handle=platform_nfo.platform_handle,
+                                                             m_date=m_date,
+                                                             m_value=val,
+                                                             sensor_id_id=obs_info.sensor_id,
+                                                             m_type_id_id=obs_info.m_type_id,
+                                                             m_lon=platform_nfo.longitude,
+                                                             m_lat=platform_nfo.latitude)
+                                )
+                                if len(pending_records) >= batch_size:
+                                    flush_pending_records()
+                                if row_ndx and row_ndx % 1000 == 0:
+                                    logger.info(
+                                        "Prepared %s CSV rows from %s in %.2fs",
+                                        row_ndx,
+                                        file,
+                                        time.perf_counter() - file_start_time,
+                                    )
+
+                            flush_pending_records()
+
+                        logger.info(
+                            "Finished %s: attempted %s observations; invalid values %s; elapsed %.2fs",
+                            file,
+                            attempted_records,
+                            invalid_value_count,
+                            time.perf_counter() - file_start_time,
+                        )
+                else:
+                    logger.error(f"Platform {file_platform_handle} not found in list.")
         except Exception as e:
             close_django_connections()
             raise e
         finally:
             close_django_connections()
     @task()
-    def ancillary_calculations_post_db_save(config_file_name: Path, start_timestamp: float, end_timestamp: float) -> list[Any]:
+    def ancillary_calculations_epa_corrected(config_file_name: Path, start_timestamp: float, end_timestamp: float) -> list[Any]:
         start_proc_time = time.perf_counter()
 
         #Create the datetime object from the timestamps.
@@ -1092,23 +1126,23 @@ def purple_air_processing():
         task_id="save_initial_data"
     )("initial_data_save", configuration_file_path, normalized_header_data_files)
 
-    ancillary_calculations_data_files = ancillary_calculations_post_db_save(
+    epa_corrected_data_files = ancillary_calculations_epa_corrected(
         configuration_file_path,
         run_manifest["start_timestamp"],
         run_manifest["end_timestamp"],
     )
 
-    ancillary_calculations_data_save_to_database = save_to_database_task.override(
+    epa_corrected_data_save_to_database = save_to_database_task.override(
         task_id="save_ancillary_data"
-    )("ancillary_calculations_data_save", configuration_file_path, ancillary_calculations_data_files)
+    )("ancillary_calculations_data_save", configuration_file_path, epa_corrected_data_files)
 
     archive = archive_task(configuration_file_path, csv_files_to_process,
                            normalized_header_data_files,
-                           ancillary_calculations_data_files)
+                           epa_corrected_data_files)
 
     # These are control dependencies: neither downstream task consumes the
     # upstream task's return value, so TaskFlow cannot infer them from arguments.
-    initial_data_save_to_database >> ancillary_calculations_data_files
-    ancillary_calculations_data_save_to_database >> archive
+    initial_data_save_to_database >> epa_corrected_data_files
+    epa_corrected_data_save_to_database >> archive
 
 purple_air_processing()
