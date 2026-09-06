@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -624,7 +624,7 @@ def purple_air_processing():
                                 )
                                 if len(pending_records) >= batch_size:
                                     flush_pending_records()
-                                if row_ndx and row_ndx % 1000 == 0:
+                                if row_ndx and row_ndx % 10 == 0:
                                     logger.info(
                                         "Prepared %s CSV rows from %s in %.2fs",
                                         row_ndx,
@@ -991,10 +991,7 @@ def purple_air_processing():
         logger.info(f"Finished ancillary_calculations_aqi in {time.perf_counter()-start_proc_time} seconds")
         return aqi_data_files
     @task()
-    def archive_task(config_file_name: Path,
-                     data_source_files: [],
-                     normalized_header_files: [],
-                     ancillary_calculations_data_files: []) :
+    def archive_task(config_file_name: Path) :
         archive_all_files = Variable.get("ARCHIVE_ALL_FILES_IN_DIRECTORY")
         archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY", default="purple_air")
         base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY"))
@@ -1005,7 +1002,7 @@ def purple_air_processing():
 
         raw_data_archive_directory = archive_directory / Variable.get("RAW_DATA_DIRECTORY")
         raw_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        files_to_archive = data_source_files
+        files_to_archive = []
         if archive_all_files:
             data_directory = base_dir / Path(Variable.get("RAW_DATA_DIRECTORY"))
             files_to_archive = data_directory.rglob("*.*")
@@ -1013,7 +1010,7 @@ def purple_air_processing():
 
         normalized_data_archive_directory = archive_directory / Variable.get("NORMALIZED_HEADER_DIRECTORY")
         normalized_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        files_to_archive = normalized_header_files
+        files_to_archive = []
         if archive_all_files:
             data_directory = base_dir / Path(Variable.get("NORMALIZED_HEADER_DIRECTORY"))
             files_to_archive = data_directory.rglob("*.*")
@@ -1023,9 +1020,17 @@ def purple_air_processing():
         #finally the ancillary calculations data.
         anicllary_data_archive_directory = archive_directory / Variable.get("EPA_CORRECTED_DIRECTORY")
         anicllary_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        files_to_archive = ancillary_calculations_data_files
+        files_to_archive = []
         if archive_all_files:
             data_directory = base_dir / Path(Variable.get("EPA_CORRECTED_DIRECTORY"))
+            files_to_archive = data_directory.rglob("*.*")
+        archive_and_zip(files_to_archive, anicllary_data_archive_directory, archive_directory, process_run_time)
+
+        anicllary_data_archive_directory = archive_directory / Variable.get("AQI_DIRECTORY")
+        anicllary_data_archive_directory.mkdir(parents=True, exist_ok=True)
+        files_to_archive = []
+        if archive_all_files:
+            data_directory = base_dir / Path(Variable.get("AQI_DIRECTORY"))
             files_to_archive = data_directory.rglob("*.*")
         archive_and_zip(files_to_archive, anicllary_data_archive_directory, archive_directory, process_run_time)
 
