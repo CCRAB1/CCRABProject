@@ -17,7 +17,7 @@ from django.db import IntegrityError, transaction
 from datautilities.purple_air_api.PurpleAPIWrapper import (
     PurpleAirClient,
 )
-from datautilities.epa.epa_calculations import apply_epa_correction
+from datautilities.epa.epa_calculations import apply_epa_correction, calculate_aqi
 from packages.django_setup import setup_django, close_django_connections
 from datautilities.ccrab_api.client import CCRABRestClient, CCRABAuthenticationError
 from observationsdatabase.xenia_obs_map import Organization, Platform
@@ -850,6 +850,147 @@ def purple_air_processing():
         return corrected_file_list
 
     @task()
+    def ancillary_calculations_aqi(config_file_name: Path,
+                                   epa_corrected_file_list: list[Any],
+                                   start_timestamp: float,
+                                   end_timestamp: float) -> list[Any]:
+        start_proc_time = time.perf_counter()
+        aqi_data_files = []
+        #Create the datetime object from the timestamps.
+        start_date_time = datetime.fromtimestamp(start_timestamp)
+        end_date_time = datetime.fromtimestamp(end_timestamp)
+
+        logger.info(f"Starting ancillary_calculations_aqi with config file: {config_file_name} "
+                    f"Start: {start_date_time} End: {end_date_time}")
+        #Checking if we have a new hour.
+        try:
+
+            base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
+            aqi_directory = base_directory / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY")) / Path(
+                Variable.get("AQI_DIRECTORY"))
+            # Let's make sure the directory exists.
+            aqi_directory.mkdir(parents=True, exist_ok=True)
+
+            organizations_setup = load_config_file(config_file_name)
+            setup_django()
+
+            from platforms_app.models import Multi_obs
+
+            #We want to get the first and last date for the file, we then use that
+            #to query the database.
+            for epa_corrected_file in epa_corrected_file_list:
+                epa_df = pd.read_csv(epa_corrected_file)
+
+                epa_df["m_date"] = pd.to_datetime(
+                    epa_df["m_date"],
+                    utc=True,
+                    errors="coerce",
+                )
+
+
+                start_row = (pd.to_datetime(epa_df.head(1)["m_date"]) - timedelta(hours=24)).dt.to_pydatetime()[0]
+                end_row = (pd.to_datetime(epa_df.tail(1)["m_date"])).dt.to_pydatetime()[0]
+                #The aqi calculation is based on the EPA corrected data.
+                column_for_aqi_calc = "pm2.5_EPAc"
+                for organization in organizations_setup:
+                    platform_handles = organization.list_platform_handles()
+                    for platform_handle in platform_handles:
+                        platform = organization.get_platform(platform_handle)
+
+                        # These are the columns ids we want to retrieve from the database.
+                        query_obs = [obs for obs in platform.observations
+                                           if obs['target_obs'] == column_for_aqi_calc]
+                        column_name_mapping = dict([(obs['sensor_id'], f"{obs['target_obs']}_{obs['s_order']}") for obs in query_obs])
+                        required_type_ids = [obs['m_type_id'] for obs in query_obs]
+                        required_sensor_ids = [obs['sensor_id'] for obs in query_obs]
+                        try:
+                            start_row_str = start_row.strftime("%Y-%m-%dT%H:%M:%SZ")
+                            end_row_str = end_row.strftime("%Y-%m-%dT%H:%M:%SZ")
+                            logger.info(f"Querying the database for {platform_handle} from {start_row_str} to "
+                                        f"{end_row_str}")
+
+                            obs_recs = (
+                                Multi_obs.objects
+                                .filter(
+                                    m_date__gte=start_row_str,
+                                    m_date__lt=end_row_str,
+                                    m_type_id__in=required_type_ids,
+                                    sensor_id__in=required_sensor_ids,
+                                )
+                                .values(
+                                    "platform_handle",
+                                    "m_date",
+                                    "m_value"
+                                )
+                                .order_by("m_date")
+                            )
+                        except Exception as e:
+                            logger.exception(e)
+                            raise e
+                        if len(obs_recs):
+                            logger.info(f"Retrieved {len(obs_recs)} records from the database for {platform_handle}")
+                            df = pd.DataFrame.from_records(obs_recs)
+                            df["m_date"] = pd.to_datetime(
+                                df["m_date"],
+                                utc=True,
+                                errors="coerce",
+                            )
+                            df = df.set_index("m_date").sort_index()
+                            df["m_value"] = pd.to_numeric(
+                                df["m_value"],
+                                errors="coerce",
+                            )
+                            file_platform_handle = platform_handle.replace('.', '_')
+                            initial_output_file = aqi_directory / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
+                                                                  f"{start_date_time.strftime('%Y%m%dT%H%M%S')}-"
+                                                                  f"{end_date_time.strftime('%Y%m%dT%H%M%S')}-initial-query.csv")
+                            try:
+                                logger.info(f"Writing to file: {initial_output_file}")
+                                df.to_csv(initial_output_file, index=False)
+                            except Exception as e:
+                                logger.error(f"Error writing to file: {initial_output_file}")
+                                logger.exception(e)
+
+                            #Now let's do the calculations.
+                            rolling_mean = (
+                                df["m_value"]
+                                .rolling(
+                                    window="24h",
+                                    min_periods=96,
+                                    closed="right",
+                                )
+                                .mean()
+                            )
+
+                            rolling_df = pd.DataFrame(
+                                {
+                                    "platform_handle": platform_handle,
+                                    "m_date": rolling_mean.index,
+                                    "pm2.5_24_hour_mean": rolling_mean.values,
+                                }
+                            )
+                            rolling_df = rolling_df.dropna(
+                                subset=["pm2.5_24_hour_mean"]
+                            )
+                            rolling_df["pm2.5_aqi"] = rolling_df["pm2.5_24_hour_mean"].apply(
+                                calculate_aqi
+                            )
+                            aqi_output_file = aqi_directory / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
+                                                                  f"{start_date_time.strftime('%Y%m%dT%H%M%S')}-"
+                                                                  f"{end_date_time.strftime('%Y%m%dT%H%M%S')}-aqi.csv")
+                            try:
+                                logger.info(f"Writing to file: {aqi_output_file}")
+                                rolling_df.to_csv(aqi_output_file, index=False)
+                                aqi_data_files.append(str(aqi_output_file))
+                            except Exception as e:
+                                logger.error(f"Error writing to file: {aqi_output_file}")
+                                logger.exception(e)
+
+        except Exception as e:
+            raise e
+        logger.info(f"Finished ancillary_calculations_aqi in {time.perf_counter()-start_proc_time} seconds")
+        return aqi_data_files
+    @task()
     def archive_task(config_file_name: Path,
                      data_source_files: [],
                      normalized_header_files: [],
@@ -918,148 +1059,6 @@ def purple_air_processing():
         except Exception as e:
             logger.error(f"Unable to zip directory: {archive_directory}")
         return
-
-    def bulk_insert_to_database(csv_file: Path, platform_nfo: Platform, insert_chunk_size: int):
-        '''
-        WHen importing large csv files, for performace we want to use this bulk insert function.
-        :param csv_file:
-        :param db:
-        :return:
-        '''
-        csv_buffer = StringIO()
-        buffer_count = 0
-        total_inserted = 0
-        total_skipped = 0
-
-        raw_conn = db.dbEngine.raw_connection()
-        with open(csv_file, "r") as csv_file_obj:
-            file_start_time = time.perf_counter()
-            row_entry_date = datetime.now()
-            csv_reader = csv.DictReader(csv_file_obj)
-            for row_ndx, row in enumerate(csv_reader):
-                for obs_info in platform_nfo.obs_map:
-                    # We build the name for each column we want which is >target_obs>_<s_order>. The date
-                    # column has been renamed m_date during the normalize task.
-                    try:
-                        column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
-                        m_date = row['m_date']
-                        try:
-                            val = float(row[column_name])
-                        except (ValueError, TypeError) as e:
-                            logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
-                            logger.exception(e)
-                        else:
-                            # Write to buffer
-                            csv_buffer.write(
-                                f"{row_entry_date}\t{m_date}\t{val}\t"
-                                f"{obs_info.sensor_id}\t{obs_info.m_type_id}\t"
-                                f"{platform_nfo.longitude}\t{platform_nfo.latitude}\n"
-                            )
-                            buffer_count += 1
-
-                            if buffer_count >= insert_chunk_size:
-                                cursor = raw_conn.cursor()
-
-                                buffer_count = 0
-                                # Create a temp table. Because we might have duplicates, we use POSTGRES ability to handle
-                                # decision on CONFLICTS.
-                                # Create temporary table matching multi_obs structure (without constraints)
-                                cursor.execute("""
-                                    CREATE
-                                        TEMP TABLE temp_multi_obs (
-                                        row_entry_date TIMESTAMP,
-                                        m_date TIMESTAMP,
-                                        m_value FLOAT,
-                                        sensor_id INTEGER,
-                                        m_type_id INTEGER,
-                                        m_lon FLOAT,
-                                        m_lat FLOAT
-                                    ) ON COMMIT DROP
-                                """)
-                                csv_buffer.seek(0)
-                                cursor.copy_from(
-                                    csv_buffer,
-                                    'temp_multi_obs',
-                                    sep='\t',
-                                    columns=['row_entry_date', 'm_date', 'm_value',
-                                             'sensor_id', 'm_type_id', 'm_lon', 'm_lat']
-                                )
-
-                                # Insert from temp to main table with duplicate handling
-                                # Using the unique constraint: (m_date, m_type_id, sensor_id)
-                                cursor.execute("""
-                                               INSERT INTO multi_obs (row_entry_date, m_date, m_value,
-                                                                      sensor_id, m_type_id, m_lon, m_lat)
-                                               SELECT row_entry_date,
-                                                      m_date,
-                                                      m_value,
-                                                      sensor_id,
-                                                      m_type_id,
-                                                      m_lon,
-                                                      m_lat
-                                               FROM temp_multi_obs ON CONFLICT (m_date, m_type_id, sensor_id) DO NOTHING
-                                               """)
-
-                                rows_inserted = cursor.rowcount
-                                total_inserted += rows_inserted
-                                total_skipped += (buffer_count - rows_inserted)
-
-                                raw_conn.commit()
-                                cursor.close()
-                                logger.info(f"Inserted {rows_inserted} rows into temp_multi_obs. "
-                                            f"Total skipped: {total_skipped} Total inserted: {total_inserted}")
-
-                    except Exception as e:
-                        raise e
-
-            # Process remaining records
-            if buffer_count > 0:
-                try:
-                    cursor = raw_conn.cursor()
-
-                    cursor.execute("""
-                                   CREATE
-                                   TEMP TABLE temp_multi_obs (
-                            row_entry_date TIMESTAMP,
-                            m_date TIMESTAMP,
-                            m_value FLOAT,
-                            sensor_id INTEGER,
-                            m_type_id INTEGER,
-                            m_lon FLOAT,
-                            m_lat FLOAT
-                        ) ON COMMIT DROP
-                                   """)
-
-                    csv_buffer.seek(0)
-                    cursor.copy_from(
-                        csv_buffer,
-                        'temp_multi_obs',
-                        sep='\t',
-                        columns=['row_entry_date', 'm_date', 'm_value',
-                                 'sensor_id', 'm_type_id', 'm_lon', 'm_lat']
-                    )
-
-                    cursor.execute("""
-                                   INSERT INTO multi_obs (row_entry_date, m_date, m_value,
-                                                          sensor_id, m_type_id, m_lon, m_lat)
-                                   SELECT row_entry_date,
-                                          m_date,
-                                          m_value,
-                                          sensor_id,
-                                          m_type_id,
-                                          m_lon,
-                                          m_lat
-                                   FROM temp_multi_obs ON CONFLICT (m_date, m_type_id, sensor_id) DO NOTHING
-                                   """)
-                except Exception as e:
-                    raise e
-                rows_inserted = cursor.rowcount
-                total_inserted += rows_inserted
-                total_skipped += (buffer_count - rows_inserted)
-                raw_conn.commit()
-                cursor.close()
-                logger.info(f"Inserted {rows_inserted} rows into temp_multi_obs. "
-                            f"Total skipped: {total_skipped} Total inserted: {total_inserted}")
 
     def normalize_header(row: [], platform_nfo: Platform) -> []:
         corrected_header = []
@@ -1136,6 +1135,15 @@ def purple_air_processing():
         task_id="save_ancillary_data"
     )("ancillary_calculations_data_save", configuration_file_path, epa_corrected_data_files)
 
+    aqi_data_files = ancillary_calculations_aqi(configuration_file_path,
+                                                epa_corrected_data_files,
+                                                run_manifest["start_timestamp"],
+                                                run_manifest["end_timestamp"],
+                                                )
+    aqi_data_save_to_database = save_to_database_task.override(
+        task_id="save_aqi_data"
+    )("aqi_calculations_data_save", configuration_file_path, aqi_data_files)
+
     archive = archive_task(configuration_file_path, csv_files_to_process,
                            normalized_header_data_files,
                            epa_corrected_data_files)
@@ -1143,6 +1151,7 @@ def purple_air_processing():
     # These are control dependencies: neither downstream task consumes the
     # upstream task's return value, so TaskFlow cannot infer them from arguments.
     initial_data_save_to_database >> epa_corrected_data_files
-    epa_corrected_data_save_to_database >> archive
+    epa_corrected_data_save_to_database >> aqi_data_files
+    aqi_data_save_to_database >> archive
 
 purple_air_processing()
