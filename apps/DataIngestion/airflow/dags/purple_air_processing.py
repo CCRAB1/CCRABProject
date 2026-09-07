@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "True"
+remote_debug = "False"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -594,13 +594,16 @@ def purple_air_processing():
                             for column_name, obs_info in active_observations:
                                 if column_name not in row:
                                     if column_name not in logged_missed_observations:
+                                        '''
                                         logger.warning(
                                             "Column %s not found in row %s of %s",
                                             column_name,
                                             row_ndx,
                                             file,
                                         )
+                                        '''
                                         logged_missed_observations.add(column_name)
+
                                     continue
 
                                 try:
@@ -612,8 +615,8 @@ def purple_air_processing():
 
                                     continue
                                 #Build the records for the bulk insert.
-                                logger.debug(
-                                    f"Adding {row_entry_date} {platform_nfo.platform_handle} {column_name} {m_date} {val}")
+                                #logger.debug(
+                                #    f"Adding {row_entry_date} {platform_nfo.platform_handle} {column_name} {m_date} {val}")
                                 pending_records.append(
                                     Multi_obs(row_entry_date=row_entry_date,
                                                              platform_handle=platform_nfo.platform_handle,
@@ -628,21 +631,18 @@ def purple_air_processing():
                                     flush_pending_records()
                                 if row_ndx and row_ndx % 10 == 0:
                                     logger.info(
-                                        "Prepared %s CSV rows from %s in %.2fs",
-                                        row_ndx,
-                                        file,
-                                        time.perf_counter() - file_start_time,
+                                        f"Prepared {row_ndx} CSV rows from {file} in {time.perf_counter() - file_start_time}",
                                     )
 
                             flush_pending_records()
-
-                        logger.info(
-                            "Finished %s: attempted %s observations; invalid values %s; elapsed %.2fs",
-                            file,
-                            attempted_records,
-                            invalid_value_count,
-                            time.perf_counter() - file_start_time,
-                        )
+                        if attempted_records:
+                            logger.info(
+                                f"Finished %s: attempted {file} observations; invalid values {invalid_value_count}; elapsed {time.perf_counter() - file_start_time}",
+                            )
+                        else:
+                            logger.warning(
+                                f"No observations found in {file}",
+                            )
                 else:
                     logger.error(f"Platform {file_platform_handle} not found in list.")
         except Exception as e:
