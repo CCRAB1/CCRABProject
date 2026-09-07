@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "True"
+remote_debug = "False"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -612,6 +612,8 @@ def purple_air_processing():
 
                                     continue
                                 #Build the records for the bulk insert.
+                                logger.debug(
+                                    f"Adding {row_entry_date} {platform_nfo.platform_handle} {column_name} {m_date} {val}")
                                 pending_records.append(
                                     Multi_obs(row_entry_date=row_entry_date,
                                                              platform_handle=platform_nfo.platform_handle,
@@ -946,7 +948,7 @@ def purple_air_processing():
                                                                   f"{end_date_time.strftime('%Y%m%dT%H%M%S')}-initial-query.csv")
                             try:
                                 logger.info(f"Writing to file: {initial_output_file}")
-                                df.to_csv(initial_output_file, index=False)
+                                df.to_csv(initial_output_file, index=True)
                             except Exception as e:
                                 logger.error(f"Error writing to file: {initial_output_file}")
                                 logger.exception(e)
@@ -1149,9 +1151,7 @@ def purple_air_processing():
         task_id="save_aqi_data"
     )("aqi_calculations_data_save", configuration_file_path, aqi_data_files)
 
-    archive = archive_task(configuration_file_path, csv_files_to_process,
-                           normalized_header_data_files,
-                           epa_corrected_data_files)
+    archive = archive_task(configuration_file_path)
 
     # These are control dependencies: neither downstream task consumes the
     # upstream task's return value, so TaskFlow cannot infer them from arguments.
