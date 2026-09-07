@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -974,7 +974,7 @@ def purple_air_processing():
                             rolling_df = rolling_df.dropna(
                                 subset=["pm2.5_24_hour_mean"]
                             )
-                            rolling_df["pm2.5_aqi"] = rolling_df["pm2.5_24_hour_mean"].apply(
+                            rolling_df["pm2.5_aqi_1"] = rolling_df["pm2.5_24_hour_mean"].apply(
                                 calculate_aqi
                             )
                             aqi_output_file = aqi_directory / (f"{file_platform_handle}-{platform.properties['external_identifier']}-"
