@@ -637,7 +637,8 @@ def purple_air_processing():
                             flush_pending_records()
                         if attempted_records:
                             logger.info(
-                                f"Finished %s: attempted {file} observations; invalid values {invalid_value_count}; elapsed {time.perf_counter() - file_start_time}",
+                                f"Finished {file}: attempted {attempted_records} observations; invalid values {invalid_value_count}; "
+                                f"elapsed {time.perf_counter() - file_start_time}",
                             )
                         else:
                             logger.warning(
