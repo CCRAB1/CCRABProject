@@ -211,9 +211,14 @@ def platform_source_configuration(request):
 
     request_log(request, "platform_source_configuration", "DEBUG", "")
     data_source_key = request.query_params.get("data_source", "purple_air")
+    #Get the sensors we want a client to have access to display.
+
+    served_sensors = served_sensor_queryset()
+    served_sensor_ids = served_sensors.values("row_id")
 
     observation_qs = (
         SourceObservationMap.objects
+        .filter(sensor_id__in=served_sensor_ids)
         .select_related(
             "sensor_id",
             "sensor_id__m_type_id",

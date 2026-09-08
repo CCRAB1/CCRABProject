@@ -5,6 +5,7 @@ from tempfile import NamedTemporaryFile
 
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.gis.admin import (
     GISModelAdmin,  # requires GeoDjango; remove if not using
 )
@@ -39,7 +40,7 @@ SENSOR_MAP_INPUT_TYPE_CHOICES = (
 
 PLATFORMS_ADMIN_MODEL_GROUPS = [
     ("Core", ["Organization", "Platform", "Sensor", "Obs_type", "Uom_type"]),
-    ("Data Sources", ["DataSource", "DataSourceSensor", "PlatformSensorDisplay", "PlatformSource", "SourceObservationMap"]),
+    ("Data Sources", ["DataSource", "PlatformSource", "SourceObservationMap"]),
     ("Status", ["Platform_status", "Sensor_status"]),
     ("Samples", ["Sample", "Sample_answer", "Sample_attachment"]),
     ("Lookups", ["Platform_type", "Platform_metadata", "Platform_images"]),
@@ -582,6 +583,147 @@ class SourceObservationMapAdminForm(forms.ModelForm):
         js = ("platforms_app/js/source_observation_map_admin.js",)
 
 
+class DataSourceDisplayAdminForm(forms.ModelForm):
+    display_sensors = forms.ModelMultipleChoiceField(
+        label="Sensors displayed by default",
+        queryset=models.M_type.objects.none(),
+        required=False,
+        widget=FilteredSelectMultiple("sensors", is_stacked=False),
+        help_text=(
+            "Move sensor types to the right to display them by default on all "
+            "platforms for this DataSource."
+        ),
+    )
+
+    class Meta:
+        model = models.DataSource
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            return
+
+        available_types = models.M_type.objects.filter(
+            sensor__platform_id__platformsource__data_source_id=self.instance.pk,
+        ).distinct().order_by("description", "row_id")
+        self.fields["display_sensors"].queryset = available_types
+        self.fields["display_sensors"].initial = (
+            models.DataSourceSensor.objects.filter(
+                data_source_id=self.instance,
+            ).values_list("m_type_id", flat=True)
+        )
+
+    def _save_m2m(self):
+        super()._save_m2m()
+        selected_type_ids = {
+            m_type.pk for m_type in self.cleaned_data["display_sensors"]
+        }
+        existing = models.DataSourceSensor.objects.filter(
+            data_source_id=self.instance,
+        )
+        existing.exclude(m_type_id__in=selected_type_ids).delete()
+        existing_type_ids = set(
+            existing.values_list("m_type_id", flat=True)
+        )
+        now = timezone.now()
+        models.DataSourceSensor.objects.bulk_create(
+            [
+                models.DataSourceSensor(
+                    data_source_id=self.instance,
+                    m_type_id_id=m_type_id,
+                    row_entry_date=now,
+                    row_update_date=now,
+                )
+                for m_type_id in selected_type_ids - existing_type_ids
+            ]
+        )
+
+
+class PlatformDisplayAdminForm(forms.ModelForm):
+    display_sensors = forms.ModelMultipleChoiceField(
+        label="Sensors displayed for this platform",
+        queryset=models.Sensor.objects.none(),
+        required=False,
+        widget=FilteredSelectMultiple("sensors", is_stacked=False),
+        help_text=(
+            "Move sensors to the right to display them. This list initially "
+            "inherits the DataSource defaults and saves only Platform overrides."
+        ),
+    )
+
+    class Meta:
+        model = models.Platform
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            return
+
+        platform_sensors = models.Sensor.objects.filter(
+            platform_id=self.instance,
+        ).select_related("platform_id", "m_type_id").order_by(
+            "short_name",
+            "s_order",
+        )
+        self.fields["display_sensors"].queryset = platform_sensors
+        self.fields["display_sensors"].initial = (
+            models.served_sensor_queryset().filter(
+                platform_id=self.instance,
+            ).values_list("row_id", flat=True)
+        )
+
+    def _save_m2m(self):
+        super()._save_m2m()
+        sensors = list(
+            models.Sensor.objects.filter(
+                platform_id=self.instance,
+            ).only("row_id", "m_type_id")
+        )
+        sensor_ids = {sensor.pk for sensor in sensors}
+        selected_sensor_ids = {
+            sensor.pk for sensor in self.cleaned_data["display_sensors"]
+        }
+        default_type_ids = set(
+            models.DataSourceSensor.objects.filter(
+                data_source_id__platformsource__platform_id=self.instance,
+            ).values_list("m_type_id", flat=True)
+        )
+
+        overrides = models.PlatformSensorDisplay.objects.filter(
+            platform_id=self.instance,
+        )
+        overrides.exclude(sensor_id__in=sensor_ids).delete()
+        override_by_sensor_id = {
+            override.sensor_id_id: override for override in overrides
+        }
+        now = timezone.now()
+
+        for sensor in sensors:
+            should_display = sensor.pk in selected_sensor_ids
+            displays_by_default = sensor.m_type_id_id in default_type_ids
+            override = override_by_sensor_id.get(sensor.pk)
+
+            if should_display == displays_by_default:
+                if override:
+                    override.delete()
+                continue
+
+            if override:
+                override.display = should_display
+                override.row_update_date = now
+                override.save(update_fields=("display", "row_update_date"))
+            else:
+                models.PlatformSensorDisplay.objects.create(
+                    platform_id=self.instance,
+                    sensor_id=sensor,
+                    display=should_display,
+                    row_entry_date=now,
+                    row_update_date=now,
+                )
+
+
 # -----------------------
 # Inlines for FK relations
 # -----------------------
@@ -673,41 +815,6 @@ class DataSourcePlatformSourceInline(TimestampedTabularInline):
     extra = 0
     show_change_link = True
 
-
-class DataSourceSensorInline(TimestampedTabularInline):
-    model = models.DataSourceSensor
-    fk_name = "data_source_id"
-    fields = ('row_id', 'm_type_id', 'row_entry_date', 'row_update_date')
-    readonly_fields = ('row_id', 'row_entry_date', 'row_update_date')
-    extra = 0
-    show_change_link = True
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "m_type_id":
-            data_source_id = request.resolver_match.kwargs.get("object_id")
-            kwargs["queryset"] = models.M_type.objects.filter(
-                sensor__platform_id__platformsource__data_source_id=data_source_id,
-            ).distinct().order_by("description", "row_id")
-
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-
-class PlatformSensorDisplayInline(TimestampedTabularInline):
-    model = models.PlatformSensorDisplay
-    fk_name = "platform_id"
-    fields = ('row_id', 'sensor_id', 'display', 'row_entry_date', 'row_update_date')
-    readonly_fields = ('row_id', 'row_entry_date', 'row_update_date')
-    extra = 0
-    show_change_link = True
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "sensor_id":
-            platform_id = request.resolver_match.kwargs.get("object_id")
-            kwargs["queryset"] = models.Sensor.objects.filter(
-                platform_id=platform_id,
-            ).order_by("short_name", "s_order")
-
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 class SourceObservationMapInline(TimestampedTabularInline):
     model = models.SourceObservationMap
@@ -865,6 +972,7 @@ class Platform_metadataAdmin(TimestampedModelAdmin):
 
 @admin.register(models.Platform)
 class PlatformAdmin(TimestampedGISModelAdmin):
+    form = PlatformDisplayAdminForm
     list_display = ('row_id', 'short_name', 'platform_handle', 'active', 'begin_date', 'end_date', 'row_entry_date')
     search_fields = ('short_name', 'long_name', 'url')
     list_filter = ('type_id', 'active')
@@ -872,7 +980,6 @@ class PlatformAdmin(TimestampedGISModelAdmin):
     date_hierarchy = "row_entry_date"
     inlines = [
         SensorInline,
-        PlatformSensorDisplayInline,
         PlatformSourceInline,
         Platform_statusInline,
         Sensor_statusInline,
@@ -880,46 +987,13 @@ class PlatformAdmin(TimestampedGISModelAdmin):
 
 @admin.register(models.DataSource)
 class DataSourceAdmin(TimestampedModelAdmin):
+    form = DataSourceDisplayAdminForm
     list_display = ('row_id', 'key', 'name', 'plugin_id', 'plugin_version', 'active', 'row_update_date')
     search_fields = ('key', 'name', 'description', 'plugin_id')
     list_filter = ('active', 'plugin_id')
     readonly_fields = ('row_entry_date', 'row_update_date')
     date_hierarchy = "row_entry_date"
-    inlines = [DataSourcePlatformSourceInline, DataSourceSensorInline]
-
-
-@admin.register(models.DataSourceSensor)
-class DataSourceSensorAdmin(TimestampedModelAdmin):
-    list_select_related = ('data_source_id', 'm_type_id')
-    list_display = ('row_id', 'data_source_id', 'm_type_id', 'row_update_date')
-    search_fields = (
-        'data_source_id__key',
-        'data_source_id__name',
-        'm_type_id__description',
-        'm_type_id__m_scalar_type_id__obs_type_id__standard_name',
-        'm_type_id__m_scalar_type_id__uom_type_id__standard_name',
-    )
-    list_filter = ('data_source_id',)
-    readonly_fields = ('row_entry_date', 'row_update_date')
-
-
-@admin.register(models.PlatformSensorDisplay)
-class PlatformSensorDisplayAdmin(TimestampedModelAdmin):
-    list_select_related = ('platform_id', 'sensor_id')
-    list_display = (
-        'row_id',
-        'platform_id',
-        'sensor_id',
-        'display',
-        'row_update_date',
-    )
-    search_fields = (
-        'platform_id__short_name',
-        'platform_id__platform_handle',
-        'sensor_id__short_name',
-    )
-    list_filter = ('display', 'platform_id')
-    readonly_fields = ('row_entry_date', 'row_update_date')
+    inlines = [DataSourcePlatformSourceInline]
 
 @admin.register(models.PlatformSource)
 class PlatformSourceAdmin(TimestampedModelAdmin):
