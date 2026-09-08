@@ -1,4 +1,5 @@
 from django.contrib.gis.db import models as gis_models  # remove if not using GeoDjango
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -275,7 +276,7 @@ class M_type(models.Model):
         managed = True
 
     def __str__(self):
-        return f"m_type {getattr(self, 'row_id', self.pk)}"
+        return self.description or f"m_type {getattr(self, 'row_id', self.pk)}"
 
 class Sensor(models.Model):
     row_id = models.AutoField(primary_key=True)
@@ -305,7 +306,139 @@ class Sensor(models.Model):
         ]
 
     def __str__(self):
-        return f"{getattr(self, 'short_name', self.pk)}-{getattr(self, 's_order', '1')}"
+        sensor_label = (
+            f"{getattr(self, 'short_name', self.pk)}-"
+            f"{getattr(self, 's_order', '1')}"
+        )
+        if not self.platform_id_id:
+            return sensor_label
+
+        platform_label = (
+            self.platform_id.short_name
+            or self.platform_id.platform_handle
+            or self.platform_id.pk
+        )
+        return f"{platform_label}: {sensor_label}"
+
+
+class DataSourceSensor(models.Model):
+    """The default display policy for a sensor type from a data source."""
+
+    row_id = models.AutoField(primary_key=True)
+    row_entry_date = models.DateTimeField(null=True, blank=True)
+    row_update_date = models.DateTimeField(null=True, blank=True)
+    data_source_id = models.ForeignKey(
+        'DataSource',
+        on_delete=models.CASCADE,
+        db_column='data_source_id',
+    )
+    m_type_id = models.ForeignKey(
+        'M_type',
+        on_delete=models.CASCADE,
+        db_column='m_type_id',
+    )
+
+    class Meta:
+        db_table = '"platforms"."data_source_sensor"'
+        managed = True
+        constraints = [
+            models.UniqueConstraint(
+                fields=['data_source_id', 'm_type_id'],
+                name='uq_data_source_sensor',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.data_source_id} / {self.m_type_id}"
+
+    def clean(self):
+        super().clean()
+        if not self.data_source_id_id or not self.m_type_id_id:
+            return
+
+        if not Sensor.objects.filter(
+            platform_id__platformsource__data_source_id=self.data_source_id_id,
+            m_type_id=self.m_type_id_id,
+        ).exists():
+            raise ValidationError(
+                {
+                    "m_type_id": (
+                        "The sensor type must be used by a platform served by "
+                        "the selected data source."
+                    )
+                }
+            )
+
+
+class PlatformSensorDisplay(models.Model):
+    """An individual platform sensor override of its data-source default."""
+
+    row_id = models.AutoField(primary_key=True)
+    row_entry_date = models.DateTimeField(null=True, blank=True)
+    row_update_date = models.DateTimeField(null=True, blank=True)
+    platform_id = models.ForeignKey(
+        'Platform',
+        on_delete=models.CASCADE,
+        db_column='platform_id',
+    )
+    sensor_id = models.ForeignKey(
+        'Sensor',
+        on_delete=models.CASCADE,
+        db_column='sensor_id',
+    )
+    display = models.BooleanField(
+        help_text="Overrides the DataSource default for this sensor.",
+    )
+
+    class Meta:
+        db_table = '"platforms"."platform_sensor_display"'
+        managed = True
+        constraints = [
+            models.UniqueConstraint(
+                fields=['platform_id', 'sensor_id'],
+                name='uq_platform_sensor_display',
+            ),
+        ]
+
+    def __str__(self):
+        state = "show" if self.display else "hide"
+        return f"{self.platform_id} / {self.sensor_id}: {state}"
+
+    def clean(self):
+        super().clean()
+        if not self.platform_id_id or not self.sensor_id_id:
+            return
+
+        if self.sensor_id.platform_id_id != self.platform_id_id:
+            raise ValidationError(
+                {"sensor_id": "The sensor must belong to the selected platform."}
+            )
+
+
+def served_sensor_queryset():
+    """Apply DataSource defaults and per-Platform overrides to sensors."""
+    data_source_default = DataSourceSensor.objects.filter(
+        data_source_id=models.OuterRef(
+            "platform_id__platformsource__data_source_id"
+        ),
+        m_type_id=models.OuterRef("m_type_id"),
+    )
+    platform_override = PlatformSensorDisplay.objects.filter(
+        platform_id=models.OuterRef("platform_id"),
+        sensor_id=models.OuterRef("pk"),
+    )
+
+    return Sensor.objects.annotate(
+        data_source_display=models.Exists(data_source_default),
+        platform_override=models.Exists(platform_override),
+        platform_show_override=models.Exists(
+            platform_override.filter(display=True)
+        ),
+    ).filter(
+        models.Q(platform_show_override=True)
+        | models.Q(platform_override=False, data_source_display=True)
+    )
+
 
 class Multi_obs(models.Model):
     row_id = models.AutoField(primary_key=True)

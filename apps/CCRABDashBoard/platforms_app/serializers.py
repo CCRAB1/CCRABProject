@@ -2,7 +2,8 @@ from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from .models import (Platform, Sample, Sensor, M_type, M_scalar_type, Obs_type, Uom_type, Platform_type,
                      Platform_images,
-                     SourceObservationMap, PlatformSource, Multi_obs)
+                     SourceObservationMap, PlatformSource, Multi_obs,
+                     served_sensor_queryset)
 
 
 
@@ -293,7 +294,7 @@ class ObservationsRequestSerializer(serializers.Serializer):
             )
 
         available_observations = set(
-            Sensor.objects.filter(
+            served_sensor_queryset().filter(
                 platform_id__platform_handle=platform_handle,
                 m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observations,
             ).values_list(
