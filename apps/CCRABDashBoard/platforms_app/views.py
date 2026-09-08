@@ -10,7 +10,13 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from json_timeseries import TsRecord, TimeSeries, JtsDocument
 import logging
 from geojson import Feature, Point, dumps as geojson_dumps
-from .models import Platform, Sensor, SourceObservationMap, PlatformSource
+from .models import (
+    Platform,
+    Sensor,
+    SourceObservationMap,
+    PlatformSource,
+    served_sensor_queryset,
+)
 from .serializers import PlatformSerializer, PlatformSourceConfigurationSerializer, ObservationsRequestSerializer
 from .models import Multi_obs
 
@@ -68,7 +74,7 @@ class PlatformViewSet(APIView):
 
 def _platform_sensor_queryset():
     sensor_qs = (
-        Sensor.objects.select_related(
+        served_sensor_queryset().select_related(
             "m_type_id__m_scalar_type_id__obs_type_id",
             "m_type_id__m_scalar_type_id__uom_type_id",
         )
@@ -82,6 +88,13 @@ def _platform_sensor_queryset():
         .order_by("obs_standard_name")
     )
     return sensor_qs
+
+
+def _served_sensor_ids_for_platform(platform_handle):
+    """Return sensor IDs after applying source defaults and platform overrides."""
+    return _platform_sensor_queryset().filter(
+        platform_id__platform_handle=platform_handle,
+    ).values("row_id")
 
 
 def _platform_queryset():
@@ -295,6 +308,7 @@ def platform_data_request(request):
             m_date__gte=start_date,
             m_date__lte=end_date,
             platform_handle=platform_handle,
+            sensor_id__in=_served_sensor_ids_for_platform(platform_handle),
             sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observations,
         )
         .annotate(

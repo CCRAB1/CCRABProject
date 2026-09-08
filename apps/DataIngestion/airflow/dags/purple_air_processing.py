@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -903,7 +903,6 @@ def purple_air_processing():
                         # These are the columns ids we want to retrieve from the database.
                         query_obs = [obs for obs in platform.observations
                                            if obs['target_obs'] == column_for_aqi_calc]
-                        column_name_mapping = dict([(obs['sensor_id'], f"{obs['target_obs']}_{obs['s_order']}") for obs in query_obs])
                         required_type_ids = [obs['m_type_id'] for obs in query_obs]
                         required_sensor_ids = [obs['sensor_id'] for obs in query_obs]
                         try:
@@ -954,7 +953,8 @@ def purple_air_processing():
                                 logger.error(f"Error writing to file: {initial_output_file}")
                                 logger.exception(e)
 
-                            #Now let's do the calculations.
+                            #Now let's do the calculations. We do a rolling 24 hour mean calculation on the
+                            #15 minute EPA corrected data.
                             rolling_mean = (
                                 df["m_value"]
                                 .rolling(

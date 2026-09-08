@@ -39,7 +39,7 @@ SENSOR_MAP_INPUT_TYPE_CHOICES = (
 
 PLATFORMS_ADMIN_MODEL_GROUPS = [
     ("Core", ["Organization", "Platform", "Sensor", "Obs_type", "Uom_type"]),
-    ("Data Sources", ["DataSource", "PlatformSource", "SourceObservationMap"]),
+    ("Data Sources", ["DataSource", "DataSourceSensor", "PlatformSensorDisplay", "PlatformSource", "SourceObservationMap"]),
     ("Status", ["Platform_status", "Sensor_status"]),
     ("Samples", ["Sample", "Sample_answer", "Sample_attachment"]),
     ("Lookups", ["Platform_type", "Platform_metadata", "Platform_images"]),
@@ -673,6 +673,42 @@ class DataSourcePlatformSourceInline(TimestampedTabularInline):
     extra = 0
     show_change_link = True
 
+
+class DataSourceSensorInline(TimestampedTabularInline):
+    model = models.DataSourceSensor
+    fk_name = "data_source_id"
+    fields = ('row_id', 'm_type_id', 'row_entry_date', 'row_update_date')
+    readonly_fields = ('row_id', 'row_entry_date', 'row_update_date')
+    extra = 0
+    show_change_link = True
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "m_type_id":
+            data_source_id = request.resolver_match.kwargs.get("object_id")
+            kwargs["queryset"] = models.M_type.objects.filter(
+                sensor__platform_id__platformsource__data_source_id=data_source_id,
+            ).distinct().order_by("description", "row_id")
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class PlatformSensorDisplayInline(TimestampedTabularInline):
+    model = models.PlatformSensorDisplay
+    fk_name = "platform_id"
+    fields = ('row_id', 'sensor_id', 'display', 'row_entry_date', 'row_update_date')
+    readonly_fields = ('row_id', 'row_entry_date', 'row_update_date')
+    extra = 0
+    show_change_link = True
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "sensor_id":
+            platform_id = request.resolver_match.kwargs.get("object_id")
+            kwargs["queryset"] = models.Sensor.objects.filter(
+                platform_id=platform_id,
+            ).order_by("short_name", "s_order")
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 class SourceObservationMapInline(TimestampedTabularInline):
     model = models.SourceObservationMap
     fk_name = "platform_source_id"
@@ -834,7 +870,13 @@ class PlatformAdmin(TimestampedGISModelAdmin):
     list_filter = ('type_id', 'active')
     readonly_fields = ('row_entry_date', 'row_update_date')
     date_hierarchy = "row_entry_date"
-    inlines = [SensorInline, PlatformSourceInline, Platform_statusInline, Sensor_statusInline]
+    inlines = [
+        SensorInline,
+        PlatformSensorDisplayInline,
+        PlatformSourceInline,
+        Platform_statusInline,
+        Sensor_statusInline,
+    ]
 
 @admin.register(models.DataSource)
 class DataSourceAdmin(TimestampedModelAdmin):
@@ -843,7 +885,41 @@ class DataSourceAdmin(TimestampedModelAdmin):
     list_filter = ('active', 'plugin_id')
     readonly_fields = ('row_entry_date', 'row_update_date')
     date_hierarchy = "row_entry_date"
-    inlines = [DataSourcePlatformSourceInline]
+    inlines = [DataSourcePlatformSourceInline, DataSourceSensorInline]
+
+
+@admin.register(models.DataSourceSensor)
+class DataSourceSensorAdmin(TimestampedModelAdmin):
+    list_select_related = ('data_source_id', 'm_type_id')
+    list_display = ('row_id', 'data_source_id', 'm_type_id', 'row_update_date')
+    search_fields = (
+        'data_source_id__key',
+        'data_source_id__name',
+        'm_type_id__description',
+        'm_type_id__m_scalar_type_id__obs_type_id__standard_name',
+        'm_type_id__m_scalar_type_id__uom_type_id__standard_name',
+    )
+    list_filter = ('data_source_id',)
+    readonly_fields = ('row_entry_date', 'row_update_date')
+
+
+@admin.register(models.PlatformSensorDisplay)
+class PlatformSensorDisplayAdmin(TimestampedModelAdmin):
+    list_select_related = ('platform_id', 'sensor_id')
+    list_display = (
+        'row_id',
+        'platform_id',
+        'sensor_id',
+        'display',
+        'row_update_date',
+    )
+    search_fields = (
+        'platform_id__short_name',
+        'platform_id__platform_handle',
+        'sensor_id__short_name',
+    )
+    list_filter = ('display', 'platform_id')
+    readonly_fields = ('row_entry_date', 'row_update_date')
 
 @admin.register(models.PlatformSource)
 class PlatformSourceAdmin(TimestampedModelAdmin):
