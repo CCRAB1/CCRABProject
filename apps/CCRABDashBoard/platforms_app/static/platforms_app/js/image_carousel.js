@@ -455,7 +455,7 @@ function registerAlpineComponents() {
       getClassForObs(obsName, obsValue)
       {
         if(obsValue !== undefined) {
-          if (obsName === "pm2.5_EPAc") {
+          if (obsName === "pm2.5_aqi") {
             var epaRange = getEPABreakpoint(obsValue);
             return "background-color: " + epaRange.color + ";";
           }
