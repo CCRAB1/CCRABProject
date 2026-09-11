@@ -149,6 +149,9 @@ export class PlatformInfo {
       shortName: source.short_name || "",
       order: order,
       active: source.active,
+      display: source.display === undefined || source.display === null
+        ? true
+        : PlatformInfo.parseBoolean(source.display),
       channelLabel: order === 1 ? "A" : "B",
       obsStandardName: source.obs_standard_name || "",
       obsDefinition: source.obs_definition || "",

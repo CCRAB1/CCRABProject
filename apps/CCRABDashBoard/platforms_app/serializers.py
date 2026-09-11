@@ -54,7 +54,6 @@ class SensorAnnotatedSerializer(serializers.ModelSerializer):
             'uom_definition'
         )
 
-
 class PlatformTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Platform_type
@@ -84,6 +83,19 @@ class PlatformSerializer(GeoFeatureModelSerializer):
             return None
         return {"type": "Point", "coordinates": [obj.fixed_longitude, obj.fixed_latitude]}
     '''
+
+
+class SensorDisplaySerializer(SensorAnnotatedSerializer):
+    display = serializers.BooleanField(read_only=True)
+
+    class Meta(SensorAnnotatedSerializer.Meta):
+        fields = SensorAnnotatedSerializer.Meta.fields + ("display",)
+
+
+class PlatformConfigurationSerializer(PlatformSerializer):
+    sensors = SensorDisplaySerializer(many=True, read_only=True)
+
+
 class SampleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sample

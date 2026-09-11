@@ -70,6 +70,7 @@ The package exports:
 - `getProjectProducts(code)`
 - `listPlatforms(options)`
 - `getPlatform(shortName, options)`
+- `getPlatformPageConfiguration(shortName, params)`
 - `legacyPlatformInfo(options)`
 - `platformConfiguration(options)`
 - `getPlatformConfiguration(options)`

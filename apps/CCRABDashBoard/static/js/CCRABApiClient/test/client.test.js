@@ -86,6 +86,27 @@ test("getPlatform encodes path parts and formats bbox arrays", async () => {
   assert.equal(requestUrl.searchParams.get("bbox"), "-80.1,32.7,-79.9,33.1");
 });
 
+test("getPlatformPageConfiguration requests the public page payload", async () => {
+  const payload = {
+    type: "Feature",
+    properties: { short_name: "PA-01" },
+  };
+  const fetch = createFakeFetch([jsonResponse(payload)]);
+  const client = new CCRABRestClient({
+    baseUrl: "https://ccrab.example",
+    accessToken: "access-token",
+    fetchFn: fetch.fn,
+  });
+
+  const platform = await client.getPlatformPageConfiguration("PA-01");
+
+  assert.deepEqual(platform, payload);
+  const requestUrl = new URL(fetch.requests[0].url);
+  assert.equal(requestUrl.pathname, "/api/v1/platform_configuration/");
+  assert.equal(requestUrl.searchParams.get("short_name"), "PA-01");
+  assert.equal(fetch.requests[0].options.headers.Authorization, undefined);
+});
+
 test("getPlatformData formats dates and observation list", async () => {
   const fetch = createFakeFetch([jsonResponse([{ value: 3.4 }])]);
   const client = new CCRABRestClient({

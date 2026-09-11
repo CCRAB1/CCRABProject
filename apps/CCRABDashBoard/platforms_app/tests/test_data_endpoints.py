@@ -53,3 +53,35 @@ class PlatformDataEndpointTests(SimpleTestCase):
             response.json(),
             {"type": "Feature", "properties": {"short_name": "PA-01"}},
         )
+
+    @patch("platforms_app.views._platform_detail_payload")
+    def test_platform_configuration_api_matches_page_payload(self, payload_mock):
+        payload = {
+            "type": "Feature",
+            "properties": {
+                "short_name": "PA-01",
+                "long_name": "PurpleAir 01",
+                "sensors": [],
+                "images": [],
+            },
+        }
+        payload_mock.return_value = (object(), payload)
+
+        response = self.client.get(
+            reverse("platform-configuration-api"),
+            {"short_name": "PA-01"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), payload)
+        payload_mock.assert_called_once()
+        self.assertEqual(payload_mock.call_args.kwargs["short_name"], "PA-01")
+
+    def test_platform_configuration_api_requires_short_name(self):
+        response = self.client.get(reverse("platform-configuration-api"))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {"short_name": ["This query parameter is required."]},
+        )

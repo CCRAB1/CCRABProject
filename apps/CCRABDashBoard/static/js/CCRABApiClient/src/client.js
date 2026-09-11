@@ -199,6 +199,16 @@ export class CCRABRestClient {
     return this.get("v1/platform_info/", { params: queryParams });
   }
 
+  async getPlatformPageConfiguration(shortName, params = {}) {
+    const queryParams = this.#params(params, {
+      short_name: shortName,
+    });
+    return this.get("v1/platform_configuration/", {
+      auth: false,
+      params: queryParams,
+    });
+  }
+
   async platformConfiguration({
     dataSource = "purple_air",
     ...params

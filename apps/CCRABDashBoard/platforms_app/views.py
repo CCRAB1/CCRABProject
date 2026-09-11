@@ -1,4 +1,5 @@
-from django.db.models import F, Prefetch, Q
+from django.db.models import BooleanField, F, OuterRef, Prefetch, Q, Subquery, Value
+from django.db.models.functions import Coalesce
 from django.http import Http404, JsonResponse, request
 from django.shortcuts import render
 from rest_framework import status
@@ -12,12 +13,18 @@ import logging
 from geojson import Feature, Point, dumps as geojson_dumps
 from .models import (
     Platform,
+    PlatformSensorDisplay,
     Sensor,
     SourceObservationMap,
     PlatformSource,
     served_sensor_queryset,
 )
-from .serializers import PlatformSerializer, PlatformSourceConfigurationSerializer, ObservationsRequestSerializer
+from .serializers import (
+    ObservationsRequestSerializer,
+    PlatformConfigurationSerializer,
+    PlatformSerializer,
+    PlatformSourceConfigurationSerializer,
+)
 from .models import Multi_obs
 
 logger = logging.getLogger(__name__)
@@ -72,9 +79,14 @@ class PlatformViewSet(APIView):
         return Response(payload)
 
 
-def _platform_sensor_queryset():
+def _platform_sensor_queryset(include_display_overrides=False):
+    if include_display_overrides:
+        sensor_qs = Sensor.objects.all()
+    else:
+        sensor_qs = served_sensor_queryset()
+
     sensor_qs = (
-        served_sensor_queryset().select_related(
+        sensor_qs.select_related(
             "m_type_id__m_scalar_type_id__obs_type_id",
             "m_type_id__m_scalar_type_id__uom_type_id",
         )
@@ -87,6 +99,20 @@ def _platform_sensor_queryset():
         )
         .order_by("obs_standard_name")
     )
+
+    if include_display_overrides:
+        display_override = PlatformSensorDisplay.objects.filter(
+            platform_id=OuterRef("platform_id"),
+            sensor_id=OuterRef("pk"),
+        ).values("display")[:1]
+        sensor_qs = sensor_qs.annotate(
+            display=Coalesce(
+                Subquery(display_override, output_field=BooleanField()),
+                Value(True),
+                output_field=BooleanField(),
+            )
+        )
+
     return sensor_qs
 
 
@@ -97,9 +123,11 @@ def _served_sensor_ids_for_platform(platform_handle):
     ).values("row_id")
 
 
-def _platform_queryset():
+def _platform_queryset(include_sensor_display=False):
     qs = Platform.objects.all()
-    sensor_qs = _platform_sensor_queryset()
+    sensor_qs = _platform_sensor_queryset(
+        include_display_overrides=include_sensor_display,
+    )
     qs = qs.prefetch_related(
         Prefetch("sensor_set", queryset=sensor_qs, to_attr="sensors"),
         "platform_images_set",
@@ -129,8 +157,14 @@ def _platform_collection_payload(query_params, request):
     return serialized
 
 
-def _platform_detail_payload(query_params, request, short_name=None):
-    qs = _platform_queryset()
+def _platform_detail_payload(
+    query_params,
+    request,
+    short_name=None,
+    include_sensor_display=False,
+    serializer_class=PlatformSerializer,
+):
+    qs = _platform_queryset(include_sensor_display=include_sensor_display)
 
     if short_name:
         qs = qs.filter(Q(short_name__icontains=short_name))
@@ -150,7 +184,7 @@ def _platform_detail_payload(query_params, request, short_name=None):
         raise Http404("Platform not found")
 
     platform = platform_rows[0]
-    serialized = dict(PlatformSerializer(platform, context={"request": request}).data)
+    serialized = dict(serializer_class(platform, context={"request": request}).data)
     return platform, serialized
 
 
@@ -163,6 +197,27 @@ def platform_collection_api(request):
 @api_view(["GET"])
 def platform_detail_api(request, short_name):
     _, payload = _platform_detail_payload(request.query_params, request, short_name=short_name)
+    return Response(payload)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def platform_configuration_api(request):
+    """Return the same platform payload used to render the detail page."""
+    short_name = request.query_params.get("short_name")
+    if not short_name:
+        return Response(
+            {"short_name": ["This query parameter is required."]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    _, payload = _platform_detail_payload(
+        request.query_params,
+        request,
+        short_name=short_name,
+        include_sensor_display=True,
+        serializer_class=PlatformConfigurationSerializer,
+    )
     return Response(payload)
 
 

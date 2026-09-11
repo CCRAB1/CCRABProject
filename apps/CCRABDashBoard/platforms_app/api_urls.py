@@ -11,6 +11,8 @@ urlpatterns = [
 
     path("v1/platform_info/", views.PlatformViewSet.as_view(), name="platforminfo"),
 
+    path("v1/platform_configuration/", views.platform_configuration_api, name="platform-configuration-api"),
+
     path("v1/system/platform_configuration/", views.platform_source_configuration, name="platform_configuration"),
 
     path("v1/platform_data_request/", views.platform_data_request, name="platform_data_request")
