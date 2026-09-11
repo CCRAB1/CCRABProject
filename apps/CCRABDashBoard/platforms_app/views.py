@@ -213,6 +213,89 @@ def platform_source_configuration(request):
     data_source_key = request.query_params.get("data_source", "purple_air")
     #Get the sensors we want a client to have access to display.
 
+    observation_qs = (
+        SourceObservationMap.objects
+        .select_related(
+            "sensor_id",
+            "sensor_id__m_type_id",
+            "sensor_id__m_type_id__m_scalar_type_id",
+            "sensor_id__m_type_id__m_scalar_type_id__obs_type_id",
+            "sensor_id__m_type_id__m_scalar_type_id__uom_type_id",
+        )
+        #.filter(active=1)
+        .order_by("sensor_id__s_order", "source_obs")
+    )
+
+    sensor_qs = (
+        Sensor.objects
+        .select_related(
+            "m_type_id",
+            "m_type_id__m_scalar_type_id",
+            "m_type_id__m_scalar_type_id__obs_type_id",
+            "m_type_id__m_scalar_type_id__uom_type_id",
+        )
+        .order_by("s_order")
+    )
+
+    platform_sources = (
+        PlatformSource.objects
+        .select_related("data_source_id", "platform_id", "platform_id__organization_id")
+        .prefetch_related(
+            Prefetch(
+                "sourceobservationmap_set",
+                queryset=observation_qs,
+                to_attr="observation_maps",
+            ),
+            Prefetch(
+                "platform_id__sensor_set",
+                queryset=sensor_qs,
+                to_attr="sensors",
+            ),
+        )
+        .filter(
+            data_source_id__key=data_source_key,
+            data_source_id__active=1,
+            platform_id__active=1,
+        )
+        .order_by(
+            "platform_id__organization_id__row_id",
+            "platform_id__platform_handle",
+        )
+    )
+    platform_sources = list(platform_sources)
+    serialized_platforms = PlatformSourceConfigurationSerializer(
+        platform_sources,
+        many=True,
+    ).data
+
+    config = {"organizations": []}
+    org_ndx = {}
+    for platform_source, platform_payload in zip(platform_sources, serialized_platforms):
+        organization = platform_source.platform_id.organization_id
+        org_id = organization.row_id
+        #org_exists = [org_ndx for org_nfo in config["organizations"] if org_nfo["org_id"] == org_id]
+        if len(org_ndx) == 0 or org_id not in org_ndx:
+        #if org_id not in config["organizations"]:
+            config["organizations"].append({
+                "org_id": org_id,
+                "short_name": organization.short_name,
+                "long_name": organization.long_name,
+                "platforms": [],
+            })
+            org_ndx[org_id] = len(config["organizations"]) - 1
+        ndx = org_ndx[org_id]
+        config["organizations"][ndx]["platforms"].append(platform_payload)
+
+    return Response(config)
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def platform_configuration(request):
+
+    request_log(request, "platform_configuration", "DEBUG", "")
+    data_source_key = request.query_params.get("data_source", "purple_air")
+    #Get the sensors we want a client to have access to display.
+
     served_sensors = served_sensor_queryset()
     served_sensor_ids = served_sensors.values("row_id")
 
