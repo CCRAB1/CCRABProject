@@ -104,8 +104,10 @@ export class PlatformInfo {
   }
 
   static parseBoolean(value) {
-    if (typeof value === "boolean") return value;
-    if (typeof value === "number") return value !== 0;
+    if (typeof value === "boolean")
+      return value;
+    if (typeof value === "number")
+      return value !== 0;
     if (typeof value === "string") {
       return value.toLowerCase() === "true" || value === "1";
     }
@@ -114,7 +116,9 @@ export class PlatformInfo {
   }
 
   static parseDate(value) {
-    if (!value) return null;
+    if (!value) {
+      return null;
+    }
 
     var parsed = DateTime.fromISO(value);
     return parsed.isValid ? parsed : null;
@@ -194,6 +198,17 @@ export class PlatformInfo {
     return normalized;
   }
 
+  displayedSensors() {
+    var displayed = [];
+    for (var i = 0; i < this.sensors.length; i += 1) {
+      if (this.sensors[i].display)
+      {
+        displayed.push(this.sensors[i]);
+      }
+    }
+    return displayed;
+  }
+
   static findByShortName(collection, shortName) {
     if (!collection || typeof collection.findByShortName !== "function") {
       return undefined;
@@ -209,8 +224,9 @@ export class PlatformInfo {
   observationNames() {
     var observationList = [];
 
-    for (var i = 0; i < this.sensors.length; i += 1) {
-      var sensor = this.sensors[i];
+    var sensors = this.displayedSensors();
+    for (var i = 0; i < sensors.length; i += 1) {
+      var sensor = sensors[i];
       var observationName = sensor.obsStandardName || sensor.shortName;
       if (observationName && observationList.indexOf(observationName) === -1) {
         observationList.push(observationName);

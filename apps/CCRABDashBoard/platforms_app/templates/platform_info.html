@@ -1,181 +1,198 @@
 {% extends 'base_platform.html' %}
 {% load static %}
-{% load custom_filters %}
-{% load ui_components %}
 
-{% block title %}
-    {{ platform_info.properties.short_name }} | Platform
-{% endblock %}
+{% block title %}Platform{% endblock %}
 
 {% block platform_header %}
-    {{ platform_info|json_script:"platform-info-data" }}
     <nav class="breadcrumb is-small platform-breadcrumb" aria-label="breadcrumbs">
         <ul>
             <li><a href="{% url 'platform_catalog' %}">Platforms</a></li>
             <li class="is-active">
-                <a href="#" aria-current="page">{{ platform_info.properties.short_name }}</a>
+                <a href="#" aria-current="page" x-text="platformInfo?.shortName || requestedShortName"></a>
             </li>
         </ul>
     </nav>
 
-    <div class="platform-header-grid">
+    <div x-show="isLoadingPlatform && !platformInfo" aria-live="polite">
+        <progress class="progress is-small is-primary" max="100">Loading platform</progress>
+        <p class="has-text-grey">Loading platform information…</p>
+    </div>
+
+    <div
+        class="notification is-danger is-light"
+        x-show="platformLoadError"
+        x-cloak
+        role="alert"
+    >
+        <p x-text="platformLoadError"></p>
+        <button type="button" class="button is-danger is-light is-small mt-3" @click="retryPlatformLoad()">
+            Try again
+        </button>
+    </div>
+
+    <div class="platform-header-grid" x-show="platformInfo" x-cloak>
         <div class="platform-heading">
             <p class="platform-eyebrow">Platform</p>
-            <h1 class="platform-title page-montserrat">{{ platform_info.properties.long_name }}</h1>
+            <h1 class="platform-title page-montserrat" x-text="platformInfo?.longName"></h1>
             <p class="platform-subtitle">
-                {{ platform_info.properties.short_name }}
-                {% if platform_info.properties.neighborhood %}
-                    <span aria-hidden="true">/</span> {{ platform_info.properties.neighborhood }}
-                {% endif %}
+                <span x-text="platformInfo?.shortName"></span>
+                <template x-if="platformInfo?.neighborhood">
+                    <span><span aria-hidden="true">/</span> <span x-text="platformInfo.neighborhood"></span></span>
+                </template>
             </p>
         </div>
 
         <div class="platform-status-tags" aria-label="Platform summary">
-            {% if platform_info.properties.active %}
-                <span class="tag is-success is-light">Active</span>
-            {% else %}
-                <span class="tag is-light">Inactive</span>
-            {% endif %}
-            {% if platform_info.properties.type_id.type_name %}
-                <span class="tag is-info is-light">{{ platform_info.properties.type_id.type_name }}</span>
-            {% endif %}
+            <span
+                class="tag"
+                :class="platformInfo?.active ? 'is-success is-light' : 'is-light'"
+                x-text="platformInfo?.active ? 'Active' : 'Inactive'"
+            ></span>
+            <span
+                class="tag is-info is-light"
+                x-show="platformInfo?.typeName"
+                x-text="platformInfo?.typeName"
+            ></span>
         </div>
     </div>
 {% endblock %}
 
 {% block platform_media %}
-    {% image_carousel platform_info.properties.images autoplay=True interval=4000 aspect_ratio="16by9" items_mobile=1 items_tablet=1 items_desktop=1 aria_label="Platform images" %}
-
-    <section class="platform-panel platform-map-panel" aria-labelledby="platform-map-title">
-        <div class="platform-panel-heading">
-            <h2 id="platform-map-title" class="platform-section-title">Location</h2>
-        </div>
+    <div x-show="platformInfo" x-cloak>
         <div
-            id="map"
-            class="platform_map"
-            aria-label="Platform location map"
-            data-lat="{{ platform_info.properties.fixed_latitude|default:'0' }}"
-            data-lon="{{ platform_info.properties.fixed_longitude|default:'0' }}"
-            data-has-coordinates="{% if platform_info.properties.fixed_latitude and platform_info.properties.fixed_longitude %}true{% else %}false{% endif %}"
-            x-init="$nextTick(function () { if (window.initPlatformMap) window.initPlatformMap($el); })"
-        ></div>
-    </section>
+            class="bc-carousel platform-panel"
+            x-data="platformCarousel({ autoplay: true, interval: 4000, loop: true, pauseOnHover: true })"
+            x-effect="platformInfo?.images; $nextTick(function () { refresh(); })"
+            @mouseenter="pause()"
+            @mouseleave="resume()"
+            @focusin="pause()"
+            @focusout="resume()"
+            aria-label="Platform images"
+            style="--bc-carousel-items-mobile: 1; --bc-carousel-items-tablet: 1; --bc-carousel-items-desktop: 1; --bc-carousel-gap: 0.75rem;"
+        >
+            <div class="bc-carousel__nav" x-show="slideCount > 0" aria-hidden="false">
+                <button
+                    type="button"
+                    class="button is-light is-small"
+                    @click="previous()"
+                    :disabled="!loop && activeIndex === 0"
+                    aria-label="Previous"
+                >
+                    <span aria-hidden="true">‹</span>
+                </button>
+                <button
+                    type="button"
+                    class="button is-light is-small"
+                    @click="next()"
+                    :disabled="!loop && activeIndex >= slideCount - 1"
+                    aria-label="Next"
+                >
+                    <span aria-hidden="true">›</span>
+                </button>
+            </div>
+
+            <div
+                class="bc-carousel__viewport"
+                x-ref="viewport"
+                x-show="platformInfo?.images.length > 0"
+                tabindex="0"
+                role="group"
+                aria-roledescription="carousel"
+                @keydown.arrow-left.prevent="previous()"
+                @keydown.arrow-right.prevent="next()"
+                @pointerdown="restartAutoplay()"
+                @touchstart="restartAutoplay()"
+                @wheel="restartAutoplay()"
+                @scroll="scheduleScrollUpdate()"
+                @resize.window="scheduleScrollUpdate(); restartAutoplay(250)"
+                @visibilitychange.document="document.hidden ? stopAutoplay() : startAutoplay()"
+            >
+                <template x-for="(image, index) in platformInfo?.images || []" :key="image.rowId || image.filepath">
+                    <div class="bc-carousel__slide" data-carousel-slide :data-index="index">
+                        <figure class="image is-16by9">
+                            <img
+                                :src="image.filepath"
+                                :alt="image.description || image.name || ''"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        </figure>
+                    </div>
+                </template>
+            </div>
+
+            <div
+                class="bc-carousel__dots buttons is-centered mt-3"
+                x-show="slideCount > 0"
+                data-carousel-dots
+                aria-label="Slide navigation"
+            >
+                <template x-for="index in slideCount" :key="index">
+                    <button
+                        type="button"
+                        class="button is-small bc-carousel__dot"
+                        @click="goTo(index - 1)"
+                        :class="{ 'is-primary': activeIndex === index - 1, 'is-light': activeIndex !== index - 1 }"
+                        :aria-current="activeIndex === index - 1 ? 'true' : 'false'"
+                        :aria-label="'Go to slide ' + index"
+                    ></button>
+                </template>
+            </div>
+
+            <div class="platform-empty-media has-text-centered p-5" x-show="platformInfo?.images.length === 0">
+                <p class="has-text-grey">No platform images available.</p>
+            </div>
+        </div>
+
+        <section class="platform-panel platform-map-panel" aria-labelledby="platform-map-title">
+            <div class="platform-panel-heading">
+                <h2 id="platform-map-title" class="platform-section-title">Location</h2>
+            </div>
+            <div
+                id="map"
+                class="platform_map"
+                aria-label="Platform location map"
+                x-effect="if (platformInfo) $nextTick(function () { window.initPlatformMap?.($el, platformInfo.fixedLatitude, platformInfo.fixedLongitude); })"
+            ></div>
+        </section>
+    </div>
 {% endblock %}
 
 {% block platform_details %}
-    <div class="platform-detail-surface">
+    <div class="platform-detail-surface" x-show="platformInfo" x-cloak>
         <div class="platform-tabs buttons has-addons" role="tablist" aria-label="Platform detail sections">
-            <button
-                type="button"
-                class="button platform-tab-button"
-                :class="activePanel === 'current_data' ? 'is-primary' : 'is-light'"
-                @click="setPanel('current_data')"
-                role="tab"
-                :aria-selected="activePanel === 'current_data' ? 'true' : 'false'"
-            >
-                Current Data
-            </button>
-            <button
-                type="button"
-                class="button platform-tab-button"
-                :class="activePanel === 'observations' ? 'is-primary' : 'is-light'"
-                @click="setPanel('observations')"
-                role="tab"
-                :aria-selected="activePanel === 'observations' ? 'true' : 'false'"
-            >
-                Observations Collected
-            </button>
-            <button
-                type="button"
-                class="button platform-tab-button"
-                :class="activePanel === 'overview' ? 'is-primary' : 'is-light'"
-                @click="setPanel('overview')"
-                role="tab"
-                :aria-selected="activePanel === 'overview' ? 'true' : 'false'"
-            >
-                Overview
-            </button>
-            <button
-                type="button"
-                class="button platform-tab-button"
-                :class="activePanel === 'location' ? 'is-primary' : 'is-light'"
-                @click="setPanel('location')"
-                role="tab"
-                :aria-selected="activePanel === 'location' ? 'true' : 'false'"
-            >
-                Location
-            </button>
+            <button type="button" class="button platform-tab-button" :class="activePanel === 'current_data' ? 'is-primary' : 'is-light'" @click="setPanel('current_data')" role="tab" :aria-selected="activePanel === 'current_data' ? 'true' : 'false'">Current Data</button>
+            <button type="button" class="button platform-tab-button" :class="activePanel === 'observations' ? 'is-primary' : 'is-light'" @click="setPanel('observations')" role="tab" :aria-selected="activePanel === 'observations' ? 'true' : 'false'">Observations Collected</button>
+            <button type="button" class="button platform-tab-button" :class="activePanel === 'overview' ? 'is-primary' : 'is-light'" @click="setPanel('overview')" role="tab" :aria-selected="activePanel === 'overview' ? 'true' : 'false'">Overview</button>
+            <button type="button" class="button platform-tab-button" :class="activePanel === 'location' ? 'is-primary' : 'is-light'" @click="setPanel('location')" role="tab" :aria-selected="activePanel === 'location' ? 'true' : 'false'">Location</button>
         </div>
 
-        <section
-            x-show="activePanel === 'overview'"
-            x-transition.opacity
-            role="tabpanel"
-            aria-label="Platform overview"
-        >
+        <section x-show="activePanel === 'overview'" x-transition.opacity role="tabpanel" aria-label="Platform overview">
             <div class="content platform-description">
                 <h2 class="platform-section-title">Description</h2>
-                {% if platform_info.properties.description %}
-                    <p>{{ platform_info.properties.description }}</p>
-                {% else %}
-                    <p class="has-text-grey">No description is available for this platform.</p>
-                {% endif %}
+                <p x-show="platformInfo?.description" x-text="platformInfo?.description"></p>
+                <p class="has-text-grey" x-show="!platformInfo?.description">No description is available for this platform.</p>
             </div>
 
             <div class="platform-fact-grid" aria-label="Platform facts">
-                <div class="platform-fact">
-                    <span>Type</span>
-                    <strong>{{ platform_info.properties.type_id.type_name|default:"Not available" }}</strong>
-                </div>
-                <div class="platform-fact">
-                    <span>Active Dates</span>
-                    <strong>
-                        {% if platform_info.properties.begin_date is not None %}
-                            {{ platform_info.properties.begin_date|format_datetime:"%Y-%m-%d" }} to
-                            {% if platform_info.properties.end_date is not None %}
-                                {{ platform_info.properties.end_date|format_datetime:"%Y-%m-%d" }}
-                            {% else %}
-                                Currently active
-                            {% endif %}
-                        {% else %}
-                            Not available
-                        {% endif %}
-                    </strong>
-                </div>
-                <div class="platform-fact">
-                    <span>Neighborhood</span>
-                    <strong>{{ platform_info.properties.neighborhood|default:"Not available" }}</strong>
-                </div>
-                <div class="platform-fact">
-                    <span>Manufacturer</span>
-                    <strong>{{ platform_info.properties.manufacturer|default:"Not available" }}</strong>
-                </div>
-                <div class="platform-fact">
-                    <span>Serial Number</span>
-                    <strong>{{ platform_info.properties.serial_number|default:"Not available" }}</strong>
-                </div>
-                <div class="platform-fact">
-                    <span>Firmware</span>
-                    <strong>{{ platform_info.properties.firmware_version|default:"Not available" }}</strong>
-                </div>
+                <div class="platform-fact"><span>Type</span><strong x-text="displayValue(platformInfo?.typeName)"></strong></div>
+                <div class="platform-fact"><span>Active Dates</span><strong x-text="formatPlatformDateRange()"></strong></div>
+                <div class="platform-fact"><span>Neighborhood</span><strong x-text="displayValue(platformInfo?.neighborhood)"></strong></div>
+                <div class="platform-fact"><span>Manufacturer</span><strong x-text="displayValue(platformInfo?.manufacturer)"></strong></div>
+                <div class="platform-fact"><span>Serial Number</span><strong x-text="displayValue(platformInfo?.serialNumber)"></strong></div>
+                <div class="platform-fact"><span>Firmware</span><strong x-text="displayValue(platformInfo?.firmwareVersion)"></strong></div>
             </div>
         </section>
-        <section
-            x-show="activePanel === 'current_data'"
-            x-transition.opacity
-            x-cloak
-            role="tabpanel"
-            aria-label="Obervations Collected"
-        >
+
+        <section x-show="activePanel === 'current_data'" x-transition.opacity role="tabpanel" aria-label="Current observations">
             <div class="platform-section-header">
-                <h2>
-                    From: <span x-text="startDateTime"></span>
-                </h2>
-                <h2>
-                    To: <span x-text="endDateTime"></span>
-                </h2>
-                <span class="tag is-light">{{ platform_info.properties.sensors|length }}</span>
+                <h2>From: <span x-text="startDateTime || 'Not available'"></span></h2>
+                <h2>To: <span x-text="endDateTime || 'Not available'"></span></h2>
+                <span class="tag is-light" x-text="displayedSensorCount"></span>
             </div>
+
+            <div class="notification is-warning is-light" x-show="observationLoadError" role="alert" x-text="observationLoadError"></div>
+            <p class="has-text-grey mb-3" x-show="isLoadingObservationData">Loading observation data…</p>
 
             <div class="platform-observation-list">
                 <div class="columns is-mobile">
@@ -189,169 +206,62 @@
                     <template x-if="getObservationDisplayState(obs_row.obsStandardName, obs_row.obsSOrder)">
                         <div class="columns is-mobile">
                             <div class="column is-one-quarter" @click="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
-                              <span x-text="obs_row.obsStandardName"></span>
-                              <span x-text="obs_row.obsSOrderLabel"></span>
+                                <span x-text="obs_row.obsStandardName"></span>
+                                <span x-text="obs_row.obsSOrderLabel"></span>
                             </div>
                             <div class="column" @click="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
-                              <span
-                                class="tag is-info is-light"
-                                x-show="obs_row.units"
-                                x-text="obs_row.units">
-                              </span>
+                                <span class="tag is-info is-light" x-show="obs_row.units" x-text="obs_row.units"></span>
                             </div>
-                            <div class="column"
-                                 :style="getClassForObs(obs_row.obsStandardName, obs_row.stats?.most_recent.value)"
-                                 x-text="formatObservationValue(obs_row.stats?.most_recent.value)"></div>
-                            <div class="column"
-                                :style="getClassForObs(obs_row.obsStandardName, obs_row.stats?.min.value)"
-                                 x-text="formatObservationValue(obs_row.stats?.min.value)"></div>
-                            <div class="column"
-                                :style="getClassForObs(obs_row.obsStandardName, obs_row.stats?.max.value)"
-                                 x-text="formatObservationValue(obs_row.stats?.max.value)"></div>
-                    </div>
+                            <div class="column" :style="getClassForObs(obs_row.obsStandardName, obs_row.stats?.most_recent.value)" x-text="formatObservationValue(obs_row.stats?.most_recent.value)"></div>
+                            <div class="column" :style="getClassForObs(obs_row.obsStandardName, obs_row.stats?.min.value)" x-text="formatObservationValue(obs_row.stats?.min.value)"></div>
+                            <div class="column" :style="getClassForObs(obs_row.obsStandardName, obs_row.stats?.max.value)" x-text="formatObservationValue(obs_row.stats?.max.value)"></div>
+                        </div>
                     </template>
                 </template>
-                <!--
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Observation</th>
-                            <th>Current</th>
-                            <th><abbr title="Min">Minimum</abbr></th>
-                            <th><abbr title="Max">Maximum</abbr></th>
-                        </tr>
-                    </thead>
-                    <template x-for="obs_row in observationTableRows" :key="obs_row.key">
-                        <template x-if="displayObservation(obs_row.obsStandardName, obs_row.obsSOrder)">
-                            <tr>
-                            <td @change="toggleObservation(obs_row.obsStandardName, obs_row.obsSOrder)">
-                              <strong x-text="obs_row.obsStandardName"></strong>
-                              <strong x-text="obs_row.obsSOrder"></strong>
-                              <span
-                                class="tag is-info is-light"
-                                x-show="obs_row.units"
-                                x-text="obs_row.units">
-                              </span>
-                            </td>
-                            <td x-text="formatObservationValue(obs_row.stats?.most_recent.value)"></td>
-                            <td x-text="formatObservationValue(obs_row.stats?.min.value)"></td>
-                            <td x-text="formatObservationValue(obs_row.stats?.max.value)"></td>
-                        </tr>
-                        </template>
-                        <tr x-show="isLoadingObservationData">
-                          <td colspan="4" class="has-text-grey">
-                            Loading observation data...
-                          </td>
-                        </tr>
-                    </template>
-                </table>
-                -->
             </div>
-            <div
-                class="platform-chart-panel"
-                x-data="chartComponent()"
-                @graph:add-dataset.window="addDataset($event.detail)"
-                @graph:remove-dataset.window="removeDataset($event.detail)"
-            >
-                <div class="platform-chart-header">
-                    <h2 class="platform-section-title">Observation Graph</h2>
-                </div>
-                <div class="platform-chart-canvas-wrap">
-                    <canvas x-ref="canvas" aria-label="Observation graph"></canvas>
-                </div>
+
+            <div class="platform-chart-panel" x-data="chartComponent()" @graph:add-dataset.window="addDataset($event.detail)" @graph:remove-dataset.window="removeDataset($event.detail)">
+                <div class="platform-chart-header"><h2 class="platform-section-title">Observation Graph</h2></div>
+                <div class="platform-chart-canvas-wrap"><canvas x-ref="canvas" aria-label="Observation graph"></canvas></div>
             </div>
         </section>
-        <section
-            x-show="activePanel === 'observations'"
-            x-transition.opacity
-            x-cloak
-            role="tabpanel"
-            aria-label="Platform observations"
-        >
+
+        <section x-show="activePanel === 'observations'" x-transition.opacity role="tabpanel" aria-label="Platform observations">
             <div class="platform-section-header">
                 <h2 class="platform-section-title">Observations Collected</h2>
-                <span class="tag is-light">{{ platform_info.properties.sensors|length }}</span>
+                <span class="tag is-light" x-text="displayedSensorCount"></span>
             </div>
 
             <div class="platform-observation-list">
                 <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Observation</th>
-                            <th>Units of Measurement</th>
-                            <th>Show in Current Observations</th>
-                        </tr>
-                    </thead>
-                    <template x-for="obs_row in platformInfoTableRows" :key="obs_row.key">
-                        <template x-if="obs_row.active == 1">
-                            <tr>
-                            <td>
-                              <strong x-text="obs_row.obsStandardName"></strong>
-                              <strong x-text="obs_row.sensorLabel"></strong>
-                            </td>
-                            <td>
-                                <strong x-text="obs_row.units"></strong>
-                            </td>
-                            <td>
-                                <input
-                                    type="checkbox"
-                                    :checked="initialObservationDisplayState(obs_row.obsStandardName, obs_row.sensorOrder)"
-                                    @change="observationCheckClicked($event.target.checked, obs_row.obsStandardName, obs_row.sensorOrder)"/>
-                            </td>
-                        </tr>
+                    <thead><tr><th>Observation</th><th>Units of Measurement</th><th>Show in Current Observations</th></tr></thead>
+                    <tbody>
+                        <template x-for="obs_row in platformInfoTableRows" :key="obs_row.key">
+                            <template x-if="obs_row.active == 1">
+                                <tr>
+                                    <td><strong x-text="obs_row.obsStandardName"></strong> <strong x-text="obs_row.sensorLabel"></strong></td>
+                                    <td><strong x-text="obs_row.units"></strong></td>
+                                    <td><input type="checkbox" :checked="initialObservationDisplayState(obs_row.obsStandardName, obs_row.sensorOrder)" @change="observationCheckClicked($event.target.checked, obs_row.obsStandardName, obs_row.sensorOrder)"></td>
+                                </tr>
+                            </template>
                         </template>
-                         <tr x-show="isLoadingObservationData">
-                          <td colspan="4" class="has-text-grey">
-                            Loading observation list...
-                          </td>
-                        </tr>
-                    </template>
+                    </tbody>
                 </table>
             </div>
 
-            {% if platform_info.properties.sensors|length > 8 %}
-                <button
-                    type="button"
-                    class="button is-small is-light mt-4"
-                    @click="showAllObservations = !showAllObservations"
-                    x-text="showAllObservations ? 'Show fewer' : 'Show all observations'"
-                >
-                    Show all observations
-                </button>
-            {% endif %}
+            <button type="button" class="button is-small is-light mt-4" x-show="displayedSensorCount > 8" @click="showAllObservations = !showAllObservations" x-text="showAllObservations ? 'Show fewer' : 'Show all observations'"></button>
         </section>
-        <section
-            x-show="activePanel === 'location'"
-            x-transition.opacity
-            x-cloak
-            role="tabpanel"
-            aria-label="Platform location"
-        >
-            <div class="platform-section-header">
-                <h2 class="platform-section-title">Location Details</h2>
-            </div>
 
+        <section x-show="activePanel === 'location'" x-transition.opacity role="tabpanel" aria-label="Platform location">
+            <div class="platform-section-header"><h2 class="platform-section-title">Location Details</h2></div>
             <div class="platform-fact-grid">
-                <div class="platform-fact">
-                    <span>Latitude</span>
-                    <strong>{{ platform_info.properties.fixed_latitude|default:"Not available" }}</strong>
-                </div>
-                <div class="platform-fact">
-                    <span>Longitude</span>
-                    <strong>{{ platform_info.properties.fixed_longitude|default:"Not available" }}</strong>
-                </div>
-                <div class="platform-fact">
-                    <span>City</span>
-                    <strong>{{ platform_info.properties.city|default:"Not available" }}</strong>
-                </div>
-                <div class="platform-fact">
-                    <span>Country</span>
-                    <strong>{{ platform_info.properties.country_name|default:"Not available" }}</strong>
-                </div>
+                <div class="platform-fact"><span>Latitude</span><strong x-text="displayValue(platformInfo?.fixedLatitude)"></strong></div>
+                <div class="platform-fact"><span>Longitude</span><strong x-text="displayValue(platformInfo?.fixedLongitude)"></strong></div>
+                <div class="platform-fact"><span>City</span><strong x-text="displayValue(platformInfo?.city)"></strong></div>
+                <div class="platform-fact"><span>Country</span><strong x-text="displayValue(platformInfo?.countryName)"></strong></div>
             </div>
         </section>
     </div>
-
 {% endblock %}
 
 {% block extra_scripts %}
@@ -359,39 +269,39 @@
     <script>
     (function () {
         var platformMap = null;
+        var platformMarker = null;
 
-        window.initPlatformMap = function (element) {
+        window.initPlatformMap = function (element, latitude, longitude) {
             if (!element || typeof L === "undefined") return;
 
-            if (platformMap) {
-                platformMap.invalidateSize();
-                return;
-            }
-
             try {
-                var lat = Number.parseFloat(element.dataset.lat || "0");
-                var lon = Number.parseFloat(element.dataset.lon || "0");
-                var hasCoordinates = element.dataset.hasCoordinates === "true";
+                var lat = Number.parseFloat(latitude);
+                var lon = Number.parseFloat(longitude);
+                var hasCoordinates = Number.isFinite(lat) && Number.isFinite(lon);
                 var center = hasCoordinates ? [lat, lon] : [0, 0];
+                var zoom = hasCoordinates ? 13 : 2;
 
-                platformMap = L.map(element, { scrollWheelZoom: false }).setView(
-                    center,
-                    hasCoordinates ? 13 : 2
-                );
-
-                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                    zoom: 4,
-                    maxZoom: 19,
-                    attribution: "&copy; OpenStreetMap contributors",
-                    referrerPolicy: "strict-origin-when-cross-origin"
-                }).addTo(platformMap);
+                if (!platformMap) {
+                    platformMap = L.map(element, { scrollWheelZoom: false }).setView(center, zoom);
+                    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                        maxZoom: 19,
+                        attribution: "&copy; OpenStreetMap contributors",
+                        referrerPolicy: "strict-origin-when-cross-origin"
+                    }).addTo(platformMap);
+                } else {
+                    platformMap.setView(center, zoom);
+                }
 
                 if (hasCoordinates) {
-                    L.marker([lat, lon]).addTo(platformMap);
+                    if (platformMarker) platformMarker.setLatLng(center);
+                    else platformMarker = L.marker(center).addTo(platformMap);
+                } else if (platformMarker) {
+                    platformMap.removeLayer(platformMarker);
+                    platformMarker = null;
                 }
 
                 window.setTimeout(function () {
-                    if (platformMap && platformMap.invalidateSize) platformMap.invalidateSize();
+                    if (platformMap) platformMap.invalidateSize();
                 }, 250);
             } catch (error) {
                 console.warn("Leaflet map init error", error);
@@ -399,12 +309,12 @@
         };
 
         window.addEventListener("resize", function () {
-            if (platformMap && platformMap.invalidateSize) platformMap.invalidateSize();
+            if (platformMap) platformMap.invalidateSize();
         });
 
         window.addEventListener("platform-panel-changed", function () {
             window.setTimeout(function () {
-                if (platformMap && platformMap.invalidateSize) platformMap.invalidateSize();
+                if (platformMap) platformMap.invalidateSize();
             }, 125);
         });
     })();

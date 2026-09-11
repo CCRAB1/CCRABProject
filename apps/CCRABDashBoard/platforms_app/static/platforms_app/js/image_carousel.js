@@ -3,7 +3,7 @@
 import Alpine from "alpinejs";
 import {DateTime} from "luxon";
 
-import { CCRABRestClient, DEFAULT_BASE_URL }
+import { CCRABRestClient }
   from "../../../../static/js/CCRABApiClient/src/index.js";
 import { StatsJtsDocument }
   from "../../../../static/js/StatsTimeSeries/src/index.js";
@@ -33,8 +33,12 @@ function registerAlpineComponents() {
     return {
       activePanel: "current_data",
       showAllObservations: false,
+      isLoadingPlatform: true,
       isLoadingObservationData: false,
+      platformLoadError: null,
+      observationLoadError: null,
       platformInfo: null,
+      requestedShortName: "",
       observationWindow: null,
       observationTimeSeriesDoc: null,
       startDateTime: null,
@@ -42,29 +46,70 @@ function registerAlpineComponents() {
       currentObservationsToDisplay: null,
       sensorListToDisplay: null,
 
-      init() {
+      async init() {
         console.log("Initializing platform page");
-        var endDate = DateTime.utc();
-        var startDate = endDate.minus({ hours: 24 });
-        console.log("Getting platformInfo from page element.")
-        this.platformInfo = PlatformInfo.fromScriptElement("platform-info-data");
-        this.setupDisplayObservations();
-        if (this.platformInfo !== null) {
-          console.log("Querying data for platform: " + this.platformInfo.platformHandle + " from: " + startDate + " to " + endDate);
+        this.requestedShortName = this.$root.dataset.platformShortName || "";
+        await this.loadPlatform();
+      },
+      async loadPlatform() {
+        this.isLoadingPlatform = true;
+        this.platformLoadError = null;
+        this.platformInfo = null;
+        this.observationTimeSeriesDoc = null;
+        this.startDateTime = null;
+        this.endDateTime = null;
+
+        const client = new CCRABRestClient({
+          baseUrl: window.location.origin,
+        });
+
+        try {
+          const payload = await client.getPlatformPageConfiguration(
+            this.requestedShortName,
+          );
+          this.platformInfo = PlatformInfo.parse(payload);
+          document.title = this.platformInfo.shortName + " | Platform";
+          this.setupDisplayObservations();
+
+          await this.$nextTick();
+          window.dispatchEvent(new CustomEvent("platform-info-loaded"));
+
+          const observations = this.platformInfo.observationNames();
+          if (!this.platformInfo.platformHandle || observations.length === 0) {
+            return;
+          }
+
+          var endDate = DateTime.utc();
+          var startDate = endDate.minus({ hours: 24 });
           this.getObservationData(
             startDate,
             endDate,
             this.platformInfo.platformHandle,
-            this.platformInfo.observationNames()
+            observations,
           );
+        } catch (error) {
+          console.error("Unable to load platform information", error);
+          this.platformLoadError = this.platformErrorMessage(error);
+        } finally {
+          this.isLoadingPlatform = false;
         }
+      },
+      platformErrorMessage(error) {
+        if (error && error.statusCode === 404) {
+          return "The requested platform could not be found.";
+        }
+        return "Platform information could not be loaded. Please try again.";
+      },
+      retryPlatformLoad() {
+        this.loadPlatform();
       },
       async getObservationData(startDate, endDate, platformHandle, observations) {
         console.debug("Querying platform: " + platformHandle + " data from: " + startDate + " to " + endDate);
         const client = new CCRABRestClient({
-          baseUrl: DEFAULT_BASE_URL
+          baseUrl: window.location.origin,
         });
         this.isLoadingObservationData = true;
+        this.observationLoadError = null;
         try {
           let observationData = await client.getPlatformData(
             startDate,
@@ -73,7 +118,9 @@ function registerAlpineComponents() {
             observations
           );
           this.observationTimeSeriesDoc = StatsJtsDocument.from(observationData['properties']['timeseries']);
-
+        } catch (error) {
+          console.error("Unable to load observation data", error);
+          this.observationLoadError = "Current observations could not be loaded.";
         }
         finally {
           this.isLoadingObservationData = false;
@@ -85,6 +132,7 @@ function registerAlpineComponents() {
        * @returns {void}*/
       setupDisplayObservations() {
         console.log("Setting up display observations");
+        if (!this.platformInfo) return;
         var platform_handle = this.platformInfo.platformHandle;
         var initial_setup = false;
         if(this.currentObservationsToDisplay == null) {
@@ -92,7 +140,7 @@ function registerAlpineComponents() {
           this.currentObservationsToDisplay = {};
           this.currentObservationsToDisplay[platform_handle] = {};
         }
-        for (const sensor_nfo of this.platformInfo.sensors)
+        for (const sensor_nfo of this.platformInfo.displayedSensors())
         {
           if(initial_setup)
           {
@@ -145,7 +193,7 @@ function registerAlpineComponents() {
        * @returns {{key: string, obsStandardName: *, sensorOrder: *, units}[]}
        */
       get platformInfoTableRows() {
-        const sensors = this.platformInfo.sensors || [];
+        const sensors = this.platformInfo?.displayedSensors() || [];
         return sensors.map((sensor) => {
           return {
             key: `${sensor.obsStandardName}-${sensor.order}`,
@@ -162,7 +210,7 @@ function registerAlpineComponents() {
        * @returns {{key: string, obsStandardName: *, obsSOrder: *, units, display: *, stats: {min: *, max: *, most_recent: *}|*}[]}
        */
       get observationTableRows() {
-        const sensors = this.platformInfo.sensors || [];
+        const sensors = this.platformInfo?.displayedSensors() || [];
         return sensors.map((sensor) => {
           var timeseries_id = sensor.obsStandardName + " " + sensor.order;
           var stats = {
@@ -327,6 +375,7 @@ function registerAlpineComponents() {
        */
       getObservationDisplayState(obsStandardName, obsSOrder)
       {
+          if (!this.platformInfo || !this.currentObservationsToDisplay) return false;
           var obs_key = obsStandardName + " " + obsSOrder;
           if(this.platformInfo.platformHandle in this.currentObservationsToDisplay &&
               (obs_key in this.currentObservationsToDisplay[this.platformInfo.platformHandle]))
@@ -355,6 +404,33 @@ function registerAlpineComponents() {
         var dt = DateTime.fromJSDate(timestamp_rec);
         var formattedDateTime = dt.toFormat("yyyy-MM-dd hh:mm:ss a");
         return formattedDateTime
+      },
+      formatPlatformDateRange() {
+        if (!this.platformInfo || !this.platformInfo.beginDate) {
+          return "Not available";
+        }
+
+        var beginDate = DateTime.fromISO(this.platformInfo.beginDate);
+        var beginLabel = beginDate.isValid
+          ? beginDate.toFormat("yyyy-MM-dd")
+          : this.platformInfo.beginDate;
+        if (!this.platformInfo.endDate) {
+          return beginLabel + " to Currently active";
+        }
+
+        var endDate = DateTime.fromISO(this.platformInfo.endDate);
+        var endLabel = endDate.isValid
+          ? endDate.toFormat("yyyy-MM-dd")
+          : this.platformInfo.endDate;
+        return beginLabel + " to " + endLabel;
+      },
+      displayValue(value) {
+        return value === null || value === undefined || value === ""
+          ? "Not available"
+          : value;
+      },
+      get displayedSensorCount() {
+        return this.platformInfo?.displayedSensors().length || 0;
       },
       /**
        * Formats the sOrder to the more industry appropriate format.
@@ -403,6 +479,13 @@ function registerAlpineComponents() {
 
       init() {
         this.slideCount = this.slides().length;
+        this.updateFromScroll();
+        this.startAutoplay();
+      },
+
+      refresh() {
+        this.slideCount = this.slides().length;
+        if (this.activeIndex >= this.slideCount) this.activeIndex = 0;
         this.updateFromScroll();
         this.startAutoplay();
       },

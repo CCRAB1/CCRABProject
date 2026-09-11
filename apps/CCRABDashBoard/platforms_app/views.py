@@ -232,13 +232,11 @@ def platform_detail_web_data(request, short_name):
 
 
 def PlatformInfo(request, short_name=None):
-    platform, serialized = _platform_detail_payload(request.GET, request, short_name=short_name)
     return render(
         request,
         "platform_info.html",
         {
-            "platform": platform,
-            "platform_info": serialized,
+            "short_name": short_name,
         },
     )
 
@@ -433,6 +431,7 @@ def platform_configuration(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def platform_data_request(request):
+    request_log(request, "platform_data_request", "DEBUG", "")
     serializer = ObservationsRequestSerializer(data=request.query_params)
 
     if not serializer.is_valid():
@@ -444,65 +443,76 @@ def platform_data_request(request):
     start_date = validated_data["start_date"]
     end_date = validated_data["end_date"]
     observations = validated_data["observations"]
+    #Get the platform metadata
+    platform_qs = Platform.objects.filter(platform_handle=platform_handle)\
+        .values("fixed_longitude","fixed_latitude")
 
-    queryset = (
-        Multi_obs.objects
-        .filter(
-            m_date__gte=start_date,
-            m_date__lte=end_date,
-            platform_handle=platform_handle,
-            sensor_id__in=_served_sensor_ids_for_platform(platform_handle),
-            sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observations,
+    if len(platform_qs):
+        queryset = (
+            Multi_obs.objects
+            .filter(
+                m_date__gte=start_date,
+                m_date__lte=end_date,
+                platform_handle=platform_handle,
+                sensor_id__in=_served_sensor_ids_for_platform(platform_handle),
+                sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observations,
+            )
+            .annotate(
+                observation_name=F(
+                    "sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name"
+                ),
+                uom_display=F(
+                    "sensor_id__m_type_id__m_scalar_type_id__uom_type_id__display"
+                ),
+                uom_standard_name=F(
+                    "sensor_id__m_type_id__m_scalar_type_id__uom_type_id__standard_name"
+                ),
+                s_order=F("sensor_id__s_order"),
+            )
+            .order_by("m_date", "observation_name", "s_order")
+            .values(
+                "m_date",
+                "m_value",
+                "m_lon",
+                "m_lat",
+                "platform_handle",
+                "observation_name",
+                "uom_display",
+                "uom_standard_name",
+                "s_order",
+            )
         )
-        .annotate(
-            observation_name=F(
-                "sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name"
-            ),
-            uom_display=F(
-                "sensor_id__m_type_id__m_scalar_type_id__uom_type_id__display"
-            ),
-            uom_standard_name=F(
-                "sensor_id__m_type_id__m_scalar_type_id__uom_type_id__standard_name"
-            ),
-            s_order=F("sensor_id__s_order"),
-        )
-        .order_by("m_date", "observation_name", "s_order")
-        .values(
-            "m_date",
-            "m_value",
-            "m_lon",
-            "m_lat",
-            "platform_handle",
-            "observation_name",
-            "uom_display",
-            "uom_standard_name",
-            "s_order",
-        )
-    )
-    jts_document = JtsDocument()
-    current_obs_type = None
-    first_row = None
-    for ndx, row in enumerate(queryset):
-        if ndx == 0:
-            first_row = row
-        ident = f"{row['observation_name']} {row['s_order']}"
-        if current_obs_type != ident:
-            data_ts = next((ts for ts in jts_document.series if ts.identifier == ident), None)
-            if data_ts is None:
-                data_ts = TimeSeries(identifier=ident,
-                                     name=row["observation_name"],
-                                     units=row["uom_display"] or row["uom_standard_name"],
-                                     data_type='NUMBER')
-                jts_document.series.append(data_ts)
-            current_obs_type = ident
-        data_ts.records.append(TsRecord(**{'timestamp': row["m_date"],
-                                           'value': row["m_value"]}))
-    feature_rec = Feature(geometry=Point((first_row["m_lon"], first_row["m_lat"])),
-                          properties={
-                            "platform_handle": first_row["platform_handle"],
-                            "start_date": start_date.strftime("%Y-%m-%dT%H:%M:%S"),
-                            "end_date": end_date.strftime("%Y-%m-%dT%H:%M:%S"),
-                            "timeseries": jts_document.toJSON()
+        jts_document = JtsDocument()
+        current_obs_type = None
+        first_row = None
+        for ndx, row in enumerate(queryset):
+            if ndx == 0:
+                first_row = row
+            ident = f"{row['observation_name']} {row['s_order']}"
+            if current_obs_type != ident:
+                data_ts = next((ts for ts in jts_document.series if ts.identifier == ident), None)
+                if data_ts is None:
+                    data_ts = TimeSeries(identifier=ident,
+                                         name=row["observation_name"],
+                                         units=row["uom_display"] or row["uom_standard_name"],
+                                         data_type='NUMBER')
+                    jts_document.series.append(data_ts)
+                current_obs_type = ident
+            data_ts.records.append(TsRecord(**{'timestamp': row["m_date"],
+                                               'value': row["m_value"]}))
+        feature_rec = Feature(geometry=Point((platform_qs[0]['fixed_longitude'], platform_qs[0]['fixed_latitude'])),
+                              properties={
+                                "platform_handle": platform_handle,
+                                "start_date": start_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                                "end_date": end_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                                "timeseries": jts_document.toJSON() if len(jts_document.series) > 0 else [],
 
-                          })
-    return Response(feature_rec)
+                              })
+        return Response(feature_rec)
+    else:
+        msg = f"{platform_handle} not available."
+        return Response(
+            {"platform_handle": [msg]},
+            status=status.HTTP_400_BAD_REQUEST,
+
+        )

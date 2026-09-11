@@ -5,6 +5,17 @@ from django.urls import reverse
 
 
 class PlatformDataEndpointTests(SimpleTestCase):
+    @patch("platforms_app.views._platform_detail_payload")
+    def test_platform_page_renders_client_side_shell(self, payload_mock):
+        response = self.client.get(
+            reverse("platform_info", kwargs={"short_name": "PA-01"})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-platform-short-name="PA-01"')
+        self.assertNotContains(response, 'id="platform-info-data"')
+        payload_mock.assert_not_called()
+
     def test_platform_list_api_requires_authentication(self):
         response = self.client.get(reverse("platform-list-api"))
 

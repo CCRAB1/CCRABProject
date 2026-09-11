@@ -39,7 +39,11 @@
 
     {% include "top_navbar_template.html" %}
 
-    <main class="platform-detail-page" x-data="platformPage()">
+    <main
+        class="platform-detail-page"
+        data-platform-short-name="{{ short_name|default:'' }}"
+        x-data="platformPage()"
+    >
         <section class="section platform-hero-section">
             <div class="container">
                 {% block platform_header %}{% endblock %}
