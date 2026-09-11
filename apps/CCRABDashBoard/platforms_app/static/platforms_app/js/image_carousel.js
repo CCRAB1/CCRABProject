@@ -330,7 +330,7 @@ function registerAlpineComponents() {
         //EPA breakpoint function.
         var useEPABreakpoints = false;
         var timeSeriesIntervalSeconds = tsInterval.seconds;
-        if(obsStandardName === "pm2.5_EPAc") {
+        if(obsStandardName === "pm2.5_AQI") {
           useEPABreakpoints = true;
         }
         return {
