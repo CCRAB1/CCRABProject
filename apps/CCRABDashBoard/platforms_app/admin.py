@@ -872,7 +872,19 @@ class SensorSourceObservationMapInline(TimestampedTabularInline):
 class Platform_statusInline(TimestampedTabularInline):
     model = models.Platform_status
     fk_name = "platform_id"
-    fields = ('row_id', 'row_entry_date', 'begin_date', 'expected_end_date', 'end_date', 'row_update_date')
+    fields = (
+        'row_id',
+        'alert_type',
+        'status',
+        'opened_at',
+        'last_observation_at',
+        'last_notified_at',
+        'notification_count',
+        'resolved_at',
+        'row_entry_date',
+        'row_update_date',
+    )
+    readonly_fields = ('row_id', 'row_entry_date', 'row_update_date')
     extra = 0
     show_change_link = True
 
@@ -988,9 +1000,19 @@ class PlatformAdmin(TimestampedGISModelAdmin):
 @admin.register(models.DataSource)
 class DataSourceAdmin(TimestampedModelAdmin):
     form = DataSourceDisplayAdminForm
-    list_display = ('row_id', 'key', 'name', 'plugin_id', 'plugin_version', 'active', 'row_update_date')
+    list_display = (
+        'row_id',
+        'key',
+        'name',
+        'plugin_id',
+        'plugin_version',
+        'active',
+        'freshness_monitoring_enabled',
+        'stale_after',
+        'row_update_date',
+    )
     search_fields = ('key', 'name', 'description', 'plugin_id')
-    list_filter = ('active', 'plugin_id')
+    list_filter = ('active', 'plugin_id', 'freshness_monitoring_enabled')
     readonly_fields = ('row_entry_date', 'row_update_date')
     date_hierarchy = "row_entry_date"
     inlines = [DataSourcePlatformSourceInline]
@@ -1279,10 +1301,25 @@ class Multi_obsAdmin(GISModelAdmin):
 '''
 @admin.register(models.Platform_status)
 class Platform_statusAdmin(TimestampedModelAdmin):
-    list_display = ('row_id', 'platform_handle', 'status', 'begin_date', 'end_date', 'row_entry_date')
-    list_filter = ('status', 'platform_id')
+    list_display = (
+        'row_id',
+        'platform_id',
+        'alert_type',
+        'status',
+        'last_observation_at',
+        'opened_at',
+        'last_notified_at',
+        'resolved_at',
+    )
+    list_filter = ('alert_type', 'status', 'platform_id')
+    search_fields = (
+        'platform_id__platform_handle',
+        'platform_id__short_name',
+        'reason',
+        'author',
+    )
     readonly_fields = ('row_entry_date', 'row_update_date')
-    date_hierarchy = "row_entry_date"
+    date_hierarchy = "opened_at"
 
 @admin.register(models.Sensor_status)
 class Sensor_statusAdmin(TimestampedModelAdmin):

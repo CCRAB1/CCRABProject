@@ -1,6 +1,9 @@
+from datetime import timedelta
+
 from django.contrib.gis.db import models as gis_models  # remove if not using GeoDjango
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 
 # Auto-generated Django models from XeniaTables.py
@@ -173,10 +176,92 @@ class DataSource(models.Model):
     plugin_version = models.CharField(max_length=50, null=True, blank=True)
     active = models.IntegerField(null=True, blank=True)
     settings = models.JSONField(null=True, blank=True)
+    freshness_monitoring_enabled = models.BooleanField(default=False)
+    stale_after = models.DurationField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Maximum age of the latest observation before a platform is "
+            "considered stale."
+        ),
+    )
+    never_reported_after = models.DurationField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Time allowed before alerting for a platform that has never "
+            "reported. Uses stale_after when left blank."
+        ),
+    )
+    repeat_alert_after = models.DurationField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Time between repeat notifications for an unresolved incident. "
+            "Leave blank to notify only when the incident opens."
+        ),
+    )
+    send_recovery_alert = models.BooleanField(default=True)
 
     class Meta:
         db_table = '"platforms"."data_source"'
         managed = True
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(freshness_monitoring_enabled=False)
+                    | models.Q(stale_after__isnull=False)
+                ),
+                name="ck_data_source_monitoring_stale_after",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(stale_after__isnull=True)
+                    | models.Q(stale_after__gt=timedelta(0))
+                ),
+                name="ck_data_source_stale_after_positive",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(never_reported_after__isnull=True)
+                    | models.Q(never_reported_after__gt=timedelta(0))
+                ),
+                name="ck_data_source_never_reported_positive",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(repeat_alert_after__isnull=True)
+                    | models.Q(repeat_alert_after__gt=timedelta(0))
+                ),
+                name="ck_data_source_repeat_alert_positive",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if self.freshness_monitoring_enabled and self.stale_after is None:
+            errors["stale_after"] = (
+                "A stale threshold is required when freshness monitoring is enabled."
+            )
+
+        duration_fields = (
+            "stale_after",
+            "never_reported_after",
+            "repeat_alert_after",
+        )
+        for field_name in duration_fields:
+            duration = getattr(self, field_name)
+            if duration is not None and duration <= timedelta(0):
+                errors[field_name] = "Duration must be greater than zero."
+
+        if errors:
+            raise ValidationError(errors)
+
+    @property
+    def effective_never_reported_after(self):
+        return self.never_reported_after or self.stale_after
 
     def __str__(self):
         return self.name or self.key or f"Data Source {self.pk}"
@@ -532,23 +617,81 @@ class SourceObservationMap(models.Model):
         return f"Source Observation Map {getattr(self, 'source_obs', self.pk)}"
 
 class Platform_status(models.Model):
+    class AlertType(models.TextChoices):
+        NEVER_REPORTED = "never_reported", "Never reported"
+        STALE = "stale", "Stale data"
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        ACKNOWLEDGED = "acknowledged", "Acknowledged"
+        RESOLVED = "resolved", "Resolved"
+
     row_id = models.AutoField(primary_key=True)
     row_entry_date = models.DateTimeField(null=True, blank=True)
-    begin_date = models.DateTimeField(null=True, blank=True)
-    expected_end_date = models.DateTimeField(null=True, blank=True)
-    end_date = models.DateTimeField(null=True, blank=True)
     row_update_date = models.DateTimeField(null=True, blank=True)
-    platform_handle = models.CharField(max_length=50, null=True, blank=True)
+    platform_id = models.ForeignKey(
+        'Platform',
+        on_delete=models.CASCADE,
+        db_column='platform_id',
+    )
+    alert_type = models.CharField(max_length=30, choices=AlertType.choices)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN,
+    )
+    opened_at = models.DateTimeField(default=timezone.now)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    last_observation_at = models.DateTimeField(null=True, blank=True)
+    stale_after = models.DurationField(
+        help_text="Snapshot of the threshold that triggered this incident.",
+    )
+    last_notified_at = models.DateTimeField(null=True, blank=True)
+    notification_count = models.PositiveIntegerField(default=0)
     author = models.CharField(max_length=100, null=True, blank=True)
     reason = models.CharField(max_length=500, null=True, blank=True)
-    status = models.IntegerField(null=True, blank=True)
-    platform_id = models.ForeignKey('Platform', on_delete=models.CASCADE, db_column='platform_id', null=True, blank=True)
+    details = models.JSONField(null=True, blank=True)
+
     class Meta:
         db_table = '"platforms"."platform_status"'
         managed = True
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(stale_after__gt=timedelta(0)),
+                name="ck_platform_status_stale_after_positive",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status="resolved",
+                        resolved_at__isnull=False,
+                    )
+                    | models.Q(
+                        status__in=["open", "acknowledged"],
+                        resolved_at__isnull=True,
+                    )
+                ),
+                name="ck_platform_status_resolution",
+            ),
+            models.UniqueConstraint(
+                fields=["platform_id"],
+                condition=models.Q(resolved_at__isnull=True),
+                name="uq_open_platform_freshness_incident",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["status", "opened_at"],
+                name="i_platform_status_opened",
+            ),
+        ]
 
     def __str__(self):
-        return f"platform_status {getattr(self, 'row_id', self.pk)}"
+        return (
+            f"{self.get_alert_type_display()} for "
+            f"{self.platform_id}: {self.get_status_display()}"
+        )
 
 class Sensor_status(models.Model):
     row_id = models.AutoField(primary_key=True)
