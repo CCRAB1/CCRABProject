@@ -135,6 +135,7 @@ def check_data_flow():
         platform_ids = []
         for platform_source in monitored_platforms:
             platform_ids.append(platform_source['row_id'])
+            logger.info(f"Platform: {platform_source['platform_handle']} is stale, latest_m_date: {platform_source['latest_m_date']}")
 
         # Lock open incidents while classifying platforms so another task run
         # cannot create or resolve the same incident concurrently.
