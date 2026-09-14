@@ -86,7 +86,7 @@ def check_data_flow():
         )
         df = pd.DataFrame.from_records(platforms)
         for index, row in df.iterrows():
-            logger.info(f"{df['platform_handle']} last reported: {row['latest_m_date']}")
+            logger.info(f"{row['platform_handle']} last reported: {row['latest_m_date']}")
         output_file = base_directory / f"check_data_flow-{now_time.timestamp()}.csv"
         df.to_csv(output_file, index=False)
 
