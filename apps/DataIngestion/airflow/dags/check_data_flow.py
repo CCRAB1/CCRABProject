@@ -60,6 +60,8 @@ def check_data_flow():
         from django.db.models import OuterRef, Subquery, F
         from platforms_app.models import Multi_obs, Platform, Platform_status
 
+        # Correlate each Platform row with its newest non-null observation date.
+        # The (platform_handle, m_date) index supports this descending lookup.
         latest_observation = (
             Multi_obs.objects
             .filter(
@@ -86,6 +88,8 @@ def check_data_flow():
         output_file = base_directory / f"check_data_flow-{now_time.timestamp()}.csv"
         df.to_csv(output_file, index=False)
 
+        # Start with active Platforms and use PlatformSource only as the bridge
+        # to the DataSource that owns the freshness-monitoring policy.
         monitored_platforms = (
             Platform.objects
             .filter(
@@ -110,6 +114,8 @@ def check_data_flow():
                     "platformsource__data_source_id__send_recovery_alert"
                 ),
             )
+            # Returning dictionaries keeps the task payload small and avoids
+            # fetching complete Platform and DataSource model instances.
             .values(
                 "row_id",
                 "platform_handle",
@@ -125,10 +131,13 @@ def check_data_flow():
                 "send_recovery_alert",
             )
         )
+        # Fetch all existing incidents in one query rather than once per platform.
         platform_ids = []
         for platform_source in monitored_platforms:
             platform_ids.append(platform_source['row_id'])
 
+        # Lock open incidents while classifying platforms so another task run
+        # cannot create or resolve the same incident concurrently.
         with transaction.atomic():
             open_incidents = (
                 Platform_status.objects
@@ -139,10 +148,12 @@ def check_data_flow():
                 )
             )
 
+            # Index incidents by platform for constant-time lookup in the loop.
             incidents_by_platform = {}
             for incident in open_incidents:
                 incidents_by_platform[incident.platform_id_id] = incident
 
+            # Accumulate writes so they can be persisted in batches below.
             incidents_to_create = []
             incidents_to_update = []
 
@@ -151,11 +162,15 @@ def check_data_flow():
                 latest_m_date = platform_record["latest_m_date"]
                 stale_after = platform_record["stale_after"]
 
+                # A source-specific never-reported threshold is optional; when
+                # absent, use the normal stale-data threshold.
                 never_reported_after = (
-                        platform_record["never_reported_after"]
-                        or stale_after
+                    platform_record["never_reported_after"]
+                    or stale_after
                 )
 
+                # Preserve the source identity in the incident while incidents
+                # remain linked directly to Platform during this implementation.
                 data_source_details = {
                     "data_source_id": platform_record["data_source_row_id"],
                     "data_source_key": platform_record["data_source_key"],
@@ -165,23 +180,27 @@ def check_data_flow():
                 threshold = None
                 reason = None
 
+                # No timestamp means this active platform has never reported.
+                # Its Platform dates establish when the initial grace period began.
                 if latest_m_date is None:
                     threshold = never_reported_after
 
                     monitoring_started_at = (
-                            platform_record["begin_date"]
-                            or platform_record["row_entry_date"]
+                        platform_record["begin_date"]
+                        or platform_record["row_entry_date"]
                     )
 
                     grace_period_expired = (
-                            monitoring_started_at is None
-                            or now_time >= monitoring_started_at + threshold
+                        monitoring_started_at is None
+                        or now_time >= monitoring_started_at + threshold
                     )
 
                     if grace_period_expired:
                         alert_type = Platform_status.AlertType.NEVER_REPORTED
                         reason = "Active platform has never reported data."
 
+                # Platforms with data become stale once the newest observation
+                # falls outside the DataSource's permitted age.
                 elif latest_m_date <= now_time - stale_after:
                     threshold = stale_after
                     alert_type = Platform_status.AlertType.STALE
@@ -194,6 +213,8 @@ def check_data_flow():
 
                 if alert_type is not None:
                     if incident is None:
+                        # A notification step can use this newly opened incident
+                        # as the signal to send the first alert.
                         incidents_to_create.append(
                             Platform_status(
                                 # Assign the integer primary key directly.
@@ -211,6 +232,8 @@ def check_data_flow():
                             )
                         )
                     else:
+                        # Refresh the existing incident instead of opening a
+                        # duplicate on every scheduled DAG run.
                         incident.alert_type = alert_type
                         incident.last_observation_at = latest_m_date
                         incident.stale_after = threshold
@@ -220,6 +243,7 @@ def check_data_flow():
                         incidents_to_update.append(incident)
 
                 elif incident is not None:
+                    # A platform that no longer violates its policy has recovered.
                     incident.status = Platform_status.Status.RESOLVED
                     incident.resolved_at = now_time
                     incident.last_observation_at = latest_m_date
@@ -227,6 +251,8 @@ def check_data_flow():
                     incident.row_update_date = now_time
                     incidents_to_update.append(incident)
 
+            # Keep write volume constant with respect to platform count: at most
+            # one bulk insert and one bulk update are issued per task run.
             if incidents_to_create:
                 Platform_status.objects.bulk_create(incidents_to_create)
 
