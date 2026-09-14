@@ -133,6 +133,7 @@ def check_data_flow():
         )
         # Fetch all existing incidents in one query rather than once per platform.
         platform_ids = []
+        logger.info(f"{len(monitored_platforms)} platforms have stale data.")
         for platform_source in monitored_platforms:
             platform_ids.append(platform_source['row_id'])
             logger.info(f"Platform: {platform_source['platform_handle']} is stale, latest_m_date: {platform_source['latest_m_date']}")
