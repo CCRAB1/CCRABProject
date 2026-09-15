@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.gis.db import models as gis_models  # remove if not using GeoDjango
+from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -202,6 +203,15 @@ class DataSource(models.Model):
         ),
     )
     send_recovery_alert = models.BooleanField(default=True)
+    alert_recipients = ArrayField(
+        models.EmailField(),
+        default=list,
+        blank=True,
+        help_text=(
+            "Email addresses that receive freshness alerts. Enter addresses "
+            "separated by commas."
+        ),
+    )
 
     class Meta:
         db_table = '"platforms"."data_source"'

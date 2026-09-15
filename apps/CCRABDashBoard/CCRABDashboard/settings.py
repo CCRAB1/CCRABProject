@@ -108,6 +108,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     "django.contrib.gis",  # GeoDjango
+    "django.contrib.postgres",
     "rest_framework",
     "rest_framework_gis",
     "platforms_app.apps.PlatformsAppConfig",

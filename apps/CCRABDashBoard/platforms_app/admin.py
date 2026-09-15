@@ -1009,6 +1009,7 @@ class DataSourceAdmin(TimestampedModelAdmin):
         'active',
         'freshness_monitoring_enabled',
         'stale_after',
+        'alert_recipients',
         'row_update_date',
     )
     search_fields = ('key', 'name', 'description', 'plugin_id')

@@ -13,7 +13,6 @@ from packages.django_setup import setup_django, close_django_connections
 from mako.template import Template
 from mako import exceptions as makoExceptions
 
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
@@ -146,9 +145,12 @@ def check_data_flow():
                     repeat_alert_after=F(
                         "platformsource__data_source_id__repeat_alert_after"
                     ),
-                    send_recovery_alert=F(
-                        "platformsource__data_source_id__send_recovery_alert"
-                    ),
+                send_recovery_alert=F(
+                    "platformsource__data_source_id__send_recovery_alert"
+                ),
+                alert_recipients=F(
+                    "platformsource__data_source_id__alert_recipients"
+                ),
                 )
                 # Returning dictionaries keeps the task payload small and avoids
                 # fetching complete Platform and DataSource model instances.
@@ -163,9 +165,10 @@ def check_data_flow():
                     "data_source_key",
                     "stale_after",
                     "never_reported_after",
-                    "repeat_alert_after",
-                    "send_recovery_alert",
-                )
+                "repeat_alert_after",
+                "send_recovery_alert",
+                "alert_recipients",
+            )
             )
             # Fetch all existing incidents in one query rather than once per platform.
             platform_ids = []
@@ -317,17 +320,38 @@ def check_data_flow():
     @task()
     def send_alerts(**context):
         logger.info("Beginning the send_alerts task")
+
         setup_django()
         from platforms_app.models import Platform_status
         from django.db.models import DateTimeField, ExpressionWrapper, F
         from django.db.models.functions import Now
 
+        def write_output_file(output_file_name: Path, run_date: datetime, site_data_list: []):
+            try:
+                with open(output_file_name, 'w') as report_out_file:
+                    results_report = output_template.render(run_date=run_date.strftime("%Y-%m-%d %H:%M"),
+                                                            site_data_list=site_data_list)
+                    report_out_file.write(results_report)
+                    return results_report
+            except TypeError as e:
+                logger.exception(makoExceptions.text_error_template().render())
+            except (IOError, AttributeError, Exception) as e:
+                logger.exception(e)
+            return None
 
-        repeat_interval = (
-            "platform_id__platformsource__data_source_id__repeat_alert_after"
-        )
-        alert_list = []
-        try:
+        def send_email_alert(run_date: datetime, alert_report: str):
+            SMTP_USER = os.environ.get("AIRFLOW__SMTP__SMTP_USER")
+
+            send_email(
+                to="ChiefDan@gmail.com",
+                subject=f"CCRAB Stale or Missing Data Report for {run_date.strftime('%Y-%m-%d %H:%M')}",
+                html_content=alert_report
+            )
+        def get_alerts() -> List[Any]:
+            repeat_interval = (
+                "platform_id__platformsource__data_source_id__repeat_alert_after"
+            )
+
             alert_list = (
                 Platform_status.objects
                 .filter(
@@ -348,6 +372,7 @@ def check_data_flow():
                     data_source_key=F(
                         "platform_id__platformsource__data_source_id__key"
                     ),
+                    recipient_list=F("platform_id__platformsource__data_source_id__alert_recipients"),
                     repeat_alert_after=F(repeat_interval),
                     next_notification_at=ExpressionWrapper(
                         F("last_notified_at") + F(repeat_interval),
@@ -357,6 +382,31 @@ def check_data_flow():
                 .filter(next_notification_at__lte=Now())
                 .order_by("next_notification_at")
             )
+            return alert_list
+
+        def update_last_notified(alert_id_list: List[int], report_time: datetime):
+            updated_count = (
+                Platform_status.objects
+                .filter(
+                    row_id__in=alert_id_list,
+                    resolved_at__isnull=True,
+                    status__in=[
+                        Platform_status.Status.OPEN,
+                        Platform_status.Status.ACKNOWLEDGED,
+                    ],
+                )
+                .update(
+                    last_notified_at=report_time,
+                    notification_count=F("notification_count") + 1,
+                    row_update_date=report_time,
+                )
+            )
+
+
+
+        alert_list = []
+        try:
+            alert_list = get_alerts()
         except Exception as e:
             raise e
         finally:
@@ -376,24 +426,9 @@ def check_data_flow():
                                       'last_reported': last_reported})
                 alert_ids.append(alert.row_id)
                 send_alerts = True
-
-            updated_count = (
-                Platform_status.objects
-                .filter(
-                    row_id__in=alert_ids,
-                    resolved_at__isnull=True,
-                    status__in=[
-                        Platform_status.Status.OPEN,
-                        Platform_status.Status.ACKNOWLEDGED,
-                    ],
-                )
-                .update(
-                    last_notified_at=report_time,
-                    notification_count=F("notification_count") + 1,
-                    row_update_date=report_time,
-                )
-            )
-
+            #If we're sending alerts, update the last_notified_at field for the open alerts.
+            if len(alert_ids):
+                update_last_notified(alert_ids, report_time)
             close_django_connections()
             if send_alerts:
                 base_directory = (Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY")
@@ -403,27 +438,6 @@ def check_data_flow():
                 send_email_alert(report_time, report)
 
         return
-    def write_output_file(output_file_name: Path, run_date: datetime, site_data_list: []):
-        try:
-            with open(output_file_name, 'w') as report_out_file:
-                results_report = output_template.render(run_date=run_date.strftime("%Y-%m-%d %H:%M"),
-                                                        site_data_list=site_data_list)
-                report_out_file.write(results_report)
-                return results_report
-        except TypeError as e:
-            logger.exception(makoExceptions.text_error_template().render())
-        except (IOError, AttributeError, Exception) as e:
-            logger.exception(e)
-        return None
-
-    def send_email_alert(run_date: datetime, alert_report: str):
-        SMTP_USER = os.environ.get("AIRFLOW__SMTP__SMTP_USER")
-
-        send_email(
-            to="ChiefDan@gmail.com",
-            subject=f"CCRAB Stale or Missing Data Report for {run_date.strftime('%Y-%m-%d %H:%M')}",
-            html_content=alert_report
-        )
 
     latest_records = most_current_record()
     send_alerts()
