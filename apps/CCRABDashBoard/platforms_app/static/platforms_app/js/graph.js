@@ -1,4 +1,4 @@
-import {getEPABreakpoint} from "./calculations.js";
+import {getAQIColorCode} from "./calculations.js";
 
 const graphColors = [
   {
@@ -227,9 +227,9 @@ export function registerGraphComponents(Alpine) {
                             //console.log("chartPt: " + JSON.stringify(chartPt));
                             //var useEPABreakpoints = Alpine.store("graphInfo").has(dataset.id).useEPABreakpoints;
                             //if (useEPABreakpoints) {
-                            if(dataset.EPABreakpoints) {
-                                var epaRange = getEPABreakpoint(chartPt.p0.parsed.y);
-                                return epaRange.color;
+                            if(dataset.AQIColorRange) {
+                                var aqiRange = getAQIColorCode(chartPt.p0.parsed.y);
+                                return aqiRange.color;
                             }
                             return undefined;
                         }

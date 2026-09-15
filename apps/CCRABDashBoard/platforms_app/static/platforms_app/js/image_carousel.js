@@ -12,7 +12,7 @@ import { registerGraphComponents } from "./graph.js";
 import { PlatformInfo } from "./platform_info.js";
 //import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
 //import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";
-import {getEPABreakpoint} from "./calculations.js";
+import {getAQIColorCode} from "./calculations.js";
 
 //const CCRAB_BASE_URL = window.CCRAB_BASE_URL || window.location.origin;
 let alpineComponentsRegistered = false;
@@ -328,16 +328,16 @@ function registerAlpineComponents() {
         var sensor = this.findSensor(obsStandardName, obsSOrder);
         //If the user turned on the pm2.5 EPA Corrected channel, we want the graph coloration to use the
         //EPA breakpoint function.
-        var useEPABreakpoints = false;
+        var useAQIColorCodes = false;
         var timeSeriesIntervalSeconds = tsInterval.seconds;
         if(obsStandardName === "pm2.5_aqi") {
-          useEPABreakpoints = true;
+          useAQIColorCodes = true;
         }
         return {
           id: seriesId,
           label: this.formatObservationLabel(obsStandardName, obsSOrder),
           data: graphData,
-          EPABreakpoints: useEPABreakpoints,
+          AQIColorRange: useAQIColorCodes,
           timeSeriesIntervalSeconds: timeSeriesIntervalSeconds,
           xAxis: {
             key: "observation-time",
@@ -456,8 +456,8 @@ function registerAlpineComponents() {
       {
         if(obsValue !== undefined) {
           if (obsName === "pm2.5_aqi") {
-            var epaRange = getEPABreakpoint(obsValue);
-            return "background-color: " + epaRange.color + ";";
+            var aqiRange = getAQIColorCode(obsValue);
+            return "background-color: " + aqiRange.color + ";";
           }
         }
       }
