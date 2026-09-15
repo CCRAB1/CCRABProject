@@ -339,11 +339,11 @@ def check_data_flow():
                 logger.exception(e)
             return None
 
-        def send_email_alert(run_date: datetime, alert_report: str):
+        def send_email_alert(run_date: datetime, alert_report: str, recipients: []):
             SMTP_USER = os.environ.get("AIRFLOW__SMTP__SMTP_USER")
 
             send_email(
-                to="ChiefDan@gmail.com",
+                to=recipients,
                 subject=f"CCRAB Stale or Missing Data Report for {run_date.strftime('%Y-%m-%d %H:%M')}",
                 html_content=alert_report
             )
@@ -425,14 +425,16 @@ def check_data_flow():
                 send_alerts = True
             #If we're sending alerts, update the last_notified_at field for the open alerts.
             if len(alert_ids):
+                logger.info(f"Updating last_notified_at for alert ids: {alert_ids}")
                 update_last_notified(alert_ids, report_time)
             close_django_connections()
             if send_alerts:
+                logger.info("Sending alerts")
                 base_directory = (Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY")
                                   / Variable.get("DATA_FLOW_CHECK"))
                 out_filename = base_directory / f"alert_report-{report_time.timestamp()}.html"
                 report = write_output_file(out_filename, report_time, template_data)
-                send_email_alert(report_time, report)
+                send_email_alert(report_time, report, recipients=['ChiefDan@gmail.com'])
 
         return
 
