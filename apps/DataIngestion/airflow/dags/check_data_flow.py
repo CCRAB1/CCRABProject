@@ -382,6 +382,7 @@ def check_data_flow():
                 .filter(next_notification_at__lte=Now())
                 .order_by("next_notification_at")
             )
+            logger.info(f"{alert_list.query}")
             return alert_list
 
         def update_last_notified(alert_id_list: List[int], report_time: datetime):
