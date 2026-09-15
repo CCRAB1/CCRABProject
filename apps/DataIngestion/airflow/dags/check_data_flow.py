@@ -13,8 +13,6 @@ from packages.django_setup import setup_django, close_django_connections
 from mako.template import Template
 from mako import exceptions as makoExceptions
 
-from platforms_app.models import Platform_status
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
@@ -323,6 +321,11 @@ def check_data_flow():
     def send_alerts(**context):
         logger.info("Beginning the send_alerts task")
 
+        setup_django()
+        from platforms_app.models import Platform_status
+        from django.db.models import DateTimeField, ExpressionWrapper, F
+        from django.db.models.functions import Now
+
         def write_output_file(output_file_name: Path, run_date: datetime, site_data_list: []):
             try:
                 with open(output_file_name, 'w') as report_out_file:
@@ -345,6 +348,10 @@ def check_data_flow():
                 html_content=alert_report
             )
         def get_alerts() -> List[Any]:
+            repeat_interval = (
+                "platform_id__platformsource__data_source_id__repeat_alert_after"
+            )
+
             alert_list = (
                 Platform_status.objects
                 .filter(
@@ -365,6 +372,7 @@ def check_data_flow():
                     data_source_key=F(
                         "platform_id__platformsource__data_source_id__key"
                     ),
+                    recipient_list=F("platform_id__platformsource__data_source_id__alert_recipients"),
                     repeat_alert_after=F(repeat_interval),
                     next_notification_at=ExpressionWrapper(
                         F("last_notified_at") + F(repeat_interval),
@@ -394,15 +402,8 @@ def check_data_flow():
                 )
             )
 
-        setup_django()
-        from platforms_app.models import Platform_status
-        from django.db.models import DateTimeField, ExpressionWrapper, F
-        from django.db.models.functions import Now
 
 
-        repeat_interval = (
-            "platform_id__platformsource__data_source_id__repeat_alert_after"
-        )
         alert_list = []
         try:
             alert_list = get_alerts()
