@@ -414,7 +414,7 @@ def check_data_flow():
         alert_list = []
         try:
             alert_list = get_alerts()
-            logger.info(f"Found {len(alert_list)} open alerts")
+            logger.info(f"Found {len(alert_list)} active alerts to send alerts for.")
         except Exception as e:
             raise e
         finally:
