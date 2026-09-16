@@ -323,7 +323,7 @@ def check_data_flow():
 
         setup_django()
         from platforms_app.models import Platform_status
-        from django.db.models import DateTimeField, ExpressionWrapper, F
+        from django.db.models import DateTimeField, ExpressionWrapper, F, Q
         from django.db.models.functions import Now
 
         def write_output_file(output_file_name: Path, run_date: datetime, site_data_list: []):
@@ -379,7 +379,16 @@ def check_data_flow():
                         output_field=DateTimeField(),
                     ),
                 )
-                .filter(next_notification_at__lte=Now())
+                .filter(
+                    # Initial alert.
+                    Q(last_notified_at__isnull=True)
+
+                    # Repeat alert.
+                    | Q(
+                        repeat_alert_after__isnull=False,
+                        next_notification_at__lte=Now(),
+                    )
+                )
                 .order_by("next_notification_at")
             )
             logger.info(f"{alert_list.query}")
@@ -441,7 +450,8 @@ def check_data_flow():
         return
 
     latest_records = most_current_record()
-    send_alerts()
+    send_alerts_task = send_alerts()
 
+    latest_records >> send_alerts_task
 
 check_data_flow()
