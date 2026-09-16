@@ -82,8 +82,7 @@ def check_data_flow():
             unique_run_id = context['run_id']
             logger.info("Query most current records for platforms.")
             now_time = datetime.now(tz=pytz.UTC)
-            base_directory = (Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY")
-                              / Variable.get("DATA_FLOW_CHECK"))
+            base_directory = (Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / Variable.get("DATA_FLOW_CHECK"))
             logger.info(f"Base directory: {base_directory}")
             # Make sure out destination directory exists.
             base_directory.mkdir(parents=True, exist_ok=True)
@@ -441,8 +440,7 @@ def check_data_flow():
             close_django_connections()
             if send_alerts:
                 logger.info("Sending alerts")
-                base_directory = (Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY")
-                                  / Variable.get("DATA_FLOW_CHECK"))
+                base_directory = (Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / Variable.get("DATA_FLOW_CHECK"))
                 out_filename = base_directory / f"alert_report-{report_time.timestamp()}.html"
                 report = write_output_file(out_filename, report_time, template_data)
                 send_email_alert(report_time, report, recipients=['ChiefDan@gmail.com'])
