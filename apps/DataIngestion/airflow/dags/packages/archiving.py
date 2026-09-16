@@ -57,3 +57,44 @@ def zip_files(archive_directory: Path):
                 zip_file_obj.close()
 
                 logger.info("Finished zipping files.")
+
+
+def zip_directory_relative(source_dir: Path, output_zippath: Path, remove_source_after_zip: bool = True):
+    # Convert input to a resolved, absolute Path object
+    source_path = source_dir.resolve()
+
+    with zipfile.ZipFile(output_zippath, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        # rglob("*") recursively finds all files and subfolders
+        for item in source_path.rglob('*'):
+            if item.is_file():
+                # Extract the path relative to the root source directory
+                relative_path = item.relative_to(source_path)
+
+                # Write to zip: item is the disk location, relative_path is the internal ZIP path
+                zipf.write(item, arcname=relative_path)
+    #Now that the files are zipped, let's remove them from the source directory
+    if remove_source_after_zip:
+        for item in sorted(source_path.rglob('*'), reverse=True):
+            if item.is_file():
+                item.unlink()
+            elif item.is_dir():
+                # item.rmdir() only works if the directory is empty
+                item.rmdir()
+
+def add_to_archive_zip(source_file: Path, destination_zip: Path) -> None:
+    logger = logging.getLogger()
+
+    logger.info(f"Adding file {source_file} to zip {destination_zip}")
+    file_mode = 'a'
+    if not destination_zip.exists():
+        logger.info(f"Archive zip file {destination_zip} doesn't exist, so we're creating it.")
+        file_mode = 'w'
+    with zipfile.ZipFile(destination_zip, file_mode) as zip_file:
+        zip_file.write(source_file,
+                       arcname=source_file.name,
+                       compress_type=zipfile.ZIP_DEFLATED)
+        #Now let's remove the run zip.
+        logger.info(f"Removing run zip file: {source_file} since it is now archived.")
+        os.remove(source_file)
+
+    return

@@ -21,7 +21,7 @@ from datautilities.epa.epa_calculations import apply_epa_correction, calculate_a
 from packages.django_setup import setup_django, close_django_connections
 from datautilities.ccrab_api.client import CCRABRestClient, CCRABAuthenticationError
 from observationsdatabase.xenia_obs_map import Organization, Platform
-from packages.archiving import archive_file, zip_files
+from packages.archiving import zip_directory_relative, add_to_archive_zip
 from ioos_qc.config import QcConfig
 from ioos_qc.streams import PandasStream
 from ioos_qc.results import CollectedResult, collect_results
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -995,77 +995,25 @@ def purple_air_processing():
         return aqi_data_files
     @task()
     def archive_task(config_file_name: Path) :
-        archive_all_files = Variable.get("ARCHIVE_ALL_FILES_IN_DIRECTORY")
-        archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY", default="purple_air")
-        base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY"))
-
-        archive_directory.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Starting archive_task with config file.")
-        process_run_time = datetime.now()
-
-        raw_data_archive_directory = archive_directory / Variable.get("RAW_DATA_DIRECTORY")
-        raw_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        files_to_archive = []
-        if archive_all_files:
-            data_directory = base_dir / Path(Variable.get("RAW_DATA_DIRECTORY"))
-            files_to_archive = data_directory.rglob("*.*")
-        archive_and_zip(files_to_archive, raw_data_archive_directory, archive_directory, process_run_time)
-
-        normalized_data_archive_directory = archive_directory / Variable.get("NORMALIZED_HEADER_DIRECTORY")
-        normalized_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        files_to_archive = []
-        if archive_all_files:
-            data_directory = base_dir / Path(Variable.get("NORMALIZED_HEADER_DIRECTORY"))
-            files_to_archive = data_directory.rglob("*.*")
-
-        archive_and_zip(files_to_archive, normalized_data_archive_directory, archive_directory, process_run_time)
-        #Ancillary data has 3 steps of file creation, the queried data, the 15 minute interval creation then
-        #finally the ancillary calculations data.
-        anicllary_data_archive_directory = archive_directory / Variable.get("EPA_CORRECTED_DIRECTORY")
-        anicllary_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        files_to_archive = []
-        if archive_all_files:
-            data_directory = base_dir / Path(Variable.get("EPA_CORRECTED_DIRECTORY"))
-            files_to_archive = data_directory.rglob("*.*")
-        archive_and_zip(files_to_archive, anicllary_data_archive_directory, archive_directory, process_run_time)
-
-        anicllary_data_archive_directory = archive_directory / Variable.get("AQI_DIRECTORY")
-        anicllary_data_archive_directory.mkdir(parents=True, exist_ok=True)
-        files_to_archive = []
-        if archive_all_files:
-            data_directory = base_dir / Path(Variable.get("AQI_DIRECTORY"))
-            files_to_archive = data_directory.rglob("*.*")
-        archive_and_zip(files_to_archive, anicllary_data_archive_directory, archive_directory, process_run_time)
-
-        logger.info(f"Completed archiving data files.")
-        return
-
-    def archive_and_zip(file_list: [],
-                        directory_to_process: Path,
-                        archive_directory: Path,
-                        process_run_time: datetime) -> None:
-        """
-        Archive and zip files in the specified directory.
-
-        Args:
-            file_list (list): List of files to archive.
-            directory_to_process (Path): Directory containing files to archive.
-            archive_directory (Path): Directory to store the zipped archive.
-            process_run_time (datetime): Timestamp of the processing run.
-        """
-        logger.info(f"Archiving data files: {directory_to_process}")
-
-        for file in file_list:
-            logger.info(f"Archiving file: {file}")
-            try:
-                archive_file(Path(file), directory_to_process, process_run_time)
-            except Exception as e:
-                logger.error(f"Unable to archive file: {file}")
-        logger.info(f"Zipping directory: {archive_directory}")
         try:
-            zip_files(directory_to_process)
+            archive_directory = Path(Variable.get("ARCHIVE_DIRECTORY", default="./")) / Variable.get("PURPLE_AIR_WORKING_DIRECTORY", default="purple_air")
+            #Make sure the directory exists.
+            archive_directory.mkdir(parents=True, exist_ok=True)
+
+            base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / Path(Variable.get("PURPLE_AIR_WORKING_DIRECTORY"))
+
+            archive_time = datetime.now()
+            zipped_file = archive_directory / f"{archive_time.strftime('%Y%m%d_%H%M%S')}.zip"
+            zip_directory_relative(base_dir, zipped_file, True)
+            destination_archive_zip = archive_directory / f"{archive_time.strftime('%Y-%m-%d')}.zip"
+            add_to_archive_zip(zipped_file, destination_archive_zip)
+            logger.info(f"Finished archiving files in {zipped_file}")
+
+
+            logger.info(f"Completed archiving data files.")
         except Exception as e:
-            logger.error(f"Unable to zip directory: {archive_directory}")
+            logger.exception(e)
+            raise e
         return
 
     def normalize_header(row: [], platform_nfo: Platform) -> []:
