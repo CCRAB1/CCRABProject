@@ -27,12 +27,28 @@ output_template = Template("""
         <body>
             <h1>CCRAB Stale or Missing Data Report</h1>
             <p>This report was generated on ${run_date}</p>
+            <br>
+            <p>The following platforms have not reported within the expected timeframe:</p>
             <table>
                 <tr>
                     <th>Platform</th>
                     <th>Last Reported</th>
                 </tr>
-                % for site_data in site_data_list:
+                % for site_data in site_data_list['opened']:
+                <tr>
+                    <td>${site_data['short_name']}</td>
+                    <td>${site_data['last_reported']}</td>
+                </tr>
+                % endfor
+            </table>
+            </br>
+            <p>The following platforms have begun reporting again:</p>
+            <table>
+                <tr>
+                    <th>Platform</th>
+                    <th>Last Reported</th>
+                </tr>
+                % for site_data in site_data_list['recovered']:
                 <tr>
                     <td>${site_data['short_name']}</td>
                     <td>${site_data['last_reported']}</td>
@@ -92,8 +108,13 @@ def check_data_flow():
             from django.db.models import OuterRef, Subquery, F
             from platforms_app.models import Multi_obs, Platform, Platform_status
 
-            # Correlate each Platform row with its newest non-null observation date.
-            # The (platform_handle, m_date) index supports this descending lookup.
+            # Build a correlated scalar subquery that returns one timestamp for
+            # whichever Platform row is currently being evaluated by an outer
+            # query. OuterRef("platform_handle") is replaced with that outer
+            # Platform's handle by PostgreSQL. Null dates are excluded explicitly;
+            # otherwise a descending PostgreSQL sort can place nulls first. The
+            # descending order plus [:1] selects only the newest m_date, and the
+            # existing (platform_handle, m_date) index supports this lookup.
             latest_observation = (
                 Multi_obs.objects
                 .filter(
@@ -104,6 +125,11 @@ def check_data_flow():
                 .values("m_date")[:1]
             )
 
+            # Produce the complete active-platform snapshot used for the CSV.
+            # annotate() runs the correlated subquery once per Platform at the
+            # database level. values() limits the selected columns and returns
+            # dictionaries, which DataFrame.from_records can consume directly.
+            # A Platform with no observation is retained with latest_m_date=None.
             platforms = (
                 Platform.objects
                 .filter(active=1)
@@ -122,8 +148,11 @@ def check_data_flow():
             output_file = base_directory / f"check_data_flow-{now_time.timestamp()}.csv"
             df.to_csv(output_file, index=False)
 
-            # Start with active Platforms and use PlatformSource only as the bridge
-            # to the DataSource that owns the freshness-monitoring policy.
+            # Produce the subset of Platforms governed by an enabled freshness
+            # policy. The platformsource__data_source_id path performs SQL joins
+            # from Platform -> PlatformSource -> DataSource. PlatformSource is
+            # used only to identify the DataSource; none of its status, dates, or
+            # settings participate in the monitoring decision.
             monitored_platforms = (
                 Platform.objects
                 .filter(
@@ -131,10 +160,14 @@ def check_data_flow():
                     platformsource__data_source_id__active=1,
                     platformsource__data_source_id__freshness_monitoring_enabled=True,
                 )
+                # Copy the latest timestamp and the relevant DataSource policy
+                # columns onto each Platform result. These F expressions become
+                # selected DataSource columns in SQL; they do not issue additional
+                # per-platform queries.
                 .annotate(
                     latest_m_date=Subquery(latest_observation),
 
-                    # PlatformSource is used only to reach DataSource.
+                    # Keep source identity for incident audit details.
                     data_source_row_id=F("platformsource__data_source_id__row_id"),
                     data_source_key=F("platformsource__data_source_id__key"),
                     stale_after=F("platformsource__data_source_id__stale_after"),
@@ -151,8 +184,9 @@ def check_data_flow():
                     "platformsource__data_source_id__alert_recipients"
                 ),
                 )
-                # Returning dictionaries keeps the task payload small and avoids
-                # fetching complete Platform and DataSource model instances.
+                # Return dictionaries containing only the fields needed for
+                # classification and incident persistence. This avoids constructing
+                # complete Platform/DataSource objects and keeps the result compact.
                 .values(
                     "row_id",
                     "platform_handle",
@@ -169,15 +203,19 @@ def check_data_flow():
                 "alert_recipients",
             )
             )
-            # Fetch all existing incidents in one query rather than once per platform.
+            # Extract IDs from the already-evaluated monitored-platform result so
+            # all open incidents can be fetched with one platform_id IN (...) query.
+            # This avoids an incident query inside the classification loop.
             platform_ids = []
             logger.info(f"{len(monitored_platforms)} platforms have stale data.")
             for platform_source in monitored_platforms:
                 platform_ids.append(platform_source['row_id'])
                 logger.info(f"Platform: {platform_source['platform_handle']} is stale, latest_m_date: {platform_source['latest_m_date']}")
 
-            # Lock open incidents while classifying platforms so another task run
-            # cannot create or resolve the same incident concurrently.
+            # Run incident reads and writes in one transaction. select_for_update()
+            # places row-level locks on existing unresolved incidents until the
+            # transaction commits, preventing concurrent runs from updating or
+            # resolving those same incident rows at the same time.
             with transaction.atomic():
                 open_incidents = (
                     Platform_status.objects
@@ -188,12 +226,15 @@ def check_data_flow():
                     )
                 )
 
-                # Index incidents by platform for constant-time lookup in the loop.
+                # Convert the incident queryset into a platform_id -> incident map.
+                # Classification can then find an existing incident in constant
+                # time without issuing another database query.
                 incidents_by_platform = {}
                 for incident in open_incidents:
                     incidents_by_platform[incident.platform_id_id] = incident
 
-                # Accumulate writes so they can be persisted in batches below.
+                # Build separate in-memory batches for INSERT and UPDATE. Django
+                # will later persist each batch with a single bulk operation.
                 incidents_to_create = []
                 incidents_to_update = []
 
@@ -291,8 +332,10 @@ def check_data_flow():
                         incident.row_update_date = now_time
                         incidents_to_update.append(incident)
 
-                # Keep write volume constant with respect to platform count: at most
-                # one bulk insert and one bulk update are issued per task run.
+                # Persist all state transitions with at most one bulk INSERT and
+                # one bulk UPDATE, regardless of the number of monitored platforms.
+                # The partial unique constraint on platform_status also prevents
+                # more than one unresolved incident for the same Platform.
                 if incidents_to_create:
                     Platform_status.objects.bulk_create(incidents_to_create)
 
@@ -347,53 +390,99 @@ def check_data_flow():
                 html_content=alert_report
             )
         def get_alerts() -> List[Any]:
+            # This relation path reaches the repeat interval configured on the
+            # DataSource associated with each incident's Platform. Keeping the
+            # path in one variable avoids repeating a long join expression below.
             repeat_interval = (
                 "platform_id__platformsource__data_source_id__repeat_alert_after"
             )
 
+            # Query only incidents that are eligible for an email now. Timing is
+            # evaluated by PostgreSQL, so Airflow does not need to retrieve every
+            # open incident and compare timestamps in Python.
             alert_list = (
                 Platform_status.objects
                 .filter(
+                    # OPEN and ACKNOWLEDGED are both unresolved operational states.
+                    # resolved_at is checked as an additional guard and matches the
+                    # platform_status database constraint.
                     status__in=[
                         Platform_status.Status.OPEN,
                         Platform_status.Status.ACKNOWLEDGED,
                     ],
                     resolved_at__isnull=True,
-                    #last_notified_at__isnull=False,
-
-                    # Only send repeats for active, monitored sources with a repeat interval.
+                    # Do not alert for inactive Platforms or DataSources, or for a
+                    # DataSource whose freshness monitoring has been disabled.
                     platform_id__active=1,
                     platform_id__platformsource__data_source_id__active=1,
                     platform_id__platformsource__data_source_id__freshness_monitoring_enabled=True,
-                    #platform_id__platformsource__data_source_id__repeat_alert_after__isnull=False,
                 )
                 .annotate(
+                    # Include routing and policy values on every returned incident.
+                    # recipient_list is already a Python list because the model uses
+                    # PostgreSQL ArrayField.
                     data_source_key=F(
                         "platform_id__platformsource__data_source_id__key"
                     ),
                     recipient_list=F("platform_id__platformsource__data_source_id__alert_recipients"),
                     repeat_alert_after=F(repeat_interval),
+                    send_recovery_alert=F(
+                        "platform_id__platformsource__data_source_id__send_recovery_alert"
+                    ),
+
+                    # Calculate the next eligible repeat time in SQL:
+                    # last successful notification + configured repeat interval.
+                    # If either operand is NULL, next_notification_at is NULL.
                     next_notification_at=ExpressionWrapper(
                         F("last_notified_at") + F(repeat_interval),
                         output_field=DateTimeField(),
                     ),
                 )
                 .filter(
-                    # Initial alert.
-                    Q(last_notified_at__isnull=True)
-
-                    # Repeat alert.
-                    | Q(
-                        repeat_alert_after__isnull=False,
-                        next_notification_at__lte=Now(),
+                    Q(
+                        status__in=[
+                            Platform_status.Status.OPEN,
+                            Platform_status.Status.ACKNOWLEDGED,
+                        ],
+                        resolved_at__isnull=True,
                     )
+
+                    & (
+                        # A NULL last_notified_at identifies an incident that has never
+                        # been emailed, so it is immediately eligible for its first alert.
+                        Q(last_notified_at__isnull=True)
+
+                        # A previously notified incident is eligible again only when a
+                        # repeat interval is configured and its calculated next time has
+                        # arrived. The explicit non-null test documents that a blank
+                        # repeat_alert_after means "do not send repeat alerts."
+                        | Q(
+                            repeat_alert_after__isnull=False,
+                            next_notification_at__lte=Now(),
+                        )
+                    )
+                        # Resolved incidents needing a recovery notification.
+                    | Q(
+                        status=Platform_status.Status.RESOLVED,
+                        resolved_at__isnull=False,
+                        send_recovery_alert=True,
+                        last_notified_at__isnull=False,
+                        last_notified_at__lt=F("resolved_at"),
+                    )
+
                 )
+                # Process the most overdue repeat notifications first. Initial
+                # alerts have a NULL next_notification_at and are still included by
+                # the OR condition above.
                 .order_by("next_notification_at")
             )
             logger.info(f"{alert_list.query}")
             return alert_list
 
         def update_last_notified(alert_id_list: List[int], report_time: datetime):
+            # Update the selected incidents after notification processing.
+            # Rechecking unresolved state prevents a concurrently resolved incident
+            # from being marked as notified after it has recovered.
             updated_count = (
                 Platform_status.objects
                 .filter(
@@ -405,6 +494,9 @@ def check_data_flow():
                     ],
                 )
                 .update(
+                    # QuerySet.update() generates one SQL UPDATE. F() performs the
+                    # increment inside PostgreSQL, avoiding a read/modify/write race
+                    # and preserving the correct count across concurrent workers.
                     last_notified_at=report_time,
                     notification_count=F("notification_count") + 1,
                     row_update_date=report_time,
@@ -418,7 +510,7 @@ def check_data_flow():
             raise e
         finally:
             report_time = datetime.now(pytz.UTC)
-            template_data = []
+            template_data = {'opened': [], 'recovered': []}
             alert_ids = []
             send_alerts = False
             for alert in alert_list:
@@ -429,8 +521,12 @@ def check_data_flow():
                     last_reported = "Never reported"
                 else:
                     last_reported = alert.last_observation_at
-                template_data.append({'short_name': alert.platform_id.short_name,
-                                      'last_reported': last_reported})
+                if alert.status == Platform_status.Status.RESOLVED:
+                    template_data['recovered'].append({'short_name': alert.platform_id.short_name,
+                                                       last_reported: last_reported,})
+                else:
+                    template_data['opened'].append({'short_name': alert.platform_id.short_name,
+                                          'last_reported': last_reported})
                 alert_ids.append(alert.row_id)
                 send_alerts = True
             #If we're sending alerts, update the last_notified_at field for the open alerts.
