@@ -16,25 +16,96 @@
 <body>
 {% include "top_navbar_template.html" %}
 
-<section class="section">
+<section class="section" x-data="platformCatalog()">
     <div class="container">
-
         <!-- CSS Grid wrapper -->
         <div class="platform-columns">
             {% for platform_rec in platform_recs.features %}
-                <a href="{% url 'platform_info' platform_rec.properties.short_name %}" class="card-link">
+                <a href="{% url 'platform_info' platform_rec.properties.short_name %}" class="card-link"
+                    x-data="{
+                        platformHandle: '{{ platform_rec.properties.platform_handle|escapejs }}',
+                        observationId: 'pm2.5_aqi 1'
+                    }"
+                >
                     <div class="column is-flex">
-
                         <div class="card is-flex is-flex-direction-column is-fullwidth">
+                            <div
+                                class="platform-observation-hero"
+                                :style="observationStyle(
+                                    platformHandle,
+                                    observationId
+                                )"
+                                :aria-label="observationAriaLabel(
+                                    platformHandle,
+                                    observationId
+                                )"
+                                aria-live="polite"
+                            >
+                                <template
+                                    x-if="hasObservation(
+                                        platformHandle,
+                                        observationId
+                                    )"
+                                >
+                                    <div class="platform-observation-reading">
+                                        <p class="platform-observation-label">
+                                            Current PM2.5 AQI
+                                        </p>
 
-                            <div class="card-image">
-                                <figure class="image is-4by3">
-                                    <img src="{% static 'images/purple_air_basic.jpg' %}"
-                                         class="card_platform_pic"
-                                         alt="{{ platform_rec.properties.short_name }}">
-                                </figure>
+                                        <div class="platform-observation-ring">
+                                            <span
+                                                class="platform-observation-value"
+                                                x-text="formatObservationValue(
+                                                    getLatestValue(
+                                                        platformHandle,
+                                                        observationId
+                                                    )
+                                                )"
+                                            ></span>
+                                        </div>
+
+                                        <p
+                                            class="platform-observation-category"
+                                            x-text="getObservationCategory(
+                                                platformHandle,
+                                                observationId
+                                            )"
+                                        ></p>
+
+                                        <p class="platform-observation-time">
+                                            Updated
+                                            <span
+                                                x-text="formatObservationTimestamp(
+                                                    getLatestTimestamp(
+                                                        platformHandle,
+                                                        observationId
+                                                    )
+                                                )"
+                                            ></span>
+                                        </p>
+                                    </div>
+                                </template>
+
+                                <template
+                                    x-if="!hasObservation(
+                                        platformHandle,
+                                        observationId
+                                    )"
+                                >
+                                    <div class="platform-observation-reading">
+                                        <p class="platform-observation-label">
+                                            Current PM2.5 AQI
+                                        </p>
+
+                                        <div class="platform-observation-ring">
+                                            <span class="platform-observation-value">—</span>
+                                        </div>
+                                        <p class="platform-observation-category">
+                                            No recent data
+                                        </p>
+                                    </div>
+                                </template>
                             </div>
-
                             <div class="card-content is-flex-grow-1">
                                 <div class="media">
                                     <div class="media-left">
@@ -53,18 +124,20 @@
 
                                 <div class="content">
                                     <p>
-                                    {{ platform_rec.properties.long_name }}<br>
-                                    {% if platform_rec.properties.description is not None %}
-                                    {{ platform_rec.properties.description }}
-                                    {% endif %}
+                                        {{ platform_rec.properties.long_name }}<br>
+                                        {% if platform_rec.properties.description is not None %}
+                                            {{ platform_rec.properties.description }}
+                                        {% endif %}
                                     </p>
                                     <p>
                                         {% if platform_rec.properties.begin_date is not None %}
                                             {{ my_datetime|format_datetime }}
-                                        Deployed: {{ platform_rec.properties.begin_date|format_datetime:"%Y-%m-%d" }}
+                                            Deployed:
+                                            {{ platform_rec.properties.begin_date|format_datetime:"%Y-%m-%d" }}
                                         {% endif %}
                                         {% if platform_rec.properties.end_date is not None %}
-                                        Decomissioned: {{ platform_rec.properties.end_date|format_datetime:"%Y-%m-%d" }}
+                                            Decomissioned:
+                                            {{ platform_rec.properties.end_date|format_datetime:"%Y-%m-%d" }}
                                         {% endif %}
                                     </p>
                                 </div>
@@ -78,6 +151,7 @@
 
     </div>
 </section>
-
+{{ platforms_jts_docs|json_script:"platforms-jts-documents" }}
+<script type="module" src="{% static 'build/platform_frontend.js' %}"></script>
 </body>
 </html>

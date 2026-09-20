@@ -1,3 +1,5 @@
+from typing import List, Dict, Any
+
 from django.db.models import BooleanField, F, OuterRef, Prefetch, Q, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.http import Http404, JsonResponse, request
@@ -10,7 +12,8 @@ from CCRABDashboard.api_permissions import HasPrivateApiAccess
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from json_timeseries import TsRecord, TimeSeries, JtsDocument
 import logging
-from geojson import Feature, Point, dumps as geojson_dumps
+from datetime import datetime, timedelta, timezone
+from geojson import Feature, Point
 from .models import (
     Platform,
     PlatformSensorDisplay,
@@ -240,16 +243,135 @@ def PlatformInfo(request, short_name=None):
         },
     )
 
+def _build_js_timeseries(queryset) -> dict[Any, Any]:
+    platforms_docs = {}
+    series_by_key = {}
+
+    for obs_record in queryset:
+        platform_handle = obs_record["platform_handle"]
+        observation_name = obs_record["observation_name"]
+        s_order = obs_record["s_order"]
+
+        jts_document = platforms_docs.get(platform_handle, None)
+        if jts_document is None:
+            jts_document = JtsDocument()
+            platforms_docs[platform_handle] = jts_document
+
+        series_key = (
+            platform_handle,
+            observation_name,
+            s_order,
+        )
+
+        data_ts = series_by_key.get(series_key)
+        if data_ts is None:
+            ident = f"{observation_name} {s_order}"
+            data_ts = TimeSeries(identifier=ident,
+                                 name=observation_name,
+                                 units=obs_record["uom_display"] or obs_record["uom_standard_name"],
+                                 data_type='NUMBER')
+
+            jts_document.series.append(data_ts)
+            series_by_key[series_key] = data_ts
+
+        data_ts.records.append(TsRecord(**{'timestamp': obs_record["m_date"],
+                                           'value': obs_record["m_value"]}))
+
+    return platforms_docs
+
+
+def _platforms_dataset_query(query_params, request, start_date=None, end_date=None):
+    qs = _platform_queryset()
+
+    name = query_params.get("name", None)
+    bbox = _parse_bbox(query_params.get("bbox"))
+    if name:
+        qs = qs.filter(Q(short_name__icontains=name))
+
+    elif bbox:
+        min_lon, min_lat, max_lon, max_lat = bbox
+        qs = qs.filter(
+            fixed_longitude__gte=min_lon,
+            fixed_longitude__lte=max_lon,
+            fixed_latitude__gte=min_lat,
+            fixed_latitude__lte=max_lat,
+        )
+
+    platforms = list(qs)
+
+    platform_ids = [platform.row_id for platform in platforms]
+    served_sensor_ids = (
+        served_sensor_queryset()
+        .filter(platform_id_id__in=platform_ids)
+        .values("row_id")
+    )
+
+    platform_handles = [platform.platform_handle for platform in platforms]
+    latest_rows = (
+        Multi_obs.objects
+        .filter(
+            platform_handle__in=platform_handles,
+            sensor_id__in=served_sensor_ids,
+            m_date__isnull=False,
+            m_value__isnull=False,
+            m_date__gte=start_date,
+            m_date__lte=end_date,
+        )
+        .annotate(
+            observation_name=F(
+                "sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name"
+            ),
+            uom_display=F(
+                "sensor_id__m_type_id__m_scalar_type_id__uom_type_id__display"
+            ),
+            uom_standard_name=F(
+                "sensor_id__m_type_id__m_scalar_type_id__uom_type_id__standard_name"
+            ),
+            s_order=F("sensor_id__s_order"),
+        )
+        .order_by(
+            "platform_handle",
+            "sensor_id_id",
+            "-m_date",
+            "-row_id",
+        )
+        .values(
+            "platform_handle",
+            "sensor_id_id",
+            "observation_name",
+            "s_order",
+            "uom_display",
+            "uom_standard_name",
+            "m_value",
+            "m_date",
+        )
+    )
+    platforms_jts_docs = _build_js_timeseries(latest_rows)
+    json_docs = {}
+    for jts_document in platforms_jts_docs:
+        doc = platforms_jts_docs[jts_document]
+        json_docs[jts_document] = doc.toJSON()
+    serialized = PlatformSerializer(platforms,
+                                    many=True,
+                                    context={"request": request}).data
+
+    return {'platform_recs': serialized,
+            'platforms_jts_docs': json_docs}
+
 
 def PlatformCatalog(request):
     serialized = _platform_collection_payload(request.GET, request)
+    #Build a list of platform_handles to use to get the past 24 hours of data.
+    end_date = datetime.now(tz=timezone.utc)
+    start_date = end_date - timedelta(days=1)
+    platforms_datasets = _platforms_dataset_query(request.GET, request, start_date, end_date)
+
+
+
     return render(
         request,
         "platforms_catalog_base.html",
-        {
-            "platform_recs": serialized,
-        },
-    )
+        platforms_datasets    )
 
 
 def PlatformMap(request):

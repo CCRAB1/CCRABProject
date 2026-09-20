@@ -1,0 +1,44 @@
+.platform-observation-hero {
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+  padding: 1.5rem;
+  text-align: center;
+  background-color: #e8e8e8;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+.platform-observation-reading {
+  width: 100%;
+}
+
+.platform-observation-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.platform-observation-value {
+  margin: 0;
+  font-size: clamp(3rem, 7vw, 5rem);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.platform-observation-category {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.platform-observation-time {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
