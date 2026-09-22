@@ -56,10 +56,9 @@ def calculate_aqi(pm25):
     try:
         # Step 1: Ensure input is a float and truncate to 1 decimal place
         pm25 = int(float(pm25) * 10) / 10.0
+        if pm25 < 0:
+            pm25 = 0
     except (ValueError, TypeError):
-        return None
-
-    if pm25 < 0:
         return None
 
     # Step 2: Loop through the table to find the matching category
