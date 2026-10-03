@@ -218,13 +218,19 @@ export function registerGraphComponents(Alpine) {
                     type: chart_type,
                     data: dataset.data,
                     yAxisID: yAxisId,
-                    borderColor: color.borderColor,
-                    backgroundColor: color.backgroundColor,
+                    //borderColor: color.borderColor,
+                    //backgroundColor: color.backgroundColor,
                     borderWidth: 2,
                     pointStyle: "circle",
                     pointRadius: 2,
                     pointHoverRadius: 8,
                     //tension: 0.25,
+                    backgroundColor: chart_type === "bar"
+                      ? (context) => getAQIColorCode(context.parsed.y).color
+                      : color.backgroundColor,
+                    borderColor: chart_type === "bar"
+                      ? (context) => getAQIColorCode(context.parsed.y).color
+                      : color.borderColor,
                     segment: {
                         borderColor: (chartPt) => {
                             if (dataset.AQIColorRange) {
