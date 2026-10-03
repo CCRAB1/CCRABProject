@@ -143,6 +143,43 @@ html, body { overflow-x: hidden; }
   line-height: 1.25;
 }
 
+.platform-date-range-info {
+  position: relative;
+}
+
+.platform-date-range-info__button {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: #3273dc;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.platform-date-range-info__button:focus-visible {
+  outline: 2px solid #3273dc;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.platform-date-range-info__popup {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  width: max-content;
+  max-width: min(22rem, 80vw);
+  padding: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #d7dfdc;
+  border-radius: 6px;
+  box-shadow: 0 0.5rem 1rem rgba(22, 38, 31, 0.14);
+  color: #22312c;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
 .platform-fact-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
