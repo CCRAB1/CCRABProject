@@ -215,7 +215,7 @@ export function registerGraphComponents(Alpine) {
                 chart.data.datasets.push({
                     id: dataset.id,
                     label: dataset.label,
-                    chart_type: chart_type,
+                    type: chart_type,
                     data: dataset.data,
                     yAxisID: yAxisId,
                     borderColor: color.borderColor,
