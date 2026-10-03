@@ -224,6 +224,7 @@ export function registerGraphComponents(Alpine) {
                     pointStyle: "circle",
                     pointRadius: 2,
                     pointHoverRadius: 8,
+                    order: chart_type === "bar" ? 10 : 0,
                     //tension: 0.25,
                     backgroundColor: chart_type === "bar"
                       ? (context) => getAQIColorCode(context.parsed.y).color
