@@ -1,58 +1,59 @@
 import {getAQIColorCode} from "./calculations.js";
 
 const graphColors = [
-  {
-    name: "Ocean Blue",
-    borderColor: "#2563eb",
-    backgroundColor: "rgba(37, 99, 235, 0.12)",
-  },
-  {
-    name: "Slate",
-    borderColor: "#475569",
-    backgroundColor: "rgba(71, 85, 105, 0.12)",
-  },
-  {
-    name: "Deep Navy",
-    borderColor: "#1e3a8a",
-    backgroundColor: "rgba(30, 58, 138, 0.12)",
-  },
-  {
-    name: "Sky Blue",
-    borderColor: "#0284c7",
-    backgroundColor: "rgba(2, 132, 199, 0.12)",
-  },
-  {
-    name: "Cool Gray",
-    borderColor: "#64748b",
-    backgroundColor: "rgba(100, 116, 139, 0.12)",
-  },
-  {
-    name: "Cyan",
-    borderColor: "#0891b2",
-    backgroundColor: "rgba(8, 145, 178, 0.12)",
-  },
-  {
-    name: "Indigo",
-    borderColor: "#4f46e5",
-    backgroundColor: "rgba(79, 70, 229, 0.12)",
-  },
-  {
-    name: "Violet",
-    borderColor: "#7c3aed",
-    backgroundColor: "rgba(124, 58, 237, 0.12)",
-  },
-  {
-    name: "Purple",
-    borderColor: "#9333ea",
-    backgroundColor: "rgba(147, 51, 234, 0.12)",
-  },
+    {
+        name: "Ocean Blue",
+        borderColor: "#2563eb",
+        backgroundColor: "rgba(37, 99, 235, 0.12)",
+    },
+    {
+        name: "Slate",
+        borderColor: "#475569",
+        backgroundColor: "rgba(71, 85, 105, 0.12)",
+    },
+    {
+        name: "Deep Navy",
+        borderColor: "#1e3a8a",
+        backgroundColor: "rgba(30, 58, 138, 0.12)",
+    },
+    {
+        name: "Sky Blue",
+        borderColor: "#0284c7",
+        backgroundColor: "rgba(2, 132, 199, 0.12)",
+    },
+    {
+        name: "Cool Gray",
+        borderColor: "#64748b",
+        backgroundColor: "rgba(100, 116, 139, 0.12)",
+    },
+    {
+        name: "Cyan",
+        borderColor: "#0891b2",
+        backgroundColor: "rgba(8, 145, 178, 0.12)",
+    },
+    {
+        name: "Indigo",
+        borderColor: "#4f46e5",
+        backgroundColor: "rgba(79, 70, 229, 0.12)",
+    },
+    {
+        name: "Violet",
+        borderColor: "#7c3aed",
+        backgroundColor: "rgba(124, 58, 237, 0.12)",
+    },
+    {
+        name: "Purple",
+        borderColor: "#9333ea",
+        backgroundColor: "rgba(147, 51, 234, 0.12)",
+    },
 ];
 const lineStyles = [
-  [],
-  [6, 4],
-  [2, 4],
-  [10, 4, 2, 4],
+    [],
+    [6, 4],
+    [2, 4],
+    [10, 4, 2, 4],
 ];
+
 class graphSetupInfo {
     constructor(id, yAxisID, xAxisID, timeSeriesIntervalSeconds, useEPABreakpoints) {
         this.id = id;
@@ -69,7 +70,7 @@ export function registerGraphComponents(Alpine) {
             graphInfo: [],
 
             has(id) {
-                 return this.graphInfo.find(nfo => nfo.id === id);
+                return this.graphInfo.find(nfo => nfo.id === id);
             },
 
             add_id(id) {
@@ -86,7 +87,7 @@ export function registerGraphComponents(Alpine) {
 
                 // If the object exists, remove exactly 1 item at that index
                 if (index !== -1) {
-                  this.graphInfo.splice(index, 1);
+                    this.graphInfo.splice(index, 1);
                 }
                 //let updatedNfo = this.graphInfo.filter(nfo => nfo.id === id);
             }
@@ -177,8 +178,7 @@ export function registerGraphComponents(Alpine) {
                 graphInfo.yAxisID = yAxisId;
                 console.debug("Adding dataset id: " + dataset.id + "axis: " + yAxisId);
                 var xAxisKey = "x-" + dataset.xAxis.key;
-                if(!(xAxisKey in chart.options.scales))
-                {
+                if (!(xAxisKey in chart.options.scales)) {
                     chart.options.scales[xAxisKey] = {};
                 }
                 chart.options.scales[xAxisKey] = dataset.xAxis;
@@ -189,8 +189,7 @@ export function registerGraphComponents(Alpine) {
                         unit: dataset.xAxis.unit || "minute",
                     },
                 }*/
-                if(!(yAxisId in chart.options.scales))
-                {
+                if (!(yAxisId in chart.options.scales)) {
                     chart.options.scales[yAxisId] = {};
                 }
                 chart.options.scales[yAxisId] = {
@@ -204,7 +203,7 @@ export function registerGraphComponents(Alpine) {
                         drawOnChartArea: chart.data.datasets.length === 0,
                     },
                 };
-                if(currentColorIndex == graphColors.length) {
+                if (currentColorIndex == graphColors.length) {
                     currentColorIndex = 0;
                 }
                 var color = graphColors[currentColorIndex % graphColors.length];
@@ -223,13 +222,12 @@ export function registerGraphComponents(Alpine) {
                     backgroundColor: color.backgroundColor,
                     borderWidth: 2,
                     pointStyle: "circle",
-                    pointRadius: 6,
+                    pointRadius: 4,
                     pointHoverRadius: 8,
                     //tension: 0.25,
                     segment: {
-                        borderColor: (chartPt) =>
-                        {
-                            if(dataset.AQIColorRange) {
+                        borderColor: (chartPt) => {
+                            if (dataset.AQIColorRange) {
                                 var aqiRange = getAQIColorCode(chartPt.p0.parsed.y);
                                 return aqiRange.color;
                             }
@@ -240,7 +238,7 @@ export function registerGraphComponents(Alpine) {
                 });
                 currentColorIndex += 1;
                 if (chart.scales && chart.scales.y) {
-                  delete chart.scales.y;
+                    delete chart.scales.y;
                 }
 
                 chart.update("none");
@@ -254,7 +252,7 @@ export function registerGraphComponents(Alpine) {
                 if (!chart) return;
 
                 var existingIndex = chart.data.datasets.findIndex((dataset) => {
-                  return dataset.id === id;
+                    return dataset.id === id;
                 });
                 var axisId = "y-" + id.replaceAll(" ", "-");
                 console.debug("Removing dataset id: " + id + "axis: " + axisId);
