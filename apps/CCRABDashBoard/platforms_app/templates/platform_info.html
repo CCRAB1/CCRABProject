@@ -225,11 +225,32 @@
                         <button type="submit" class="button is-primary is-fullwidth" :class="{ 'is-loading': isLoadingObservationData }" :disabled="isLoadingObservationData">Apply</button>
                     </div>
                 </div>
-                <p class="help">Times are shown in your local time zone.</p>
+                <div class="dropdown" :class="{ 'is-active': dateRangeInfoOpen }" @click.outside="dateRangeInfoOpen = false" @keydown.escape.window="dateRangeInfoOpen = false">
+                    <div class="dropdown-trigger">
+                        <button
+                            id="observation-range-info-button"
+                            type="button"
+                            class="button is-text is-small"
+                            @click="dateRangeInfoOpen = !dateRangeInfoOpen"
+                            :aria-expanded="dateRangeInfoOpen.toString()"
+                            aria-controls="observation-range-info"
+                        >
+                            <span aria-hidden="true">ⓘ</span>
+                            <span class="ml-1">About these times</span>
+                        </button>
+                    </div>
+                    <div id="observation-range-info" class="dropdown-menu" role="dialog" aria-labelledby="observation-range-info-button">
+                        <div class="dropdown-content">
+                            <div class="dropdown-item">
+                                <p>Times are shown in your local time zone.</p>
+                                <p class="mt-2" x-show="startDateTime && endDateTime">
+                                    Returned data: <span x-text="startDateTime"></span> to <span x-text="endDateTime"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <p class="help is-danger" x-show="observationRangeError" x-text="observationRangeError" role="alert"></p>
-                <p class="help" x-show="!observationRangeError && startDateTime && endDateTime">
-                    Returned data: <span x-text="startDateTime"></span> to <span x-text="endDateTime"></span>
-                </p>
             </form>
 
             <div class="notification is-warning is-light" x-show="observationLoadError" role="alert" x-text="observationLoadError"></div>
