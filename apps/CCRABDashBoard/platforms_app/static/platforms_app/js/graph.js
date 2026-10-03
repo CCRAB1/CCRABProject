@@ -209,9 +209,9 @@ export function registerGraphComponents(Alpine) {
                 var color = graphColors[currentColorIndex % graphColors.length];
                 //var borderDash = lineStyles[currentColorIndex % lineStyles.length];
                 var chart_type = 'line';
-                /*if(dataset.AQIColorRange) {
+                if(dataset.AQIColorRange) {
                     chart_type = 'bar';
-                }*/
+                }
                 chart.data.datasets.push({
                     id: dataset.id,
                     label: dataset.label,
