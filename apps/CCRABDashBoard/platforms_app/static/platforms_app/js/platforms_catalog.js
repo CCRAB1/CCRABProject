@@ -128,7 +128,7 @@ export function registerPlatformCatalogComponents(Alpine) {
           platformHandle,
           observationId
         );
-
+        //We can set a value used in the CSS.
         return {
           "--platform-aqi-color": range !== undefined ? range.color : "#b5b5b5",
         };

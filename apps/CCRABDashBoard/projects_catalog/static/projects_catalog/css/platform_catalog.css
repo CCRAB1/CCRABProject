@@ -83,7 +83,7 @@
   width: clamp(6.5rem, 52%, 8.5rem);
   aspect-ratio: 1;
   border: 0.65rem solid var(--platform-aqi-color);
-  border-radius: 50%;
+  border-radius: 50%;   /*This is the ring. WIthout the 50% radius, we have a square*/
   background: #ffffff;
   transition: border-color 200ms ease;
 }

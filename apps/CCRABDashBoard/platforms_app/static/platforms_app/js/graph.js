@@ -209,6 +209,10 @@ export function registerGraphComponents(Alpine) {
                 }
                 var color = graphColors[currentColorIndex % graphColors.length];
                 //var borderDash = lineStyles[currentColorIndex % lineStyles.length];
+                var chart_type = 'line';
+                if(dataset.AQIColorRange) {
+                    chart_type = 'bar';
+                }
                 chart.data.datasets.push({
                     id: dataset.id,
                     label: dataset.label,
@@ -224,9 +228,6 @@ export function registerGraphComponents(Alpine) {
                     segment: {
                         borderColor: (chartPt) =>
                         {
-                            //console.log("chartPt: " + JSON.stringify(chartPt));
-                            //var useEPABreakpoints = Alpine.store("graphInfo").has(dataset.id).useEPABreakpoints;
-                            //if (useEPABreakpoints) {
                             if(dataset.AQIColorRange) {
                                 var aqiRange = getAQIColorCode(chartPt.p0.parsed.y);
                                 return aqiRange.color;
@@ -234,7 +235,6 @@ export function registerGraphComponents(Alpine) {
                             return undefined;
                         }
                     }
-                    //borderDash: borderDash
 
                 });
                 currentColorIndex += 1;
