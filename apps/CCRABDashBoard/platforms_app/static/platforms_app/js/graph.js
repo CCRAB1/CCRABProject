@@ -223,8 +223,8 @@ export function registerGraphComponents(Alpine) {
                     backgroundColor: color.backgroundColor,
                     borderWidth: 2,
                     pointStyle: "circle",
-                    pointRadius: 2,
-                    pointHoverRadius: 4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
                     tension: 0.25,
                     segment: {
                         borderColor: (chartPt) =>
