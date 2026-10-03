@@ -46,7 +46,7 @@ function registerAlpineComponents() {
       selectedStartDateTime: "",
       selectedEndDateTime: "",
       observationRangeError: null,
-      dateRangeInfoOpen: false,
+      dateRangeInfoOpen: null,
       currentObservationsToDisplay: null,
       sensorListToDisplay: null,
 
@@ -65,7 +65,7 @@ function registerAlpineComponents() {
         this.selectedStartDateTime = "";
         this.selectedEndDateTime = "";
         this.observationRangeError = null;
-        this.dateRangeInfoOpen = false;
+        this.dateRangeInfoOpen = null;
 
         const client = new CCRABRestClient({
           baseUrl: window.location.origin,

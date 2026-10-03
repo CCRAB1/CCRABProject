@@ -193,7 +193,22 @@
                 <div class="columns is-variable is-3 is-multiline">
                     <div class="column is-12-mobile is-5-tablet">
                         <div class="field">
-                            <label class="label" for="observation-start-date">From</label>
+                            <div class="is-flex is-align-items-center">
+                                <label class="label mb-0" for="observation-start-date">From</label>
+                                <div class="dropdown ml-2" :class="{ 'is-active': dateRangeInfoOpen === 'from' }" @click.outside="dateRangeInfoOpen = null" @keydown.escape.window="dateRangeInfoOpen = null">
+                                    <div class="dropdown-trigger">
+                                        <button type="button" class="button is-text is-small p-0" @click="dateRangeInfoOpen = dateRangeInfoOpen === 'from' ? null : 'from'" :aria-expanded="(dateRangeInfoOpen === 'from').toString()" aria-controls="observation-from-range-info" aria-label="About the selected times">ⓘ</button>
+                                    </div>
+                                    <div id="observation-from-range-info" class="dropdown-menu" role="dialog" aria-label="About the selected times">
+                                        <div class="dropdown-content">
+                                            <div class="dropdown-item">
+                                                <p>Times are shown in your local time zone.</p>
+                                                <p class="mt-2" x-show="startDateTime && endDateTime">Returned data: <span x-text="startDateTime"></span> to <span x-text="endDateTime"></span></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="control">
                                 <input
                                     id="observation-start-date"
@@ -208,7 +223,22 @@
                     </div>
                     <div class="column is-12-mobile is-5-tablet">
                         <div class="field">
-                            <label class="label" for="observation-end-date">To</label>
+                            <div class="is-flex is-align-items-center">
+                                <label class="label mb-0" for="observation-end-date">To</label>
+                                <div class="dropdown ml-2" :class="{ 'is-active': dateRangeInfoOpen === 'to' }" @click.outside="dateRangeInfoOpen = null" @keydown.escape.window="dateRangeInfoOpen = null">
+                                    <div class="dropdown-trigger">
+                                        <button type="button" class="button is-text is-small p-0" @click="dateRangeInfoOpen = dateRangeInfoOpen === 'to' ? null : 'to'" :aria-expanded="(dateRangeInfoOpen === 'to').toString()" aria-controls="observation-to-range-info" aria-label="About the selected times">ⓘ</button>
+                                    </div>
+                                    <div id="observation-to-range-info" class="dropdown-menu" role="dialog" aria-label="About the selected times">
+                                        <div class="dropdown-content">
+                                            <div class="dropdown-item">
+                                                <p>Times are shown in your local time zone.</p>
+                                                <p class="mt-2" x-show="startDateTime && endDateTime">Returned data: <span x-text="startDateTime"></span> to <span x-text="endDateTime"></span></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="control">
                                 <input
                                     id="observation-end-date"
@@ -223,31 +253,6 @@
                     </div>
                     <div class="column is-12-mobile is-2-tablet is-flex is-align-items-flex-end">
                         <button type="submit" class="button is-primary is-fullwidth" :class="{ 'is-loading': isLoadingObservationData }" :disabled="isLoadingObservationData">Apply</button>
-                    </div>
-                </div>
-                <div class="dropdown" :class="{ 'is-active': dateRangeInfoOpen }" @click.outside="dateRangeInfoOpen = false" @keydown.escape.window="dateRangeInfoOpen = false">
-                    <div class="dropdown-trigger">
-                        <button
-                            id="observation-range-info-button"
-                            type="button"
-                            class="button is-text is-small"
-                            @click="dateRangeInfoOpen = !dateRangeInfoOpen"
-                            :aria-expanded="dateRangeInfoOpen.toString()"
-                            aria-controls="observation-range-info"
-                        >
-                            <span aria-hidden="true">ⓘ</span>
-                            <span class="ml-1">About these times</span>
-                        </button>
-                    </div>
-                    <div id="observation-range-info" class="dropdown-menu" role="dialog" aria-labelledby="observation-range-info-button">
-                        <div class="dropdown-content">
-                            <div class="dropdown-item">
-                                <p>Times are shown in your local time zone.</p>
-                                <p class="mt-2" x-show="startDateTime && endDateTime">
-                                    Returned data: <span x-text="startDateTime"></span> to <span x-text="endDateTime"></span>
-                                </p>
-                            </div>
-                        </div>
                     </div>
                 </div>
                 <p class="help is-danger" x-show="observationRangeError" x-text="observationRangeError" role="alert"></p>
