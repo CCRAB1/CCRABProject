@@ -43,6 +43,9 @@ function registerAlpineComponents() {
       observationTimeSeriesDoc: null,
       startDateTime: null,
       endDateTime: null,
+      selectedStartDateTime: "",
+      selectedEndDateTime: "",
+      observationRangeError: null,
       currentObservationsToDisplay: null,
       sensorListToDisplay: null,
 
@@ -58,6 +61,9 @@ function registerAlpineComponents() {
         this.observationTimeSeriesDoc = null;
         this.startDateTime = null;
         this.endDateTime = null;
+        this.selectedStartDateTime = "";
+        this.selectedEndDateTime = "";
+        this.observationRangeError = null;
 
         const client = new CCRABRestClient({
           baseUrl: window.location.origin,
@@ -79,9 +85,11 @@ function registerAlpineComponents() {
             return;
           }
 
-          var endDate = DateTime.utc();
+          var endDate = DateTime.local().startOf("minute");
           var startDate = endDate.minus({ hours: 24 });
-          this.getObservationData(
+          this.selectedStartDateTime = this.toDateTimeLocalValue(startDate);
+          this.selectedEndDateTime = this.toDateTimeLocalValue(endDate);
+          await this.getObservationData(
             startDate,
             endDate,
             this.platformInfo.platformHandle,
@@ -125,6 +133,41 @@ function registerAlpineComponents() {
         finally {
           this.isLoadingObservationData = false;
         }
+      },
+      toDateTimeLocalValue(dateTime) {
+        if (!dateTime || !dateTime.isValid) return "";
+        return dateTime.toFormat("yyyy-LL-dd'T'HH:mm");
+      },
+      selectedDateTime(value) {
+        if (!value) return null;
+
+        var dateTime = DateTime.fromFormat(value, "yyyy-LL-dd'T'HH:mm");
+        return dateTime.isValid ? dateTime : null;
+      },
+      async applyObservationRange() {
+        var startDate = this.selectedDateTime(this.selectedStartDateTime);
+        var endDate = this.selectedDateTime(this.selectedEndDateTime);
+        this.observationRangeError = null;
+
+        if (!startDate || !endDate) {
+          this.observationRangeError = "Choose both a start and end date and time.";
+          return;
+        }
+
+        if (startDate >= endDate) {
+          this.observationRangeError = "The end date and time must be after the start date and time.";
+          return;
+        }
+
+        if (!this.platformInfo || !this.platformInfo.platformHandle) return;
+
+        this.observationTimeSeriesDoc = null;
+        await this.getObservationData(
+          startDate.toUTC(),
+          endDate.toUTC(),
+          this.platformInfo.platformHandle,
+          this.platformInfo.observationNames(),
+        );
       },
       /**
        * Sets up the initial display observations based on the platform info.

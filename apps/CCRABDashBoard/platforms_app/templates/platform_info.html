@@ -186,10 +186,51 @@
 
         <section x-show="activePanel === 'current_data'" x-transition.opacity role="tabpanel" aria-label="Current observations">
             <div class="platform-section-header">
-                <h2>From: <span x-text="startDateTime || 'Not available'"></span></h2>
-                <h2>To: <span x-text="endDateTime || 'Not available'"></span></h2>
                 <span class="tag is-light" x-text="displayedSensorCount"></span>
             </div>
+
+            <form class="platform-date-range box mb-4" @submit.prevent="applyObservationRange()" aria-label="Observation date and time range">
+                <div class="columns is-variable is-3 is-multiline">
+                    <div class="column is-12-mobile is-5-tablet">
+                        <div class="field">
+                            <label class="label" for="observation-start-date">From</label>
+                            <div class="control">
+                                <input
+                                    id="observation-start-date"
+                                    class="input"
+                                    type="datetime-local"
+                                    x-model="selectedStartDateTime"
+                                    :max="selectedEndDateTime || null"
+                                    required
+                                >
+                            </div>
+                        </div>
+                    </div>
+                    <div class="column is-12-mobile is-5-tablet">
+                        <div class="field">
+                            <label class="label" for="observation-end-date">To</label>
+                            <div class="control">
+                                <input
+                                    id="observation-end-date"
+                                    class="input"
+                                    type="datetime-local"
+                                    x-model="selectedEndDateTime"
+                                    :min="selectedStartDateTime || null"
+                                    required
+                                >
+                            </div>
+                        </div>
+                    </div>
+                    <div class="column is-12-mobile is-2-tablet is-flex is-align-items-flex-end">
+                        <button type="submit" class="button is-primary is-fullwidth" :class="{ 'is-loading': isLoadingObservationData }" :disabled="isLoadingObservationData">Apply</button>
+                    </div>
+                </div>
+                <p class="help">Times are shown in your local time zone.</p>
+                <p class="help is-danger" x-show="observationRangeError" x-text="observationRangeError" role="alert"></p>
+                <p class="help" x-show="!observationRangeError && startDateTime && endDateTime">
+                    Returned data: <span x-text="startDateTime"></span> to <span x-text="endDateTime"></span>
+                </p>
+            </form>
 
             <div class="notification is-warning is-light" x-show="observationLoadError" role="alert" x-text="observationLoadError"></div>
             <p class="has-text-grey mb-3" x-show="isLoadingObservationData">Loading observation data…</p>
