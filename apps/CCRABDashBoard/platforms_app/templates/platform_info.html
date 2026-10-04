@@ -275,7 +275,7 @@
                 </template>
             </div>
 
-            <div class="platform-chart-panel" x-data="chartComponent()" @graph:add-dataset.window="addDataset($event.detail)" @graph:remove-dataset.window="removeDataset($event.detail)">
+            <div class="platform-chart-panel" x-data="chartComponent()" @graph:add-dataset.window="addDataset($event.detail)" @graph:update-dataset.window="updateDataset($event.detail)" @graph:remove-dataset.window="removeDataset($event.detail)">
                 <div class="platform-chart-header"><h2 class="platform-section-title">Observation Graph</h2></div>
                 <div class="platform-chart-canvas-wrap"><canvas x-ref="canvas" aria-label="Observation graph"></canvas></div>
             </div>

@@ -128,9 +128,12 @@ function registerAlpineComponents() {
             observations
           );
           this.observationTimeSeriesDoc = StatsJtsDocument.from(observationData['properties']['timeseries']);
-        } catch (error) {
+          return true;
+        }
+        catch (error) {
           console.error("Unable to load observation data", error);
           this.observationLoadError = "Current observations could not be loaded.";
+          return false;
         }
         finally {
           this.isLoadingObservationData = false;
@@ -163,13 +166,58 @@ function registerAlpineComponents() {
 
         if (!this.platformInfo || !this.platformInfo.platformHandle) return;
 
+        var graphedSeriesIds = this.graphedSeriesIds();
         this.observationTimeSeriesDoc = null;
-        await this.getObservationData(
+        var observationDataLoaded = await this.getObservationData(
           startDate.toUTC(),
           endDate.toUTC(),
           this.platformInfo.platformHandle,
           this.platformInfo.observationNames(),
         );
+        if (observationDataLoaded) {
+          this.refreshGraphedObservations(graphedSeriesIds);
+        }
+      },
+      graphedSeriesIds() {
+        var graphStore = Alpine.store("graphInfo");
+        var seriesIds = [];
+        if (!graphStore || !Array.isArray(graphStore.graphInfo)) return seriesIds;
+
+        for (const graphInfo of graphStore.graphInfo) {
+          seriesIds.push(graphInfo.id);
+        }
+        return seriesIds;
+      },
+      refreshGraphedObservations(graphedSeriesIds) {
+        if (!this.platformInfo || !Array.isArray(graphedSeriesIds)) return;
+
+        for (const sensor of this.platformInfo.displayedSensors()) {
+          var seriesId = this.observationSeriesId(sensor.obsStandardName, sensor.order);
+          if (graphedSeriesIds.indexOf(seriesId) === -1) continue;
+
+          var payload = this.buildChartSeriesPayload(sensor.obsStandardName, sensor.order);
+          if (!payload) {
+            payload = {
+              id: seriesId,
+              label: this.formatObservationLabel(sensor.obsStandardName, sensor.order),
+              data: [],
+              xAxis: {
+                key: "observation-time",
+                type: "time",
+                unit: "minute",
+                tooltipFormat: "yyyy-MMM-d,  h:mm a",
+                maxTicksLimit: 10,
+                displayFormats: {
+                  hour: "HH:MM",
+                },
+              },
+            };
+          }
+
+          window.dispatchEvent(new CustomEvent("graph:update-dataset", {
+            detail: payload,
+          }));
+        }
       },
       /**
        * Sets up the initial display observations based on the platform info.

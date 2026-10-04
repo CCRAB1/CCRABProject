@@ -250,6 +250,27 @@ export function registerGraphComponents(Alpine) {
 
                 chart.update("none");
             },
+            updateDataset(dataset) {
+                if (!chart || !dataset || !dataset.id || !Array.isArray(dataset.data)) {
+                    console.warn("Invalid graph dataset payload", dataset);
+                    return;
+                }
+
+                var existingDataset = chart.data.datasets.find((item) => {
+                    return item.id === dataset.id;
+                });
+                if (!existingDataset) {
+                    this.addDataset(dataset);
+                    return;
+                }
+
+                existingDataset.data = dataset.data;
+                existingDataset.label = dataset.label;
+
+                var xAxisKey = "x-" + dataset.xAxis.key;
+                chart.options.scales[xAxisKey] = dataset.xAxis;
+                chart.update("none");
+            },
             /**
              * When the user clicks on an observation that is currently displayed, this function will remove the dataset
              * from the graph.
