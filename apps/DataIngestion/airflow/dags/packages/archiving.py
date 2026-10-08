@@ -60,6 +60,8 @@ def zip_files(archive_directory: Path):
 
 
 def zip_directory_relative(source_dir: Path, output_zippath: Path, remove_source_after_zip: bool = True):
+    logger = logging.getLogger()
+    logger.info(f"Zipping directory: {source_dir}")
     # Convert input to a resolved, absolute Path object
     source_path = source_dir.resolve()
 
@@ -69,7 +71,7 @@ def zip_directory_relative(source_dir: Path, output_zippath: Path, remove_source
             if item.is_file():
                 # Extract the path relative to the root source directory
                 relative_path = item.relative_to(source_path)
-
+                logger.info(f"Adding file to zip: {relative_path}")
                 # Write to zip: item is the disk location, relative_path is the internal ZIP path
                 zipf.write(item, arcname=relative_path)
     #Now that the files are zipped, let's remove them from the source directory
