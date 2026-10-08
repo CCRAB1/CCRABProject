@@ -892,8 +892,7 @@ def purple_air_processing():
                 )
 
 
-                start_row = (pd.to_datetime(epa_df.head(1)["m_date"]) - np.array(timedelta(hours=24)).dt.to_pydatetime())[0]
-                #end_row = np.array(pd.to_datetime(epa_df.tail(1)["m_date"]).dt.to_pydatetime())[0]
+                start_row = (pd.to_datetime(epa_df.head(1)["m_date"]) - timedelta(hours=24)).dt.to_pydatetime()[0]
                 end_row = (pd.to_datetime(epa_df.tail(1)["m_date"])).dt.to_pydatetime()[0]
                 #The aqi calculation is based on the EPA corrected data.
                 column_for_aqi_calc = "pm2.5_EPAc"
