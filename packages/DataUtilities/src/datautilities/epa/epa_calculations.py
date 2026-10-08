@@ -1,3 +1,6 @@
+from datautilities import logger
+
+
 def apply_epa_correction(pm25_cf1_a, humidity_a, pm25_cf1_b, humidity_b):
     """
     Applies EPA correction to PM2.5 concentration values.
@@ -59,6 +62,7 @@ def calculate_aqi(pm25):
         if pm25 < 0:
             pm25 = 0
     except (ValueError, TypeError):
+        logger.error("Invalid input for PM2.5 concentration: {}".format(pm25))
         return None
 
     # Step 2: Loop through the table to find the matching category
@@ -72,5 +76,5 @@ def calculate_aqi(pm25):
     # Return 501+ for concentrations beyond the official index scale
     if pm25 > 500.4:
         return round(pm25)
-
+    logger.warning("PM2.5 concentration out of range: {}".format(pm25))
     return None
