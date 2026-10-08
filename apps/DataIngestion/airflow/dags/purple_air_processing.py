@@ -611,7 +611,7 @@ def purple_air_processing():
                                     raw_value = row[column_name]
                                     val = float(raw_value)
                                 except (ValueError, TypeError) as e:
-                                    logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
+                                    logger.error(f"Unable to process column: {column_name}  Value: {row[column_name]} Row: {row}({row_ndx})")
                                     logger.exception(e)
 
                                     continue
