@@ -92,7 +92,10 @@ function registerAlpineComponents() {
           this.selectedStartDateTime = this.toDateTimeLocalValue(startDate);
           this.selectedEndDateTime = this.toDateTimeLocalValue(endDate);
           await this.getObservationData(
-            startDate,
+            startDate.toUTC(),
+            endDate.toUTC(),
+            this.platformInfo.platformHandle,
+            observations,
             endDate,
             this.platformInfo.platformHandle,
             observations,
