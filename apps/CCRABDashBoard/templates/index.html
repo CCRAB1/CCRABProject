@@ -1,0 +1,66 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Explore CCRAB's community air monitoring platforms and research projects.">
+    <title>CCRAB Data Hub</title>
+    <link rel="stylesheet" href="{% static 'css/splash.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="{% url 'home' %}" aria-label="CCRAB Data Hub home">
+                <img src="{% static 'images/ccrab_logo.png' %}" alt="CCRAB" width="205" height="59">
+            </a>
+            <span class="header-label">Data Hub</span>
+        </div>
+    </header>
+
+    <main>
+        <section class="intro" aria-labelledby="page-title">
+            <div class="intro-inner">
+                <p class="eyebrow">Charleston Community Research to Action Board</p>
+                <h1 id="page-title">Explore the CCRAB Data Hub</h1>
+                <p class="intro-copy">The CCRAB Data Hub brings community air monitoring and local research together in one place. Explore where sensors are deployed, see recent air quality readings, and learn about the projects and partnerships behind the work.</p>
+            </div>
+        </section>
+
+        <div class="catalog-grid" aria-label="Data Hub components">
+            <section class="catalog-card" aria-labelledby="platforms-title">
+                <a class="preview" href="https://datahub.ccrabsc.org/platforms_catalog" aria-label="Explore the Platforms Catalog">
+                    <img src="{% static 'images/splash/platforms-catalog.png' %}"
+                         alt="Screenshot of the Platforms Catalog showing monitoring locations and recent PM2.5 AQI readings"
+                         width="3360" height="1460">
+                </a>
+                <div class="card-body">
+                    <p class="card-kicker">Monitoring data</p>
+                    <h2 id="platforms-title">Platforms Catalog</h2>
+                    <p>Browse monitoring locations and recent PM2.5 AQI readings. Open a platform to see its sensors, observations, and deployment details.</p>
+                    <a class="card-link" href="https://datahub.ccrabsc.org/platforms_catalog">Explore platforms <span aria-hidden="true">&rarr;</span></a>
+                </div>
+            </section>
+
+            <section class="catalog-card" aria-labelledby="projects-title">
+                <a class="preview" href="https://datahub.ccrabsc.org/projects_catalog" aria-label="Explore the Projects Catalog">
+                    <img src="{% static 'images/splash/projects-catalog.png' %}"
+                         alt="Screenshot of the Projects Catalog showing project filters and a research project card"
+                         width="3360" height="1460">
+                </a>
+                <div class="card-body">
+                    <p class="card-kicker">Community research</p>
+                    <h2 id="projects-title">Projects Catalog</h2>
+                    <p>Discover CCRAB research projects, filter by topic or location, and find the resources and data products connected to each project.</p>
+                    <a class="card-link" href="https://datahub.ccrabsc.org/projects_catalog">Explore projects <span aria-hidden="true">&rarr;</span></a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>Charleston Community Research to Action Board</p>
+        <a href="https://www.ccrabsc.org/">Visit CCRAB <span aria-hidden="true">&rarr;</span></a>
+    </footer>
+</body>
+</html>
