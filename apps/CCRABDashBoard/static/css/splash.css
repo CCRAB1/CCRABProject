@@ -1,0 +1,193 @@
+@font-face {
+    font-family: Montserrat;
+    src: url("../fonts/montserrat/Montserrat-Regular.woff2") format("woff2");
+    font-display: swap;
+}
+
+@font-face {
+    font-family: Montserrat;
+    src: url("../fonts/montserrat/Montserrat-SemiBold.woff2") format("woff2");
+    font-weight: 600;
+    font-display: swap;
+}
+
+:root {
+    color-scheme: light;
+    font-family: Montserrat, Arial, sans-serif;
+    color: #202733;
+    background: #f7f8f6;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; }
+
+a { color: inherit; }
+
+a:focus-visible {
+    outline: 3px solid #3c9f76;
+    outline-offset: 4px;
+}
+
+.site-header {
+    background: #111516;
+    color: #fff;
+}
+
+.header-inner, .intro-inner, .catalog-grid, .site-footer {
+    width: min(1160px, calc(100% - 48px));
+    margin-inline: auto;
+}
+
+.header-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 86px;
+    gap: 24px;
+}
+
+.brand { display: inline-flex; align-items: center; }
+.brand img { display: block; width: 205px; height: auto; }
+
+.header-label {
+    padding-left: 22px;
+    border-left: 1px solid rgba(255, 255, 255, .35);
+    font-size: .85rem;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+}
+
+.intro {
+    padding: clamp(54px, 8vw, 104px) 0 66px;
+    background: linear-gradient(135deg, #e8f3ec 0%, #f7f8f6 65%);
+}
+
+.intro-inner { max-width: 1160px; }
+
+.eyebrow, .card-kicker {
+    margin: 0 0 16px;
+    color: #28684e;
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+}
+
+h1, h2, p { margin-top: 0; }
+
+h1 {
+    max-width: 780px;
+    margin-bottom: 22px;
+    font-size: clamp(2.4rem, 5vw, 4.25rem);
+    font-weight: 600;
+    letter-spacing: -.045em;
+    line-height: 1.12;
+}
+
+.intro-copy {
+    max-width: 780px;
+    margin-bottom: 0;
+    color: #46534e;
+    font-size: clamp(1rem, 1.45vw, 1.15rem);
+    line-height: 1.8;
+}
+
+.catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px;
+    padding-block: 54px 90px;
+}
+
+.catalog-card {
+    overflow: hidden;
+    border: 1px solid #e1e6e2;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 16px 45px rgba(30, 55, 40, .06);
+}
+
+.preview {
+    display: block;
+    height: clamp(220px, 24vw, 300px);
+    overflow: hidden;
+    background: #e9eeeb;
+}
+
+.preview img {
+    display: block;
+    width: 136%;
+    max-width: none;
+    height: 100%;
+    object-fit: cover;
+    object-position: left top;
+    transition: transform .25s ease;
+}
+
+.preview:hover img { transform: scale(1.025); }
+
+.card-body { padding: 32px 34px 36px; }
+
+.card-kicker { margin-bottom: 10px; }
+
+h2 {
+    margin-bottom: 14px;
+    font-size: clamp(1.45rem, 2.4vw, 1.9rem);
+    font-weight: 600;
+    letter-spacing: -.035em;
+}
+
+.card-body > p:not(.card-kicker) {
+    min-height: 5.4em;
+    margin-bottom: 22px;
+    color: #52605a;
+    line-height: 1.8;
+}
+
+.card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: #1e664a;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.card-link:hover { text-decoration: underline; }
+.card-link span { font-size: 1.3em; }
+
+.site-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding-block: 25px 34px;
+    border-top: 1px solid #dce3dd;
+    color: #5e6962;
+    font-size: .85rem;
+}
+
+.site-footer p { margin-bottom: 0; }
+.site-footer a { text-decoration: none; }
+.site-footer a:hover { text-decoration: underline; }
+
+@media (max-width: 720px) {
+    .catalog-grid { grid-template-columns: 1fr; padding-block: 32px 56px; }
+    .preview { height: clamp(220px, 56vw, 330px); }
+    .card-body > p:not(.card-kicker) { min-height: 0; }
+    .intro { padding-bottom: 48px; }
+}
+
+@media (max-width: 480px) {
+    .header-inner, .intro-inner, .catalog-grid, .site-footer { width: min(100% - 32px, 1160px); }
+    .header-inner { min-height: 72px; }
+    .brand img { width: 155px; }
+    .header-label { padding-left: 12px; font-size: .67rem; }
+    .card-body { padding: 26px; }
+    .site-footer { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .preview img { transition: none; }
+}
