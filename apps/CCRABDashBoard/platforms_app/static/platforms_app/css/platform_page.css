@@ -212,10 +212,6 @@ html, body { overflow-x: hidden; }
   display: grid;
   gap: 0.0rem;
 }
-.platform-observation-list .columns {
-  margin-top: -0.25rem;
-  margin-bottom: -0.25rem;
-}
 .platform-observation-list .column {
   margin-top: -0.25rem;
   margin-bottom: -0.25rem;
