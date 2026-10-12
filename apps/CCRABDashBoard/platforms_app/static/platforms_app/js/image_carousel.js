@@ -95,16 +95,25 @@ function registerAlpineComponents() {
             startDate.toUTC(),
             endDate.toUTC(),
             this.platformInfo.platformHandle,
-            observations,
-            endDate,
-            this.platformInfo.platformHandle,
-            observations,
+            observations
           );
         } catch (error) {
           console.error("Unable to load platform information", error);
           this.platformLoadError = this.platformErrorMessage(error);
         } finally {
           this.isLoadingPlatform = false;
+          //Now let's graph the observations
+          for (const sensor_nfo of this.platformInfo.displayedSensors())
+          {
+            //We will have multiple sensors of the same type, so we build the key based on name and order.
+            var obs_key = sensor_nfo.obsStandardName + " " + sensor_nfo.order;
+            this.currentObservationsToDisplay[platform_handle][obs_key] = false;
+            if(default_obs_to_display.includes(obs_key)) {
+              console.log("Setting default observation to true: " + obs_key);
+              this.currentObservationsToDisplay[platform_handle][obs_key] = true;
+            }
+          }
+
         }
       },
       platformErrorMessage(error) {
@@ -246,7 +255,6 @@ function registerAlpineComponents() {
             if(default_obs_to_display.includes(obs_key)) {
               console.log("Setting default observation to true: " + obs_key);
               this.currentObservationsToDisplay[platform_handle][obs_key] = true;
-              this.graphObservationClicked(sensor_nfo.obsStandardName, sensor_nfo.order);
             }
           }
         }
