@@ -19,6 +19,11 @@ class CatalogRoutesTests(SimpleTestCase):
         url = reverse("projects-index")
         self.assertEqual(url, "/projects_catalog/")
 
+    def test_projects_index_page_renders(self):
+        response = self.client.get(reverse("projects-index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Projects")
+
     def test_projects_map_route_resolves(self):
         url = reverse("projects-map")
         self.assertEqual(url, "/projects_catalog/map/")

@@ -4,15 +4,6 @@
 {% block title %}Platform{% endblock %}
 
 {% block platform_header %}
-    <nav class="breadcrumb is-small platform-breadcrumb" aria-label="breadcrumbs">
-        <ul>
-            <li><a href="{% url 'platform_catalog' %}">Platforms</a></li>
-            <li class="is-active">
-                <a href="#" aria-current="page" x-text="platformInfo?.shortName || requestedShortName"></a>
-            </li>
-        </ul>
-    </nav>
-
     <div x-show="isLoadingPlatform && !platformInfo" aria-live="polite">
         <progress class="progress is-small is-primary" max="100">Loading platform</progress>
         <p class="has-text-grey">Loading platform information…</p>

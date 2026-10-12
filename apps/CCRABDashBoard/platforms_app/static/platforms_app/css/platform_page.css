@@ -29,10 +29,6 @@ html, body { overflow-x: hidden; }
   padding-top: 1.5rem;
 }
 
-.platform-breadcrumb {
-  margin-bottom: 0.75rem;
-}
-
 .platform-header-grid {
   display: flex;
   align-items: flex-end;

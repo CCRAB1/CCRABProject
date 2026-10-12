@@ -18,6 +18,10 @@
     <body class="platforms-map-page">
     {% include "top_navbar_template.html" %}
 
+    <div class="platforms-map-breadcrumb">
+        {% include "_catalog_breadcrumb.html" %}
+    </div>
+
     <main class="platforms-map-shell" x-data="platformsMap()" x-cloak>
         <aside class="platforms-map-controls" aria-label="Platform map controls">
             <div class="platforms-map-controls-header">

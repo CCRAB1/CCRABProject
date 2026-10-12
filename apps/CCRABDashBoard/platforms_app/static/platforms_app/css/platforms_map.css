@@ -19,6 +19,12 @@
     flex: 0 0 auto;
 }
 
+.platforms-map-breadcrumb {
+    background: #f6f8fb;
+    flex: 0 0 auto;
+    padding: 0.75rem 1.25rem 0;
+}
+
 .platforms-map-shell {
     background: #f6f8fb;
     display: flex;

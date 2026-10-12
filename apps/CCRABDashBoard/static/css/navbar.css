@@ -99,6 +99,10 @@
   color: #ffffff;
 }
 
+.catalog-breadcrumb {
+  margin-bottom: 0.75rem;
+}
+
 /* Ensure nav doesn't cause horizontal scroll */
 .navbar, .navbar-inner, .nav-links { max-width: 100%; overflow: visible; }
 

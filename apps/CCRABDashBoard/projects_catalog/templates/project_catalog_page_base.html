@@ -36,10 +36,6 @@
         .page-montserrat {
             font-family: "Montserrat", Arial, sans-serif;
         }
-        .project-breadcrumb {
-            margin-bottom: 0.75rem;
-        }
-
     </style>
 
     {% block extra_head %}{% endblock %}
@@ -49,7 +45,7 @@
 
     <section class="section">
         <div class="container">
-            {% include "_projects_breadcrumb.html" %}
+            {% include "_catalog_breadcrumb.html" %}
             {% block content %}{% endblock %}
         </div>
     </section>
