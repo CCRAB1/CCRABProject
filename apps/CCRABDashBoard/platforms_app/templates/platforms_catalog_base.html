@@ -7,11 +7,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <link rel="preload" href="{% static 'fonts/montserrat/Montserrat-Regular.woff2' %}" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
     <link rel="stylesheet" href="{% static 'css/bulma/css/versions/bulma-no-dark-mode.css' %}">
     <link rel="stylesheet" href="{% static 'projects_catalog/css/platform_catalog.css' %}">
     <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
 
     <title>{% block title %}Platform{% endblock %}</title>
+    <style>
+        .catalog-breadcrumb {
+            font-family: var(--font-body);
+        }
+    </style>
 </head>
 <body>
 {% include "top_navbar_template.html" %}
