@@ -400,6 +400,16 @@ function registerAlpineComponents() {
           }));
         }
       },
+      /**
+       * Returns whether an observation's series is currently displayed in the graph.
+       * @param obsStandardName
+       * @param obsSOrder
+       * @returns {boolean}
+       */
+      isObservationGraphed(obsStandardName, obsSOrder) {
+        var graphStore = Alpine.store("graphInfo");
+        return !!graphStore?.has(this.observationSeriesId(obsStandardName, obsSOrder));
+      },
       buildChartSeriesPayload(obsStandardName, obsSOrder) {
         if (!this.observationTimeSeriesDoc) return null;
 

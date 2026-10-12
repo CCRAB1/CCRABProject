@@ -252,6 +252,13 @@
                     <template x-if="getObservationDisplayState(obs_row.obsStandardName, obs_row.obsSOrder)">
                         <div class="columns is-mobile">
                             <div class="column is-one-quarter" @click="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
+                                <label class="checkbox mr-2" @click.stop>
+                                    <input type="checkbox"
+                                           :aria-label="'Graph ' + formatObservationLabel(obs_row.obsStandardName, obs_row.obsSOrder)"
+                                           :checked="isObservationGraphed(obs_row.obsStandardName, obs_row.obsSOrder)"
+                                           @click.stop
+                                           @change="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
+                                </label>
                                 <span x-text="obs_row.obsStandardName"></span>
                                 <span x-text="obs_row.obsSOrderLabel"></span>
                             </div>
