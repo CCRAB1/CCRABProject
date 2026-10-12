@@ -334,6 +334,7 @@ class Obs_type(models.Model):
     standard_name = models.CharField(max_length=50, null=True, blank=True)
     definition = models.CharField(max_length=1000, null=True, blank=True)
     display = models.CharField(max_length=50, null=True, blank=True)
+    info_url = models.CharField(max_length=200, null=True, blank=True)
 
     class Meta:
         db_table = '"platforms"."obs_type"'
