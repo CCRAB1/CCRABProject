@@ -247,7 +247,7 @@
                 <template x-for="obs_row in observationTableRows" :key="obs_row.key">
                     <template x-if="getObservationDisplayState(obs_row.obsStandardName, obs_row.obsSOrder)">
                         <div class="columns is-mobile">
-                            <div class="column is-one-quarter" @click="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
+                            <div class="column is-one-quarter">
                                 <label class="checkbox mr-2" @click.stop>
                                     <input type="checkbox"
                                            :aria-label="'Graph ' + formatObservationLabel(obs_row.obsStandardName, obs_row.obsSOrder)"
@@ -257,6 +257,27 @@
                                 </label>
                                 <span x-text="obs_row.obsStandardName"></span>
                                 <span x-text="obs_row.obsSOrderLabel"></span>
+                                <span class="platform-date-range-info ml-2"
+                                     @click.outside="if (observationInfoOpen === obs_row.key) observationInfoOpen = null"
+                                     @keydown.escape.window="observationInfoOpen = null">
+                                    <button type="button"
+                                            class="platform-date-range-info__button"
+                                            @click.stop="observationInfoOpen = observationInfoOpen === obs_row.key ? null : obs_row.key"
+                                            :aria-expanded="(observationInfoOpen === obs_row.key).toString()"
+                                            :aria-controls="'observation-info-' + obs_row.key"
+                                            :aria-label="'About ' + formatObservationLabel(obs_row.obsStandardName, obs_row.obsSOrder)">
+                                        ⓘ
+                                    </button>
+                                    <div :id="'observation-info-' + obs_row.key"
+                                         class="platform-date-range-info__popup"
+                                         x-show="observationInfoOpen === obs_row.key"
+                                         x-cloak
+                                         x-transition
+                                         role="dialog"
+                                         :aria-label="'About ' + formatObservationLabel(obs_row.obsStandardName, obs_row.obsSOrder)">
+                                        <p x-text="obs_row.obsDefinition"></p>
+                                    </div>
+                                </span>
                             </div>
                             <div class="column" @click="graphObservationClicked(obs_row.obsStandardName, obs_row.obsSOrder)">
                                 <span class="tag is-info is-light" x-show="obs_row.units" x-text="obs_row.units"></span>

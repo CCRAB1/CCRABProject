@@ -47,6 +47,7 @@ function registerAlpineComponents() {
       selectedEndDateTime: "",
       observationRangeError: null,
       dateRangeInfoOpen: null,
+      observationInfoOpen: null,
       currentObservationsToDisplay: null,
       sensorListToDisplay: null,
 
@@ -66,6 +67,8 @@ function registerAlpineComponents() {
         this.selectedEndDateTime = "";
         this.observationRangeError = null;
         this.dateRangeInfoOpen = null;
+        this.observationInfoOpen = null;
+
 
         const client = new CCRABRestClient({
           baseUrl: window.location.origin,
@@ -356,6 +359,8 @@ function registerAlpineComponents() {
             obsStandardName: sensor.obsStandardName,
             obsSOrder: sensor.order,
             obsSOrderLabel: this.formatSOrder(sensor.order),
+            obsDefinition: sensor.obsDefinition,
+            obs_info_url: sensor.obs_info_url || "",
             units: sensor.uomDisplay || sensor.uomStandardName,
             display: this.getObservationDisplayState(sensor.obsStandardName,
                                                       sensor.order),
