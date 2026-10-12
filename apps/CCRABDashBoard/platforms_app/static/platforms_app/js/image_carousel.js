@@ -246,6 +246,7 @@ function registerAlpineComponents() {
             if(default_obs_to_display.includes(obs_key)) {
               console.log("Setting default observation to true: " + obs_key);
               this.currentObservationsToDisplay[platform_handle][obs_key] = true;
+              this.graphObservationClicked(sensor_nfo.obsStandardName, sensor_nfo.order);
             }
           }
         }
