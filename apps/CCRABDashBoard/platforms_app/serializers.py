@@ -36,7 +36,7 @@ class MTypeSerializer(serializers.ModelSerializer):
 class SensorAnnotatedSerializer(serializers.ModelSerializer):
     obs_standard_name = serializers.CharField(read_only=True)
     obs_definition = serializers.CharField(read_only=True)
-    obs_info_url = serializers.CharField(read_only=True)
+    info_url = serializers.CharField(read_only=True)
     uom_display = serializers.CharField(read_only=True)
     uom_standard_name = serializers.CharField(read_only=True)
     uom_definition = serializers.CharField(read_only=True)
@@ -50,7 +50,7 @@ class SensorAnnotatedSerializer(serializers.ModelSerializer):
             'active',
             'obs_standard_name',
             'obs_definition',
-            'obs_info_url',
+            'info_url',
             'uom_display',
             'uom_standard_name',
             'uom_definition'
