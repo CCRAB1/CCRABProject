@@ -10,7 +10,7 @@ from .models import (Platform, Sample, Sensor, M_type, M_scalar_type, Obs_type, 
 class ObsTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Obs_type
-        fields = ('standard_name', 'definition', 'display')
+        fields = ('standard_name', 'definition', 'display', 'info_url')
 
 class UomTypeSerializer(serializers.ModelSerializer):
     class Meta:
