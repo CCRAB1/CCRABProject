@@ -360,7 +360,7 @@ function registerAlpineComponents() {
             obsSOrder: sensor.order,
             obsSOrderLabel: this.formatSOrder(sensor.order),
             obsDefinition: sensor.obsDefinition,
-            obs_info_url: sensor.obs_info_url || "",
+            obsInfoUrl: sensor.obs_info_url || "",
             units: sensor.uomDisplay || sensor.uomStandardName,
             display: this.getObservationDisplayState(sensor.obsStandardName,
                                                       sensor.order),
