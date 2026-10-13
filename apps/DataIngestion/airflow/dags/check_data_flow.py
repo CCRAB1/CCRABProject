@@ -77,7 +77,7 @@ if remote_debug == "True":
 
 default_args = {
     'owner': 'airflow',
-    'email': ['ChiefDan@gmail.com'],
+    'email': ['ChiefDan@gmail.com', 'info@ccrabsc.org'],
     'email_on_failure': True,
     'email_on_retry': False,
     'start_date': pendulum.datetime(2026, 1, 1, tz="UTC")
