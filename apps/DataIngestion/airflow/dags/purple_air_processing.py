@@ -258,6 +258,19 @@ def purple_air_processing():
                                     out_file_obj.write(f"{row}\n")
                                 logger.info(f"Wrote {ndx+1} rows to {output_file}")
                                 saved_data_files.append(str(output_file))
+                            #Let's check if we have a gap in the data/times. The data returned is not ordered
+                            #so we load it up in a dataframe.
+                            platform_file_df = pd.read_csv(output_file)
+                            # The files aren't sorted by date/time from the API. We'll do that here.
+                            platform_file_df['DateTimeStamp'] = pd.to_datetime(platform_file_df['time_stamp'],
+                                                                             #2026-07-22T13:23:54Z
+                                                                             format="%Y-%m-%dT%H:%M:%SZ")
+                            platform_file_df.sort_values(by='DateTimeStamp', inplace=True)
+                            platform_file_df.drop(columns='DateTimeStamp', inplace=True)
+                            platform_file_df["gap"] = platform_file_df["time_stamp"].diff()
+                            gaps = platform_file_df[platform_file_df["gap"] > pd.to_timedelta("3 minutes")]
+                            if len(gaps) > 0:
+                                logger.warning(f"Gap in data for platform: {platform_handle} File: {output_file}")
                         except Exception as e:
                             logger.error(f"Failed to write file: {output_file}")
 
