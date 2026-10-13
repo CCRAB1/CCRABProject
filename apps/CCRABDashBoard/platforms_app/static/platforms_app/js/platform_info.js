@@ -159,6 +159,7 @@ export class PlatformInfo {
       channelLabel: order === 1 ? "A" : "B",
       obsStandardName: source.obs_standard_name || "",
       obsDefinition: source.obs_definition || "",
+      obsInfoUrl: source.info_url || "",
       uomDisplay: source.uom_display || "",
       uomStandardName: source.uom_standard_name || "",
       uomDefinition: source.uom_definition || "",
