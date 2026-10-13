@@ -275,7 +275,7 @@ def purple_air_processing():
                             platform_file_df["gap"] = platform_file_df["time_stamp"].diff()
                             gaps = platform_file_df[platform_file_df["gap"] > pd.to_timedelta("3 minutes")]
                             if not gaps.empty:
-                                logger.warning(f"Gap in data for platform: {platform_handle} File: {output_file}")
+                                logger.warning(f"Gap in data for platform: {platform_handle} File: {output_file} Gaps: {gaps}")
                         except Exception as e:
                             logger.error(f"Failed to write file: {output_file}")
 
