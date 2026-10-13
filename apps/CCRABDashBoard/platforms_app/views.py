@@ -96,6 +96,7 @@ def _platform_sensor_queryset(include_display_overrides=False):
         .annotate(
             obs_standard_name=F("m_type_id__m_scalar_type_id__obs_type_id__standard_name"),
             obs_definition=F("m_type_id__m_scalar_type_id__obs_type_id__definition"),
+            info_url=F("m_type_id__m_scalar_type_id__obs_type_id__info_url"),
             uom_display=F("m_type_id__m_scalar_type_id__uom_type_id__display"),
             uom_standard_name=F("m_type_id__m_scalar_type_id__uom_type_id__standard_name"),
             uom_definition=F("m_type_id__m_scalar_type_id__uom_type_id__definition"),
