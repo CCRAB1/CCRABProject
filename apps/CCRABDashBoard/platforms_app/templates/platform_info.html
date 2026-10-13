@@ -276,7 +276,7 @@
                                          role="dialog"
                                          :aria-label="'About ' + formatObservationLabel(obs_row.obsStandardName, obs_row.obsSOrder)">
                                         <p x-text="obs_row.obsDefinition"></p>
-                                        <p>For additional information, visit <a :href="obs_row.info_url" target="_blank">here</a>.</p>
+                                        <p x-if="obs_row.obsInfoUrl.length">For additional information, visit <a :href="obs_row.obsInfoUrl" target="_blank">here</a>.</p>
                                     </div>
                                 </span>
                             </div>
