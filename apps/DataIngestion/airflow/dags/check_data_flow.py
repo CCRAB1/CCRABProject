@@ -362,6 +362,7 @@ def check_data_flow():
     @task()
     def send_alerts(**context):
         logger.info("Beginning the send_alerts task")
+        current_dag = context["dag"]
 
         setup_django()
         from platforms_app.models import Platform_status
@@ -539,7 +540,8 @@ def check_data_flow():
                 base_directory = (Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / Variable.get("DATA_FLOW_CHECK"))
                 out_filename = base_directory / f"alert_report-{report_time.timestamp()}.html"
                 report = write_output_file(out_filename, report_time, template_data)
-                send_email_alert(report_time, report, recipients=['ChiefDan@gmail.com'])
+                dag_emails = current_dag.default_args.get("email")
+                send_email_alert(report_time, report, recipients=dag_emails)
 
         return
 
