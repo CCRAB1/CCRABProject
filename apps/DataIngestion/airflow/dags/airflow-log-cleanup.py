@@ -7,18 +7,18 @@ airflow trigger_dag --conf '[curly-braces]"maxLogAgeInDays":30[curly-braces]' ai
 """
 import logging
 import os
-from datetime import timedelta
+from datetime import datetime,timedelta
 
 import airflow
 import jinja2
 from airflow.configuration import conf
 from airflow.models import DAG, Variable
-from airflow.operators.bash_operator import BashOperator
-from airflow.operators.dummy_operator import DummyOperator
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.bash import BashOperator
 
 # airflow-log-cleanup
 DAG_ID = os.path.basename(__file__).replace(".pyc", "").replace(".py", "")
-START_DATE = airflow.utils.dates.days_ago(1)
+START_DATE = start_date = datetime.now() - timedelta(days=1)
 try:
     BASE_LOG_FOLDER = conf.get("core", "BASE_LOG_FOLDER").rstrip("/")
 except Exception as e:
@@ -82,7 +82,7 @@ default_args = {
 dag = DAG(
     DAG_ID,
     default_args=default_args,
-    schedule_interval=SCHEDULE_INTERVAL,
+    schedule=SCHEDULE_INTERVAL,
     start_date=START_DATE,
     tags=['teamclairvoyant', 'airflow-maintenance-dags'],
     template_undefined=jinja2.Undefined
@@ -92,7 +92,7 @@ if hasattr(dag, 'doc_md'):
 if hasattr(dag, 'catchup'):
     dag.catchup = False
 
-start = DummyOperator(
+start = EmptyOperator(
     task_id='start',
     dag=dag)
 
