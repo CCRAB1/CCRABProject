@@ -160,6 +160,9 @@ services:
       - bash
       - -ec
       - |
+        chown airflow:0 /opt/ccrab/database_backup
+        chown airflow:0 /opt/ccrab/processing
+        chown airflow:0 /opt/ccrab/archive
         airflow db migrate
         if [ -f /opt/airflow/variables/production.json ]; then
           airflow variables import -a overwrite /opt/airflow/variables/production.json
