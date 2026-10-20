@@ -155,22 +155,26 @@ services:
 
   airflow-init:
     <<: *airflow_common
-    user: "0:0"
-    entrypoint: /bin/bash
     restart: "no"
     command:
+      - bash
       - -ec
       - |
-        chown airflow:0 /opt/ccrab/database_backup
-
-        exec sudo -H -u airflow \
-          /usr/local/bin/ccrab-airflow-entrypoint bash -ec '
             airflow db migrate
             if [ -f /opt/airflow/variables/production.json ]; then
               airflow variables import -a overwrite /opt/airflow/variables/production.json
             fi
-          '
 
+
+  airflow-permissions:
+    <<: *airflow_common
+    user: "0:0"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        chown airflow:0 /opt/ccrab/database_backup
+    restart: "no"
   airflow-apiserver:
     <<: *airflow_common
     restart: unless-stopped
