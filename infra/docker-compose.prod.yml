@@ -173,9 +173,13 @@ services:
     command:
       - -c
       - |
-        chown airflow:0 /opt/ccrab/database_backup
+        chown airflow:ccrabadmin /opt/ccrab/database_backup
     restart: "no"
-
+    depends_on:
+      db:
+        condition: service_healthy
+      airflow-permissions:
+        condition: service_completed_successfully
   airflow-apiserver:
     <<: *airflow_common
     restart: unless-stopped
