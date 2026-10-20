@@ -173,7 +173,7 @@ services:
     command:
       - -c
       - |
-        chown airflow:ccrabadmin /opt/ccrab/database_backup
+        chown airflow:1000 /opt/ccrab/database_backup
     restart: "no"
   airflow-apiserver:
     <<: *airflow_common
