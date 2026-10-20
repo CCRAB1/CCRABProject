@@ -176,9 +176,11 @@ services:
     user: "0:0"
     entrypoint: /bin/sh
     command:
-      - -c
+      - -ec
       - |
         chown airflow:1000 /opt/ccrab/database_backup
+        chown airflow:1000 /opt/ccrab/processing
+        chown airflow:1000 /opt/ccrab/archive
     restart: "no"
 
   airflow-apiserver:
