@@ -42,7 +42,7 @@ x-airflow-common: &airflow_common
     - ${AIRFLOW_PROCESSING_MOUNT:-../processing}:/opt/ccrab/processing
     - ${AIRFLOW_ARCHIVE_MOUNT:-../archive}:/opt/ccrab/archive
     - airflow_logs:/opt/airflow/logs
-    - airflow_working_directory:/opt/airflow/working_directory
+    - airflow_working_directory:/opt/ccrab/working_directory
     - ./docker/airflow/variables:/opt/airflow/variables:ro
   depends_on:
     db:
