@@ -164,6 +164,11 @@ services:
             if [ -f /opt/airflow/variables/production.json ]; then
               airflow variables import -a overwrite /opt/airflow/variables/production.json
             fi
+    depends_on:
+      db:
+        condition: service_healthy
+      airflow-permissions:
+        condition: service_completed_successfully
 
 
   airflow-permissions:
@@ -175,11 +180,7 @@ services:
       - |
         chown airflow:ccrabadmin /opt/ccrab/database_backup
     restart: "no"
-    depends_on:
-      db:
-        condition: service_healthy
-      airflow-permissions:
-        condition: service_completed_successfully
+
   airflow-apiserver:
     <<: *airflow_common
     restart: unless-stopped
