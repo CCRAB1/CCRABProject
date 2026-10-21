@@ -40,9 +40,12 @@ default_args = {
     default_args=default_args,
 )
 def database_backup():
-
-    @task(retries=2, retry_delay=timedelta(minutes=5))
-    def platforms_backup():
+    @task(
+        retries=2,
+        retry_delay=timedelta(minutes=5),
+        trigger_rule="all_done",
+    )
+    def backup_schema(schema_name: str):
         from airflow.sdk import get_current_context
 
         logger.info("Starting platforms_backup database backup.")
@@ -59,7 +62,7 @@ def database_backup():
         backup_dir = Path(Variable.get("DATABASE_BACKUP_DIRECTORY"))
         backup_dir.mkdir(parents=True, exist_ok=True)
 
-        output_file = backup_dir / f"platforms_database_{timestamp}.dump"
+        output_file = backup_dir / f"{schema_name}_database_{timestamp}.dump"
         temporary_file = output_file.with_suffix(".dump.partial")
         logger.info(f"Temporary backup file: {temporary_file}")
 
@@ -74,7 +77,7 @@ def database_backup():
                 f"--username={database_user}",
                 "--no-password",
                 f"--dbname={database_name}",
-                "--schema=platforms",
+                f"--schema={schema_name}",
                 "--format=custom",
                 "--compress=9",
                 f"--file={temporary_file}"
@@ -104,17 +107,22 @@ def database_backup():
             temporary_file.replace(output_file)
             return str(output_file)
 
-    @task(retries=2, retry_delay=timedelta(minutes=5), trigger_rule="all_done")
-    def projects_backup():
+    @task(
+        retries=2,
+        retry_delay=timedelta(minutes=5),
+        trigger_rule="all_done",
+    )
+    def airflow_backup():
         from airflow.sdk import get_current_context
 
-        logger.info("Starting projects_backup database backup.")
+        logger.info("Starting airflow_backup database backup.")
 
-        database_name = os.environ.get("DATABASE_NAME", default=None)
-        database_user = os.environ.get("DATABASE_USER", default=None)
-        database_password = os.environ.get("DATABASE_PASSWORD", default=None)
-        database_host = os.environ.get("DATABASE_HOST", default=None)
-        database_port = os.environ.get("DATABASE_PORT", default=None)
+
+        database_name = os.environ.get("AIRFLOW_DB_NAME", default=None)
+        database_user = os.environ.get("AIRFLOW_DB_USER", default=None)
+        database_password = os.environ.get("AIRFLOW_DB_PASSWORD", default=None)
+        database_host = os.environ.get("AIRFLOW_DB_HOST", default=None)
+        database_port = os.environ.get("AIRFLOW_DB_PORT", default=None)
 
         context = get_current_context()
         timestamp = context["logical_date"].strftime("%Y%m%dT%H%M%S")
@@ -122,7 +130,7 @@ def database_backup():
         backup_dir = Path(Variable.get("DATABASE_BACKUP_DIRECTORY"))
         backup_dir.mkdir(parents=True, exist_ok=True)
 
-        output_file = backup_dir / f"projects_database_{timestamp}.dump"
+        output_file = backup_dir / f"airflow_database_{timestamp}.dump"
         temporary_file = output_file.with_suffix(".dump.partial")
         logger.info(f"Temporary backup file: {temporary_file}")
 
@@ -137,9 +145,8 @@ def database_backup():
                 f"--username={database_user}",
                 "--no-password",
                 f"--dbname={database_name}",
-                "--schema=projects",
                 "--format=custom",
-                "--compress=6",
+                "--compress=9",
                 f"--file={temporary_file}"
              ]
             result = subprocess.run(
@@ -167,6 +174,7 @@ def database_backup():
             temporary_file.replace(output_file)
             return str(output_file)
 
+
     @task()
     def cleanup_old_backups():
 
@@ -187,9 +195,28 @@ def database_backup():
 
         logger.info(f"Finished cleanup_old_backups, deleted: {deleted_count} files.")
 
+    schemas = ["django", "platforms", "projects"]
+
+    previous_task = None
+
+    for schema_name in schemas:
+        current_task = backup_schema.override(
+            task_id=f"backup_{schema_name}",
+        )(schema_name=schema_name)
+
+        if previous_task is not None:
+            previous_task >> current_task
+
+        previous_task = current_task
+
+    airflow = airflow_backup()
+    previous_task >> airflow
+    cleanup = cleanup_old_backups()
+
+    '''
     cleanup = cleanup_old_backups()
     platform_backup = platforms_backup()
     projects_backup = projects_backup()
     cleanup >> platform_backup >> projects_backup
-
+    '''
 database_backup()
