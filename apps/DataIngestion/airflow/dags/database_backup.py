@@ -59,7 +59,7 @@ def database_backup():
         backup_dir = Path(Variable.get("DATABASE_BACKUP_DIRECTORY"))
         backup_dir.mkdir(parents=True, exist_ok=True)
 
-        output_file = backup_dir / f"database_{timestamp}.dump"
+        output_file = backup_dir / f"platforms_database_{timestamp}.dump"
         temporary_file = output_file.with_suffix(".dump.partial")
         logger.info(f"Temporary backup file: {temporary_file}")
 
@@ -73,9 +73,10 @@ def database_backup():
                 f"--port={database_port}",
                 f"--username={database_user}",
                 "--no-password",
-                "--dbname=ccrabdb",
+                f"--dbname={database_name}",
                 "--schema=platforms",
                 "--format=custom",
+                "--compress 6",
                 f"--file={temporary_file}"
              ]
             result = subprocess.run(
@@ -103,7 +104,7 @@ def database_backup():
             temporary_file.replace(output_file)
             return str(output_file)
 
-    @task(retries=2, retry_delay=timedelta(minutes=5))
+    @task(retries=2, retry_delay=timedelta(minutes=5), trigger_rule="all_done")
     def projects_backup():
         from airflow.sdk import get_current_context
 
@@ -121,7 +122,7 @@ def database_backup():
         backup_dir = Path(Variable.get("DATABASE_BACKUP_DIRECTORY"))
         backup_dir.mkdir(parents=True, exist_ok=True)
 
-        output_file = backup_dir / f"database_{timestamp}.dump"
+        output_file = backup_dir / f"projects_database_{timestamp}.dump"
         temporary_file = output_file.with_suffix(".dump.partial")
         logger.info(f"Temporary backup file: {temporary_file}")
 
@@ -135,9 +136,10 @@ def database_backup():
                 f"--port={database_port}",
                 f"--username={database_user}",
                 "--no-password",
-                "--dbname=ccrabdb",
+                f"--dbname={database_name}",
                 "--schema=projects",
                 "--format=custom",
+                "--compress 6",
                 f"--file={temporary_file}"
              ]
             result = subprocess.run(
