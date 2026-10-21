@@ -76,7 +76,7 @@ def database_backup():
                 f"--dbname={database_name}",
                 "--schema=platforms",
                 "--format=custom",
-                "--compress 6",
+                "--compress=6",
                 f"--file={temporary_file}"
              ]
             result = subprocess.run(
@@ -139,7 +139,7 @@ def database_backup():
                 f"--dbname={database_name}",
                 "--schema=projects",
                 "--format=custom",
-                "--compress 6",
+                "--compress=6",
                 f"--file={temporary_file}"
              ]
             result = subprocess.run(
