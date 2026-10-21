@@ -94,7 +94,6 @@ def database_backup():
             logger.exception("pg_dump executable was not found")
             raise
         else:
-            temporary_file.replace(output_file)
             logger.info("pg_dump completed successfully: %s", output_file)
 
             logger.info(f"pg_dump exited with results {result}")
