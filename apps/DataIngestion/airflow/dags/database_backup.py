@@ -36,7 +36,7 @@ default_args = {
     schedule="0 0 * * *",
     max_active_runs=1,
     catchup=False,
-    tags=["purpleair","ccrab", "backup"],
+    tags=["ccrab", "backup"],
     default_args=default_args,
 )
 def database_backup():
