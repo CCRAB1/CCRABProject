@@ -85,7 +85,7 @@ default_args = {
 
 @dag(
     dag_id="check_data_flow",
-    schedule="*/30 * * * *",
+    schedule="*/30 1-23 * * * *",
     max_active_runs=1,
     catchup=False,
     tags=["alerts","ccrab"],
