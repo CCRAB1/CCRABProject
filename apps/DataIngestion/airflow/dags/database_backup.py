@@ -33,7 +33,7 @@ default_args = {
 
 @dag(
     dag_id="database_backup",
-    schedule="*/30 * * * *",
+    schedule="0 0 * * *",
     max_active_runs=1,
     catchup=False,
     tags=["purpleair","ccrab", "backup"],
