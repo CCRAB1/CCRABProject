@@ -4,13 +4,13 @@ import pendulum
 from airflow.sdk import dag, task, Variable
 import subprocess
 from pathlib import Path
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
 #remote_debug = os.getenv("AIRFLOW_REMOTE_DEBUG", "False")
-remote_debug = "False"
+remote_debug = "True"
 if remote_debug == "True":
     import pydevd_pycharm
 
@@ -167,8 +167,29 @@ def database_backup():
             temporary_file.replace(output_file)
             return str(output_file)
 
+    @task()
+    def cleanup_old_backups():
+
+        logger.info("Starting cleanup_old_backups.")
+
+        backup_dir = Path(Variable.get("DATABASE_BACKUP_DIRECTORY"))
+        backup_files = backup_dir.glob("*.dump")
+        deleted_count = 0
+        for backup_file in backup_files:
+            logger.info(f"Checking age of file: {backup_file}")
+            if backup_file.is_file():
+                backup_age = backup_file.stat().st_mtime
+                time_delta = datetime.now() - timedelta(days=30)
+                if backup_age < time_delta.timestamp():
+                    backup_file.unlink()
+                    logger.info(f"Deleted old backup file: {backup_file}")
+                    deleted_count += 1
+
+        logger.info(f"Finished cleanup_old_backups, deleted: {deleted_count} files.")
+
+    cleanup = cleanup_old_backups()
     platform_backup = platforms_backup()
     projects_backup = projects_backup()
-    platform_backup >> projects_backup
+    cleanup >> platform_backup >> projects_backup
 
 database_backup()
