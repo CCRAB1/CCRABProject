@@ -1,5 +1,3 @@
-//import Alpine from "../../vendor/alpinejs/3.15.12/module.esm.min.js";
-//import { DateTime } from "../../vendor/luxon/3.7.2/luxon.min.js";
 import Alpine from "alpinejs";
 import {DateTime} from "luxon";
 
@@ -7,11 +5,8 @@ import { CCRABRestClient }
   from "../../../../static/js/CCRABApiClient/src/index.js";
 import { StatsJtsDocument }
   from "../../../../static/js/StatsTimeSeries/src/index.js";
-//import { CCRABRestClient } from "../../js/CCRABApiClient/src/index.js";
 import { registerGraphComponents } from "./graph.js";
 import { PlatformInfo } from "./platform_info.js";
-//import { StatsJtsDocument } from "../../js/StatsTimeSeries/src/index.js";
-//import {DEFAULT_BASE_URL} from "../../js/CCRABApiClient/src/index.js";
 import {getAQIColorCode} from "./calculations.js";
 
 //const CCRAB_BASE_URL = window.CCRAB_BASE_URL || window.location.origin;
@@ -85,11 +80,10 @@ function registerAlpineComponents() {
           await this.$nextTick();
           window.dispatchEvent(new CustomEvent("platform-info-loaded"));
 
-          const observations = this.platformInfo.observationNames();
+          const observations = this.platformInfo.observationIdentifiers();
           if (!this.platformInfo.platformHandle || observations.length === 0) {
             return;
           }
-
           var endDate = DateTime.local().startOf("minute");
           var startDate = endDate.minus({ hours: 24 });
           this.selectedStartDateTime = this.toDateTimeLocalValue(startDate);
@@ -185,7 +179,7 @@ function registerAlpineComponents() {
           startDate.toUTC(),
           endDate.toUTC(),
           this.platformInfo.platformHandle,
-          this.platformInfo.observationNames(),
+          this.platformInfo.observationIdentifiers(),
         );
         if (observationDataLoaded) {
           this.refreshGraphedObservations(graphedSeriesIds);

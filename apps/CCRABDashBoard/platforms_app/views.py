@@ -566,6 +566,12 @@ def platform_data_request(request):
     start_date = validated_data["start_date"]
     end_date = validated_data["end_date"]
     observations = validated_data["observations"]
+    observation_filter = Q()
+    for observation_name, s_order in observations:
+        observation_filter |= Q(
+            sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name=observation_name,
+            sensor_id__s_order=s_order,
+        )
     #Get the platform metadata
     platform_qs = Platform.objects.filter(platform_handle=platform_handle)\
         .values("fixed_longitude","fixed_latitude")
@@ -574,11 +580,11 @@ def platform_data_request(request):
         queryset = (
             Multi_obs.objects
             .filter(
+                observation_filter,
                 m_date__gte=start_date,
                 m_date__lte=end_date,
                 platform_handle=platform_handle,
                 sensor_id__in=_served_sensor_ids_for_platform(platform_handle),
-                sensor_id__m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observations,
             )
             .annotate(
                 observation_name=F(

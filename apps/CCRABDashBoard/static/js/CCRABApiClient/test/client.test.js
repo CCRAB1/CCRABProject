@@ -6,7 +6,8 @@ import {
   CCRABRestClient,
   TokenBundle,
 } from "../src/index.js";
-import { DateTime } from "../../../../../../archive/vendor/luxon/3.7.2/luxon.min.js";
+import { DateTime } from "luxon";
+import { PlatformInfo } from "../../../../platforms_app/static/platforms_app/js/platform_info.js";
 
 test("obtainToken posts credentials and stores returned tokens", async () => {
   const fetch = createFakeFetch([
@@ -107,7 +108,7 @@ test("getPlatformPageConfiguration requests the public page payload", async () =
   assert.equal(fetch.requests[0].options.headers.Authorization, undefined);
 });
 
-test("getPlatformData formats dates and observation list", async () => {
+test("getPlatformData formats dates and observation/order pairs", async () => {
   const fetch = createFakeFetch([jsonResponse([{ value: 3.4 }])]);
   const client = new CCRABRestClient({
     baseUrl: "https://ccrab.example",
@@ -119,7 +120,7 @@ test("getPlatformData formats dates and observation list", async () => {
     new Date(2026, 0, 2, 3, 4, 5),
     DateTime.local(2026, 1, 2, 4, 4, 5),
     "purple-air-1",
-    ["pm25", "temperature"],
+    ["pm25 1", "pm25 2", "temperature 1"],
     { aggregate: "hourly" },
   );
 
@@ -129,8 +130,51 @@ test("getPlatformData formats dates and observation list", async () => {
   assert.equal(requestUrl.searchParams.get("start_date"), "2026-01-02T03:04:05");
   assert.equal(requestUrl.searchParams.get("end_date"), "2026-01-02T04:04:05");
   assert.equal(requestUrl.searchParams.get("platform_handle"), "purple-air-1");
-  assert.equal(requestUrl.searchParams.get("observations"), "pm25,temperature");
+  assert.equal(
+    requestUrl.searchParams.get("observations"),
+    "pm25 1,pm25 2,temperature 1",
+  );
   assert.equal(requestUrl.searchParams.get("aggregate"), "hourly");
+});
+
+test("platform requests preserve displayed channels and deduplicate pairs", async () => {
+  const platform = new PlatformInfo({
+    type: "Feature",
+    properties: {
+      platform_handle: "purple-air-1",
+      sensors: [
+        { obs_standard_name: "pm25", s_order: 1 },
+        { obs_standard_name: "pm25", s_order: 2 },
+        { obs_standard_name: "pm25", s_order: 1 },
+        { obs_standard_name: "temperature", s_order: 0 },
+        { obs_standard_name: "humidity", s_order: 1, display: false },
+        { obs_standard_name: "pressure", s_order: null },
+      ],
+    },
+  });
+  const expected = ["pm25 1", "pm25 2", "temperature 0"];
+
+  assert.deepEqual(platform.observationIdentifiers(), expected);
+  const params = platform.observationRequestParams(
+    "2026-01-01T00:00:00Z",
+    "2026-01-02T00:00:00Z",
+  );
+  assert.equal(params.get("observations"), expected.join(","));
+
+  const fetch = createFakeFetch([jsonResponse({ type: "Feature" })]);
+  const client = new CCRABRestClient({
+    baseUrl: "https://ccrab.example",
+    fetchFn: fetch.fn,
+  });
+  await client.getPlatformData(
+    params.get("start_date"),
+    params.get("end_date"),
+    platform.platformHandle,
+    platform.observationIdentifiers(),
+  );
+
+  const requestUrl = new URL(fetch.requests[0].url);
+  assert.equal(requestUrl.searchParams.get("observations"), expected.join(","));
 });
 
 test("default browser fetch keeps the global receiver", async () => {

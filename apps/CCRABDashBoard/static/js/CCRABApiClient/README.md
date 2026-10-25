@@ -32,9 +32,13 @@ const platformData = await client.getPlatformData(
   new Date(2026, 0, 2, 8, 0, 0),
   new Date(2026, 0, 2, 12, 0, 0),
   "purple-air-1",
-  ["pm25", "temperature"],
+  ["pm25 1", "pm25 2", "temperature 1"],
 );
 ```
+
+Each observation includes its sensor's integer `s_order`, separated from the
+observation name by a space. The client sends the list as a comma-delimited
+`observations` parameter, such as `pm25 1,pm25 2,temperature 1`.
 
 You can also construct the client with existing JWTs:
 

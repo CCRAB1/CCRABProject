@@ -237,8 +237,26 @@ export class PlatformInfo {
     return observationList;
   }
 
+  observationIdentifiers() {
+    var observationList = [];
+    var sensors = this.displayedSensors();
+
+    for (var i = 0; i < sensors.length; i += 1) {
+      var sensor = sensors[i];
+      var observationName = sensor.obsStandardName || sensor.shortName;
+      if (!observationName || !Number.isInteger(sensor.order)) continue;
+
+      var identifier = observationName + " " + sensor.order;
+      if (observationList.indexOf(identifier) === -1) {
+        observationList.push(identifier);
+      }
+    }
+
+    return observationList;
+  }
+
   observationQueryValue() {
-    return this.observationNames().join(",");
+    return this.observationIdentifiers().join(",");
   }
 
   observationRequestParams(startDate, endDate) {
