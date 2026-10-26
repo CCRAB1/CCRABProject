@@ -139,7 +139,7 @@ def database_backup():
             env["PGPASSWORD"] = database_password
 
             args =  [
-                "pg_dump",
+                "/usr/lib/postgresql/16/bin/pg_dump",
                 f"--host={database_host}",
                 f"--port={database_port}",
                 f"--username={database_user}",
