@@ -15,7 +15,15 @@ RUN apt-get update \
         libgeos-dev \
         libpq-dev \
         libproj-dev \
+        postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
+
+# Match the PostgreSQL 16 database, overriding newer clients in the base image.
+ENV PATH="/usr/lib/postgresql/16/bin:${PATH}"
+
+RUN pg_dump --version | grep -E '^pg_dump \(PostgreSQL\) 16\.' \
+    && pg_restore --version | grep -E '^pg_restore \(PostgreSQL\) 16\.' \
+    && psql --version | grep -E '^psql \(PostgreSQL\) 16\.'
 
 COPY infra/docker/airflow/entrypoint.sh /usr/local/bin/ccrab-airflow-entrypoint
 RUN chmod +x /usr/local/bin/ccrab-airflow-entrypoint
