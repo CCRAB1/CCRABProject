@@ -112,6 +112,67 @@ def database_backup():
         retry_delay=timedelta(minutes=5),
         trigger_rule="all_done",
     )
+    def ccrabdb_backup():
+        from airflow.sdk import get_current_context
+
+        logger.info("Starting ccrabdb_backup database backup.")
+
+
+        database_name = os.environ.get("DATABASE_NAME", default=None)
+        database_user = os.environ.get("DATABASE_USER", default=None)
+        database_password = os.environ.get("DATABASE_PASSWORD", default=None)
+        database_host = os.environ.get("DATABASE_HOST", default=None)
+        database_port = os.environ.get("DATABASE_PORT", default=None)
+
+        context = get_current_context()
+        timestamp = context["logical_date"].strftime("%Y%m%dT%H%M%S")
+
+        backup_dir = Path(Variable.get("DATABASE_BACKUP_DIRECTORY"))
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
+        output_file = backup_dir / f"ccrabdb_database_{timestamp}.dump"
+        temporary_file = output_file.with_suffix(".dump.partial")
+        logger.info(f"Temporary backup file: {temporary_file}")
+
+        try:
+            env = os.environ.copy()
+            env["PGPASSWORD"] = database_password
+
+            args =  [
+                "/usr/lib/postgresql/16/bin/pg_dump",
+                f"--host={database_host}",
+                f"--port={database_port}",
+                f"--username={database_user}",
+                "--no-password",
+                f"--dbname={database_name}",
+                "--format=custom",
+                "--compress=9",
+                f"--file={temporary_file}"
+             ]
+            result = subprocess.run(
+                args,
+                env=env,
+                check=True,
+                timeout=3600,  # Stop waiting and terminate after one hour.
+            )
+        except subprocess.CalledProcessError as exc:
+            logger.exception("pg_dump failed with exit code %s", exc.returncode)
+            raise
+        except subprocess.TimeoutExpired:
+            logger.exception("pg_dump exceeded the one-hour timeout")
+            raise
+        except FileNotFoundError:
+            logger.exception("pg_dump executable was not found")
+            raise
+        else:
+            logger.info("pg_dump completed successfully: %s", output_file)
+
+            logger.info(f"pg_dump exited with results {result}")
+
+            logger.info(f"Renaming temp file to : {output_file}")
+
+            temporary_file.replace(output_file)
+            return str(output_file)
     def airflow_backup():
         from airflow.sdk import get_current_context
 
@@ -195,6 +256,7 @@ def database_backup():
 
         logger.info(f"Finished cleanup_old_backups, deleted: {deleted_count} files.")
 
+    '''
     schemas = ["django", "platforms", "projects"]
 
     previous_task = None
@@ -208,15 +270,10 @@ def database_backup():
             previous_task >> current_task
 
         previous_task = current_task
-
+    '''
+    ccrabdb = ccrabdb_backup()
     airflow = airflow_backup()
-    previous_task >> airflow
     cleanup = cleanup_old_backups()
+    ccrabdb >> airflow >> cleanup
 
-    '''
-    cleanup = cleanup_old_backups()
-    platform_backup = platforms_backup()
-    projects_backup = projects_backup()
-    cleanup >> platform_backup >> projects_backup
-    '''
 database_backup()
