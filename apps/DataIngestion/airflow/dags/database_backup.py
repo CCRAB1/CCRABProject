@@ -40,6 +40,7 @@ default_args = {
     default_args=default_args,
 )
 def database_backup():
+    '''
     @task(
         retries=2,
         retry_delay=timedelta(minutes=5),
@@ -106,7 +107,7 @@ def database_backup():
 
             temporary_file.replace(output_file)
             return str(output_file)
-
+    '''
     @task(
         retries=2,
         retry_delay=timedelta(minutes=5),
@@ -173,6 +174,13 @@ def database_backup():
 
             temporary_file.replace(output_file)
             return str(output_file)
+
+    @task(
+        retries=2,
+        retry_delay=timedelta(minutes=5),
+        trigger_rule="all_done",
+    )
+
     def airflow_backup():
         from airflow.sdk import get_current_context
 
