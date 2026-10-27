@@ -84,6 +84,14 @@ function registerAlpineComponents() {
           if (!this.platformInfo.platformHandle || observations.length === 0) {
             return;
           }
+          //Add the sensors to the sensor list to display.
+          for (const sensor_nfo of this.platformInfo.displayedSensors())
+          {
+            //We will have multiple sensors of the same type, so we build the key based on name and order.
+            if(default_obs_to_display.includes(this.observationSeriesId(sensor_nfo.obsStandardName, sensor_nfo.order))) {
+              this.toggleObservationDisplay(sensor_nfo.obsStandardName, sensor_nfo.order);
+            }
+          }
           var endDate = DateTime.local().startOf("minute");
           var startDate = endDate.minus({ hours: 24 });
           this.selectedStartDateTime = this.toDateTimeLocalValue(startDate);
@@ -94,19 +102,31 @@ function registerAlpineComponents() {
             this.platformInfo.platformHandle,
             observations
           );
-        } catch (error) {
+        }
+        catch (error)
+        {
           console.error("Unable to load platform information", error);
           this.platformLoadError = this.platformErrorMessage(error);
-        } finally {
+        }
+        finally
+        {
           this.isLoadingPlatform = false;
           //Now let's graph the observations
           for (const sensor_nfo of this.platformInfo.displayedSensors())
           {
             //We will have multiple sensors of the same type, so we build the key based on name and order.
-            var obs_key = sensor_nfo.obsStandardName + " " + sensor_nfo.order;
-            if(default_obs_to_display.includes(obs_key)) {
-              this.graphObservationClicked(sensor_nfo.obsStandardName, sensor_nfo.order);
-            }
+            if(default_obs_to_display.includes(this.observationSeriesId(sensor_nfo.obsStandardName, sensor_nfo.order)))
+            {
+                console.log("Adding seriesID: " + sensor_nfo.obsStandardName + " " + sensor_nfo.order + " to graph");
+                // build data and dispatch add event
+                var payload = this.buildChartSeriesPayload(sensor_nfo.obsStandardName,
+                    sensor_nfo.order);
+                if(payload) {
+                  window.dispatchEvent(new CustomEvent("graph:add-dataset", {
+                    detail: payload,
+                  }));
+                }
+              }
           }
 
         }
@@ -127,6 +147,19 @@ function registerAlpineComponents() {
         });
         this.isLoadingObservationData = true;
         this.observationLoadError = null;
+        //We only want to pull the data for the channels actually being graphed.
+        for (let obs of observations) {
+          var obs_name_sorder = obs.split(" ");
+          var seriesId = this.observationSeriesId(obs_name_sorder[0], obs_name_sorder[1]);
+          if(!Alpine.store("graphInfo").has(seriesId))
+          {
+            console.log("Removing observation: " + seriesId + " from list of observations to pull.");
+            observations = observations.filter(rec => rec !== obs);
+          }
+          else {
+            console.log("Keeping observation: " + seriesId + " in list of observations to pull.");
+          }
+        }
         try {
           let observationData = await client.getPlatformData(
             startDate,
@@ -379,6 +412,23 @@ function registerAlpineComponents() {
         current_platform_settings[obs_key] = !!checked;
       },
       /**
+       * Toggles the display state of the observation.
+       * @param obsStandardName
+       * @param obsSOrder
+       */
+      toggleObservationDisplay(obsStandardName, obsSOrder) {
+        var seriesId = this.observationSeriesId(obsStandardName, obsSOrder);
+        if (Alpine.store("graphInfo").has(seriesId))
+        {
+          console.log("Removing seriesID: " + seriesId + " from store")
+          Alpine.store("graphInfo").remove(seriesId);
+        }
+        else {
+          console.log("Adding seriesID: " + seriesId + " to store")
+          Alpine.store("graphInfo").add_id(seriesId);
+        }
+      },
+      /**
        * If the user clicks on the observation name, we figure out if we are showing or hiding the data on the
        * graph.
        * @param obsStandardName
@@ -414,7 +464,8 @@ function registerAlpineComponents() {
        */
       isObservationGraphed(obsStandardName, obsSOrder) {
         var graphStore = Alpine.store("graphInfo");
-        return !!graphStore?.has(this.observationSeriesId(obsStandardName, obsSOrder));
+        var hasSeries = graphStore?.has(this.observationSeriesId(obsStandardName, obsSOrder));
+        return hasSeries;
       },
       buildChartSeriesPayload(obsStandardName, obsSOrder) {
         if (!this.observationTimeSeriesDoc) return null;

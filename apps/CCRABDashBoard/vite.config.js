@@ -5,13 +5,17 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, "static/build"),
     minify: false,
+    target: "esnext",
     emptyOutDir: true,
     rollupOptions: {
+      treeshake: false,
       input: resolve(__dirname, "frontend/platform_frontend.js"),
       output: {
-        entryFileNames: "platform_frontend.js",
-        chunkFileNames: "chunks/[name]-[hash].js",
-        assetFileNames: "assets/[name]-[hash][extname]",
+        preserveModules: true,
+        preserveModulesRoot: resolve(__dirname),
+        entryFileNames: "[name].js",
+        chunkFileNames: "[name].js",
+        assetFileNames: "assets/[name][extname]",
       },
     },
   },
