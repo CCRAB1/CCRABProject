@@ -284,13 +284,31 @@ class ObservationsRequestSerializer(serializers.Serializer):
         return value
 
     def validate_observations(self, value):
-        observations = [
-            item.strip()
-            for item in value.split(",")
-            if item.strip()
-        ]
+        observations = []
+        seen = set()
+        for item in value.split(","):
+            item = item.strip()
+            if not item:
+                continue
 
-        observations = list(dict.fromkeys(observations))
+            parts = item.rsplit(maxsplit=1)
+            if len(parts) != 2:
+                raise serializers.ValidationError(
+                    "Each observation must use the format '<observation name> <s_order>'."
+                )
+
+            observation_name, order = parts
+            try:
+                s_order = int(order)
+            except ValueError:
+                raise serializers.ValidationError(
+                    f"Invalid s_order for '{observation_name}': expected an integer."
+                ) from None
+
+            observation = (observation_name, s_order)
+            if observation not in seen:
+                observations.append(observation)
+                seen.add(observation)
 
         if not observations:
             raise serializers.ValidationError("At least one observation is required.")
@@ -307,21 +325,24 @@ class ObservationsRequestSerializer(serializers.Serializer):
                 {"end_date": "end_date must be after start_date."}
             )
 
+        observation_names = []
+        for observation_name, s_order in observations:
+            observation_names.append(observation_name)
+
         available_observations = set(
             served_sensor_queryset().filter(
                 platform_id__platform_handle=platform_handle,
-                m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observations,
+                m_type_id__m_scalar_type_id__obs_type_id__standard_name__in=observation_names,
             ).values_list(
                 "m_type_id__m_scalar_type_id__obs_type_id__standard_name",
-                flat=True,
+                "s_order",
             )
         )
 
-        missing_observations = [
-            observation
-            for observation in observations
-            if observation not in available_observations
-        ]
+        missing_observations = []
+        for observation_name, s_order in observations:
+            if (observation_name, s_order) not in available_observations:
+                missing_observations.append(f"{observation_name} {s_order}")
 
         if missing_observations:
             raise serializers.ValidationError(

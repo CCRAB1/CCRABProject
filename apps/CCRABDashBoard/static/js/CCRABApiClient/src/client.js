@@ -225,6 +225,9 @@ export class CCRABRestClient {
     return this.platformConfiguration(options);
   }
 
+  /**
+   * @param {string[]} observations Entries formatted as "<observation name> <s_order>".
+   */
   async getPlatformData(
     startDate,
     endDate,

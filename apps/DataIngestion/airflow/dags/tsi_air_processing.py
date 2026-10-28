@@ -5,19 +5,17 @@ import csv
 import time
 from io import StringIO
 from airflow.sdk import dag, task, Variable
-#from airflow.utils.trigger_rule import TriggerRule
-from airflow.task.trigger_rule import TriggerRule
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from pathlib import Path
 import json
 import ijson
 from datetime import datetime, timedelta
 from django.db import IntegrityError, transaction
 
-from datautilities.ccrab_api.client import CCRABRestClient
+from datautilities.ccrab_api.client import CCRABAuthenticationError, CCRABRestClient
 from datautilities.tsi_api.client import TSIExternalAPIClient, CSV_ACCEPT, JSON_ACCEPT, FLAT_TELEMETRY_FIELDS
 
-from packages.django_setup import setup_django
+from packages.django_setup import setup_django, close_django_connections
 from packages.pycharm_debugging import maybe_attach_debugger
 from observationsdatabase.xenia_obs_map import Organization, Platform
 from ioos_qc.config import QcConfig
@@ -35,13 +33,21 @@ if REMOTE_DEBUG:
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.NOTSET)
 
+default_args = {
+    "owner": "airflow",
+    "email": ["ChiefDan@gmail.com"],
+    "email_on_failure": True,
+    "email_on_retry": False,
+    "start_date": pendulum.datetime(2026, 1, 1, tz="UTC"),
+}
 
 @dag(
     dag_id="tsi_processing",
     schedule=None,
-    start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+    max_active_runs=1,
     catchup=False,
     tags=["tsi","ccrab"],
+    default_args=default_args,
 )
 def tsi_processing():
 
@@ -53,24 +59,28 @@ def tsi_processing():
             maybe_attach_debugger()
 
             logger.info("Retrieving configuration")
-            base_directory = Path(Variable.get("BASE_WORKING_DIRECTORY", "./")) / 'configs'
-            #Make sure out destination directory exists.
+            base_directory = Path(Variable.get("BASE_PROCESSING_DIRECTORY")) / "tsi" / "config"
             base_directory.mkdir(parents=True, exist_ok=True)
             config_file_path = base_directory / "tsi_config.json"
             ccrab_base_url = Variable.get("CCRAB_API_URL", None)
             ccrab_api = CCRABRestClient(base_url=ccrab_base_url)
             ccrab_user = Variable.get("CCRAB_API_USERNAME", None)
             ccrab_pwd = Variable.get("CCRAB_API_USER_PASSWORD", None)
-            #Get the access token to use for the API calls.
-            ccrab_token = ccrab_api.obtain_token(username=ccrab_user, password=ccrab_pwd)
+            try:
+                ccrab_api.obtain_token(username=ccrab_user, password=ccrab_pwd)
+            except CCRABAuthenticationError:
+                logger.warning("Unable to authenticate with CCRAB API; registering a token.")
+                ccrab_api.register_user(username=ccrab_user, password=ccrab_pwd)
             organizations_setup = ccrab_api.platform_configuration(data_source='tsi_blue_sky')
-            json.dump(organizations_setup, open(config_file_path, "w"))
-        except Exception as e:
-            logger.exception(e)
+            with config_file_path.open("w") as config_file:
+                json.dump(organizations_setup, config_file)
+        except Exception:
+            logger.exception("Unable to retrieve TSI platform configuration")
+            raise
         return str(config_file_path)
 
     @task()
-    def decide_mode(mode: str) -> Dict:
+    def decide_mode() -> Dict[str, str]:
         """
         #### decide_mode task
 
@@ -78,65 +88,48 @@ def tsi_processing():
         mode can be provided as DAG conf, Airflow Variable, or left None to run 'auto' detection.
         Returns a small config dict with resolved_mode and useful paths.
 
-        **Inputs:** mode
+        **Inputs:** None
         **Outputs:** dict
         """
-        # precedence: dagrun.conf -> supplied arg -> Variable -> auto
-        #dag_conf_mode =
         base_dir = Path(Variable.get("BASE_WORKING_DIRECTORY", "./"))
         local_path = base_dir / Path(Variable.get("TSI_RAW_DATA_DIRECTORY", "tsi/unprocessed"))
-        # If user passes a conf via dag run, Airflow will pass it; we handle via Variable for now.
-        if mode is not None:
-            requested = mode.lower()
-        else:
-            requested = Variable.get("TSI_PIPELINE_MODE", "auto").lower()
+        requested = Variable.get("TSI_PIPELINE_MODE", "auto").lower()
 
         assert requested in ("auto", "local", "rest"), "mode must be 'auto', 'local', or 'rest'"
 
         local_path.mkdir(parents=True, exist_ok=True)
 
-        # auto-detect: if CSV files exist, use local. Otherwise use rest.
+        # TSI fetches are retained as JSON until headers are normalized.
         if requested == "auto":
-            found = list(local_path.glob("*.csv"))
+            found = list(local_path.glob("*.json"))
             resolved_mode = "local" if len(found) > 0 else "rest"
         else:
             resolved_mode = requested
 
         return {"mode": resolved_mode, "directory_to_process": str(local_path)}
 
-    @task.branch()
-    def branch_on_mode(mode: str) -> str:
-        """
-        #### branch_on_mode task
-        Branch to task_id "list_local" or "fetch_rest".
-        Must return the *task_id* (string) of the next task to run.
-
-        **Inputs:** cfg
-        **Outputs:** string
-        """
-        if mode == "local":
-            return "list_local"     # task_id of the local-listing task
-        else:
-            return "fetch_rest"     # task_id of the REST-fetching task
-
-
-    @task(task_id="list_local")
-    def list_local_files(local_directory: str) -> []:
+    def list_local_files(local_directory: str) -> Dict[str, Any]:
         """
         #### list_local_files task
 
-        Search the local_directory for all CSV files in the local directory.
-        Input is the local directory, the output is a list of CSV files in that directory.
+        Search the local directory for source JSON files and return a run manifest.
 
         **Inputs:** local_directory
-        **Outputs:** list[dict]
+        **Outputs:** run manifest
         """
         data_directory = Path(local_directory)
-        local_csv_list = list(data_directory.glob("*.csv"))
-        return [str(file_path) for file_path in local_csv_list]
+        local_files = list(data_directory.glob("*.json"))
+        if not local_files:
+            raise FileNotFoundError(f"No JSON files found in {data_directory}")
 
-    @task(task_id="fetch_rest")
-    def fetch_data_task(config_file_name: Path) -> []:
+        return {
+            "source": "local",
+            "saved_data_files": [str(file_path) for file_path in local_files],
+            "start_timestamp": min(file_path.stat().st_mtime for file_path in local_files),
+            "end_timestamp": max(file_path.stat().st_mtime for file_path in local_files),
+        }
+
+    def fetch_data_task(config_file_name: Path) -> Dict[str, Any]:
         """
         #### fetch_data_task task
         Using the TSI API, this task retrieves the data for the platforms setup in the JSON config.
@@ -184,8 +177,8 @@ def tsi_processing():
                                               telem=FLAT_TELEMETRY_FIELDS)
                         file_platform_handle = platform_handle.replace(".", "_")
                         output_file = data_directory / (f"{file_platform_handle}-{external_indentifier}-"
-                                                              f"{start_date.strftime('%Y-%m-%dT%H%M%S')}"
-                                                              f"{end_date.strftime('%Y-%m-%dT%H%M%S')}.json")
+                                                              f"{start_date.strftime('%Y%m%dT%H%M%S')}-"
+                                                              f"{end_date.strftime('%Y%m%dT%H%M%S')}.json")
                         logger.info(f"Writing to {output_file}")
                         try:
                             with open(output_file, "w") as out_file_obj:
@@ -201,10 +194,28 @@ def tsi_processing():
                     except Exception as e:
                         logger.error(f"Unable to retrieve data for platform: {platform_handle} ({external_indentifier})")
                         logger.exception(e)
-            return saved_data_files
+        except Exception:
+            logger.exception("Unable to retrieve TSI telemetry")
+            raise
 
         except Exception as e:
+            close_django_connections()
             raise e
+        finally:
+            close_django_connections()
+        return_data = {
+            "source": "rest",
+            "start_timestamp": start_date.timestamp(),
+            "end_timestamp": end_date.timestamp(),
+            "saved_data_files": saved_data_files,
+        }
+
+    @task(multiple_outputs=True)
+    def acquire_data(config_file_name: str, run_config: Dict[str, str]) -> Dict[str, Any]:
+        """Acquire files and return the same manifest for local and REST modes."""
+        if run_config["mode"] == "local":
+            return list_local_files(run_config["directory_to_process"])
+        return fetch_data_task(Path(config_file_name))
 
     @task()
     def normalize_headers_task(config_file_name: Path, uncorrected_data_files: []) -> []:
@@ -308,32 +319,37 @@ def tsi_processing():
                 raise e
         return qaqcd_files
 
-    # Merge / join task
-    @task(task_id="merge_file_lists", trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-    def merge_file_lists(local_files: Optional[List[str]] = None, rest_files: Optional[List[str]] = None) -> List[str]:
-        """
-        After branching, only one of local_files/rest_files will be present.
-        This merge returns whichever is not None/empty.
-        Trigger rule ensures it runs even if one upstream was skipped.
-        """
-        chosen = local_files or rest_files or []
-        # make sure it's a list (not None)
-        return chosen
-
     @task()
     def save_to_database_task(config_file_name: Path, file_list: []):
         TSI_LOG_INSERTS = Variable.get("TSI_LOG_INSERTS", deserialize_json=True, default=0)
-        TSI_BULK_INSERT_FILE_SIZE = Variable.get("TSI_BULK_INSERT_FILE_SIZE", deserialize_json=True, default=1000000)
-        TSI_CHUNK_SIZE = Variable.get("TSI_CHUNK_SIZE", deserialize_json=True, default=1000)
+        BULK_INSERT_FILE_SIZE = Variable.get("TSI_BULK_INSERT_FILE_SIZE", deserialize_json=True, default=1000000)
+        CHUNK_SIZE = Variable.get("TSI_CHUNK_SIZE", deserialize_json=True, default=1000)
         try:
             setup_django()
 
             from platforms_app.models import Multi_obs
-            configuration_data = json.load(open(config_file_name))
-            organizations_setup = []
+
+            def flush_pending_records():
+                nonlocal attempted_records
+
+                if not pending_records:
+                    return
+
+                count = len(pending_records)
+                with transaction.atomic():
+                    Multi_obs.objects.bulk_create(
+                        pending_records,
+                        batch_size=count,
+                        ignore_conflicts=True,
+                    )
+
+                attempted_records += count
+                pending_records.clear()
+
             # Build our org and platform objects.
-            for organization in configuration_data['organizations']:
-                organizations_setup.append(Organization().from_dict(organization))
+            organizations_setup = load_config_file(config_file_name)
+
+            batch_size = max(1, int(CHUNK_SIZE))
 
             for file in file_list:
                 logger.info(f"Processing file: {file} into the database")
@@ -343,208 +359,101 @@ def tsi_processing():
                 # we create the filename, we replace the "." with "_" to avoid any OS/Filesystem issues.
                 file_platform_handle = file_name_parts[0].replace("_", ".")
 
-
+                platform_nfo = None
                 for organization_nfo in organizations_setup:
                     platform_nfo = organization_nfo.get_platform(file_platform_handle)
                     if platform_nfo is not None:
                         break
-                #Check the file size, if it exceeds
-                if file_path.stat().st_size >= TSI_BULK_INSERT_FILE_SIZE:
-                    #csv_file: Path, db: xenia_alchemy, platform_nfo: Platform, insert_chunk_size: int
-                    bulk_insert_to_database(file_path, platform_nfo, TSI_CHUNK_SIZE)
-                else:
-
+                if platform_nfo is not None:
                     with open(file_path, "r") as csv_file_obj:
                         file_start_time = time.perf_counter()
                         row_entry_date = datetime.now()
                         csv_reader = csv.DictReader(csv_file_obj)
                         duplicate_row_count = 0
                         insert_exception_count = 0
+                        pending_records = []
+                        attempted_records = 0
+                        invalid_value_count = 0
+
+                        logged_missed_observations = set()
+                        #Build a list of the observations that should be in the file.
+                        active_observations = [
+                            (f"{obs.target_obs}_{obs.s_order}", obs)
+                            for obs in platform_nfo.obs_map
+                            if obs.target_active == 1
+                        ]
                         for row_ndx, row in enumerate(csv_reader):
-                            for obs_info in platform_nfo.obs_map:
-                                #We build the name for each column we want which is >target_obs>_<s_order>. The date
-                                #column has been renamed m_date during the normalize task.
+                            m_date = row["m_date"]
+
+                            for column_name, obs_info in active_observations:
+                                if column_name not in row:
+                                    if column_name not in logged_missed_observations:
+                                        '''
+                                        logger.warning(
+                                            "Column %s not found in row %s of %s",
+                                            column_name,
+                                            row_ndx,
+                                            file,
+                                        )
+                                        '''
+                                        logged_missed_observations.add(column_name)
+
+                                    continue
+
                                 try:
-                                    column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
-                                    m_date = row['m_date']
-                                    try:
-                                        val = float(row[column_name])
-                                    except (ValueError, TypeError) as e:
-                                        logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
-                                        logger.exception(e)
-                                    else:
-                                        if TSI_LOG_INSERTS:
-                                            if row_ndx % 1000 == 0:
-                                                logger.info(f"Adding record: {platform_nfo.platform_handle} Date: {m_date}"
-                                                            f" Value: {val} Sensor: {obs_info.target_obs}({obs_info.sensor_id}) "
-                                                            f"{obs_info.target_uom}({obs_info.m_type_id}) SOrder: {obs_info.s_order}")
-                                        try:
-                                            with transaction.atomic():
-                                                obs_rec = Multi_obs.objects.create(row_entry_date=row_entry_date,
-                                                                    platform_handle=platform_nfo.platform_handle,
-                                                                    m_date=m_date,
-                                                                    m_value=val,
-                                                                    sensor_id_id=obs_info.sensor_id,
-                                                                    m_type_id_id=obs_info.m_type_id,
-                                                                    m_lon=platform_nfo.longitude,
-                                                                    m_lat=platform_nfo.latitude)
-                                        except IntegrityError as e:
-                                            logger.error(f"Record already exists: {e}")
-                                            duplicate_row_count += 1
-                                        except Exception as e:
-                                            logger.error(f"Error adding record: {e}")
-                                            logger.exception(e)
-                                            insert_exception_count += 1
-                                except Exception as e:
-                                    raise e
-                    logger.info(f"Processed {row_ndx} rows from file: {file} into the database in: "
-                                f"{time.perf_counter()-file_start_time} seconds. Duplicate rows found: "
-                                f"{duplicate_row_count}. Insert exception count: {insert_exception_count} ")
+                                    raw_value = row[column_name]
+                                    val = float(raw_value)
+                                except (ValueError, TypeError) as e:
+                                    logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
+                                    logger.exception(e)
 
-        except Exception as e:
-            raise e
-
-    def bulk_insert_to_database(csv_file: Path, platform_nfo: Platform, insert_chunk_size: int):
-        '''
-        WHen importing large csv files, for performace we want to use this bulk insert function.
-        :param csv_file:
-        :param db:
-        :return:
-        '''
-        csv_buffer = StringIO()
-        buffer_count = 0
-        total_inserted = 0
-        total_skipped = 0
-
-        raw_conn = db.dbEngine.raw_connection()
-        with open(csv_file, "r") as csv_file_obj:
-            file_start_time = time.perf_counter()
-            row_entry_date = datetime.now()
-            csv_reader = csv.DictReader(csv_file_obj)
-            for row_ndx, row in enumerate(csv_reader):
-                for obs_info in platform_nfo.obs_map:
-                    # We build the name for each column we want which is >target_obs>_<s_order>. The date
-                    # column has been renamed m_date during the normalize task.
-                    try:
-                        column_name = f"{obs_info.target_obs}_{obs_info.s_order}"
-                        m_date = row['m_date']
-                        try:
-                            val = float(row[column_name])
-                        except (ValueError, TypeError) as e:
-                            logger.error(f"Unable to process row: {row}({row_ndx}) Value: {row[column_name]}")
-                            logger.exception(e)
-                        else:
-                            # Write to buffer
-                            csv_buffer.write(
-                                f"{row_entry_date}\t{m_date}\t{val}\t"
-                                f"{obs_info.sensor_id}\t{obs_info.m_type_id}\t"
-                                f"{platform_nfo.longitude}\t{platform_nfo.latitude}\n"
-                            )
-                            buffer_count += 1
-
-                            if buffer_count >= insert_chunk_size:
-                                cursor = raw_conn.cursor()
-
-                                buffer_count = 0
-                                # Create a temp table. Because we might have duplicates, we use POSTGRES ability to handle
-                                # decision on CONFLICTS.
-                                # Create temporary table matching multi_obs structure (without constraints)
-                                cursor.execute("""
-                                    CREATE
-                                        TEMP TABLE temp_multi_obs (
-                                        row_entry_date TIMESTAMP,
-                                        m_date TIMESTAMP,
-                                        m_value FLOAT,
-                                        sensor_id INTEGER,
-                                        m_type_id INTEGER,
-                                        m_lon FLOAT,
-                                        m_lat FLOAT
-                                    ) ON COMMIT DROP
-                                """)
-                                csv_buffer.seek(0)
-                                cursor.copy_from(
-                                    csv_buffer,
-                                    'temp_multi_obs',
-                                    sep='\t',
-                                    columns=['row_entry_date', 'm_date', 'm_value',
-                                             'sensor_id', 'm_type_id', 'm_lon', 'm_lat']
+                                    continue
+                                #Build the records for the bulk insert.
+                                #logger.debug(
+                                #    f"Adding {row_entry_date} {platform_nfo.platform_handle} {column_name} {m_date} {val}")
+                                pending_records.append(
+                                    Multi_obs(row_entry_date=row_entry_date,
+                                                             platform_handle=platform_nfo.platform_handle,
+                                                             m_date=m_date,
+                                                             m_value=val,
+                                                             sensor_id_id=obs_info.sensor_id,
+                                                             m_type_id_id=obs_info.m_type_id,
+                                                             m_lon=platform_nfo.longitude,
+                                                             m_lat=platform_nfo.latitude)
                                 )
+                                if len(pending_records) >= batch_size:
+                                    flush_pending_records()
+                                if row_ndx and row_ndx % 10 == 0:
+                                    logger.info(
+                                        f"Prepared {row_ndx} CSV rows from {file} in {time.perf_counter() - file_start_time}",
+                                    )
 
-                                # Insert from temp to main table with duplicate handling
-                                # Using the unique constraint: (m_date, m_type_id, sensor_id)
-                                cursor.execute("""
-                                               INSERT INTO multi_obs (row_entry_date, m_date, m_value,
-                                                                      sensor_id, m_type_id, m_lon, m_lat)
-                                               SELECT row_entry_date,
-                                                      m_date,
-                                                      m_value,
-                                                      sensor_id,
-                                                      m_type_id,
-                                                      m_lon,
-                                                      m_lat
-                                               FROM temp_multi_obs ON CONFLICT (m_date, m_type_id, sensor_id) DO NOTHING
-                                               """)
+                            flush_pending_records()
+                        if attempted_records:
+                            logger.info(
+                                f"Finished {file}: attempted {attempted_records} observations; invalid values {invalid_value_count}; "
+                                f"elapsed {time.perf_counter() - file_start_time}",
+                            )
+                        else:
+                            logger.warning(
+                                f"No observations found in {file}",
+                            )
+                else:
+                    logger.error(f"Platform {file_platform_handle} not found in list.")
+        except Exception as e:
+            close_django_connections()
+            raise e
+        finally:
+            close_django_connections()
 
-                                rows_inserted = cursor.rowcount
-                                total_inserted += rows_inserted
-                                total_skipped += (buffer_count - rows_inserted)
+    def load_config_file(configuration_file: Path) -> List[Any]:
+        configuration_data = json.load(open(configuration_file))
+        organizations_setup = []
+        # Build our org and platform objects.
+        for organization in configuration_data['organizations']:
+            organizations_setup.append(Organization().from_dict(organization))
 
-                                raw_conn.commit()
-                                cursor.close()
-                                logger.info(f"Inserted {rows_inserted} rows into temp_multi_obs. "
-                                            f"Total skipped: {total_skipped} Total inserted: {total_inserted}")
-
-                    except Exception as e:
-                        raise e
-
-            # Process remaining records
-            if buffer_count > 0:
-                try:
-                    cursor = raw_conn.cursor()
-
-                    cursor.execute("""
-                                   CREATE
-                                   TEMP TABLE temp_multi_obs (
-                            row_entry_date TIMESTAMP,
-                            m_date TIMESTAMP,
-                            m_value FLOAT,
-                            sensor_id INTEGER,
-                            m_type_id INTEGER,
-                            m_lon FLOAT,
-                            m_lat FLOAT
-                        ) ON COMMIT DROP
-                                   """)
-
-                    csv_buffer.seek(0)
-                    cursor.copy_from(
-                        csv_buffer,
-                        'temp_multi_obs',
-                        sep='\t',
-                        columns=['row_entry_date', 'm_date', 'm_value',
-                                 'sensor_id', 'm_type_id', 'm_lon', 'm_lat']
-                    )
-
-                    cursor.execute("""
-                                   INSERT INTO multi_obs (row_entry_date, m_date, m_value,
-                                                          sensor_id, m_type_id, m_lon, m_lat)
-                                   SELECT row_entry_date,
-                                          m_date,
-                                          m_value,
-                                          sensor_id,
-                                          m_type_id,
-                                          m_lon,
-                                          m_lat
-                                   FROM temp_multi_obs ON CONFLICT (m_date, m_type_id, sensor_id) DO NOTHING
-                                   """)
-                except Exception as e:
-                    raise e
-                rows_inserted = cursor.rowcount
-                total_inserted += rows_inserted
-                total_skipped += (buffer_count - rows_inserted)
-                raw_conn.commit()
-                cursor.close()
-                logger.info(f"Inserted {rows_inserted} rows into temp_multi_obs. "
-                            f"Total skipped: {total_skipped} Total inserted: {total_inserted}")
+        return organizations_setup
 
     def normalize_header(row: {}, platform_nfo: Platform) -> []:
         corrected_header = []
@@ -565,24 +474,10 @@ def tsi_processing():
 
     configuration_file_path = get_configuration()
 
-    #Figure out how we are running. We could be fetching new data from the TSI API, or
-    #we could be processing previous files.
-    run_config = decide_mode(None)
-
-    branch = branch_on_mode(run_config['mode'])
-
-    configuration_file_path >> run_config >> branch
-
-    #local_file_list = []
-    local_file_list = list_local_files(run_config['directory_to_process'])
-    remote_file_list = fetch_data_task(configuration_file_path)
-    # Wire branch to both candidate tasks. Branch operator expects task ids returned above.
-    branch >> local_file_list
-    branch >> remote_file_list
-
-
-    # Merge results (merge task has TriggerRule so it runs even when a branch is skipped)
-    csv_files_to_process = merge_file_lists(local_files=local_file_list, rest_files=remote_file_list)
+    # Resolve the mode at task runtime, then produce one manifest regardless of source.
+    run_config = decide_mode()
+    run_manifest = acquire_data(configuration_file_path, run_config)
+    csv_files_to_process = run_manifest["saved_data_files"]
 
     #We want to correct the headers from the Purple Air fields to our normalized names.
     normalized_header_data_files = normalize_headers_task(configuration_file_path, csv_files_to_process)
@@ -591,4 +486,3 @@ def tsi_processing():
     save_to_database_task(configuration_file_path, normalized_header_data_files)
 
 tsi_processing()
-
