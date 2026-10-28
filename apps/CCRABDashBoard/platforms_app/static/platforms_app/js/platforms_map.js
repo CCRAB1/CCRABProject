@@ -1,7 +1,13 @@
 import Alpine from "alpinejs";
+import { DateTime } from "luxon";
+import { CCRABRestClient } from "../../../../static/js/CCRABApiClient/src/index.js";
+import { StatsJtsDocument } from "../../../../static/js/StatsTimeSeries/src/index.js";
+import { getAQIColorCode } from "./calculations.js";
 
 const DEFAULT_CENTER = [32.7765, -79.9311];
 const DEFAULT_ZOOM = 10;
+const AQI_SERIES_ID = "pm2.5_aqi 1";
+const NO_DATA_COLOR = "#7a8594";
 
 function debounce(fn, wait) {
     let timeout;
@@ -82,13 +88,12 @@ function isActivePlatform(feature) {
     return ["1", "true", "yes"].includes(String(active).toLowerCase());
 }
 
-function markerColor(feature) {
-    return isActivePlatform(feature) ? "#2f80ed" : "#7a8594";
-}
-
 document.addEventListener("alpine:init", () => {
     Alpine.data("platformsMap", () => ({
         allPlatforms: [],
+        aqiByPlatformHandle: {},
+        observationErrorMessage: "",
+        isLoadingObservations: false,
         errorMessage: "",
         isLoading: false,
         layerByFeatureKey: {},
@@ -201,6 +206,7 @@ document.addEventListener("alpine:init", () => {
                     : [];
                 this.updateVisiblePlatforms();
                 this.fitVisiblePlatforms();
+                await this.loadObservations();
             } catch (error) {
                 console.warn("Platform map data error", error);
                 this.allPlatforms = [];
@@ -210,6 +216,90 @@ document.addEventListener("alpine:init", () => {
             } finally {
                 this.isLoading = false;
                 this.invalidateMap();
+            }
+        },
+
+        async loadObservations() {
+            const endDate = DateTime.utc();
+            const startDate = endDate.minus({ hours: 1 });
+            const client = new CCRABRestClient({
+                baseUrl: window.location.origin,
+                accessToken: this.$refs.map?.dataset?.apiToken || null,
+            });
+            this.aqiByPlatformHandle = {};
+            this.observationErrorMessage = "";
+            this.isLoadingObservations = true;
+
+            // Bound concurrent requests so a large catalog does not flood the API.
+            const handles = [];
+            for (const feature of this.allPlatforms) {
+                const handle = feature?.properties?.platform_handle;
+                if (handle && !handles.includes(handle)) {
+                    handles.push(handle);
+                }
+            }
+            let nextIndex = 0;
+            const loadNext = async () => {
+                while (nextIndex < handles.length) {
+                    const handle = handles[nextIndex++];
+                    try {
+                        const record = await this.getObservationData(client, startDate, endDate, handle);
+                        if (record) {
+                            this.aqiByPlatformHandle[handle] = record;
+                            this.updatePlatformMarker(handle);
+                        }
+                    } catch (error) {
+                        console.warn("Platform map AQI data error", handle, error);
+                        this.observationErrorMessage = "Some AQI readings could not be loaded. Gray markers have no recent AQI data.";
+                    }
+                }
+            };
+
+            try {
+                const workers = [];
+                for (let index = 0; index < Math.min(4, handles.length); index++) {
+                    workers.push(loadNext());
+                }
+                await Promise.all(workers);
+            } finally {
+                this.isLoadingObservations = false;
+            }
+        },
+
+        async getObservationData(client, startDate, endDate, platformHandle) {
+            const observationData = await client.getPlatformData(
+                startDate, endDate, platformHandle, [AQI_SERIES_ID],
+            );
+            const document = StatsJtsDocument.from(observationData.properties.timeseries);
+            const series = document.getSeries(AQI_SERIES_ID);
+            let latest = null;
+            for (const record of series?.records || []) {
+                const timestamp = record.timestamp.getTime();
+                if (record.value === null || record.value === undefined || record.value === "" ||
+                    !Number.isFinite(Number(record.value)) ||
+                    !Number.isFinite(timestamp) || timestamp < startDate.toMillis() || timestamp > endDate.toMillis()) {
+                    continue;
+                }
+                if (!latest || timestamp > latest.timestamp.getTime()) {
+                    latest = record;
+                }
+            }
+            return latest;
+        },
+
+        markerColor(feature) {
+            const record = this.aqiByPlatformHandle[feature?.properties?.platform_handle];
+            return record ? getAQIColorCode(Number(record.value))?.color || NO_DATA_COLOR : NO_DATA_COLOR;
+        },
+
+        updatePlatformMarker(platformHandle) {
+            for (const feature of this.visiblePlatforms) {
+                if (feature?.properties?.platform_handle !== platformHandle) continue;
+                const layer = this.layerByFeatureKey[this.featureKey(feature)];
+                if (layer) {
+                    layer.setStyle({ fillColor: this.markerColor(feature) });
+                    layer.setPopupContent(this.popupContent(feature));
+                }
             }
         },
 
@@ -268,7 +358,7 @@ document.addEventListener("alpine:init", () => {
                 {
                     pointToLayer: (feature, latLng) => window.L.circleMarker(latLng, {
                         color: "#ffffff",
-                        fillColor: markerColor(feature),
+                        fillColor: this.markerColor(feature),
                         fillOpacity: 0.9,
                         opacity: 1,
                         radius: 8,
@@ -366,10 +456,15 @@ document.addEventListener("alpine:init", () => {
         popupContent(feature) {
             const name = escapeHtml(this.platformName(feature));
             const meta = escapeHtml(this.platformMeta(feature));
+            const record = this.aqiByPlatformHandle[feature?.properties?.platform_handle];
+            const aqiLabel = record
+                ? `PM2.5 AQI: ${escapeHtml(Number(record.value).toFixed(0))} · ${escapeHtml(DateTime.fromJSDate(record.timestamp).toLocaleString(DateTime.DATETIME_SHORT))}`
+                : "No PM2.5 AQI data in the past hour";
 
             return `
                 <span class="platform-popup-title">${name}</span>
                 <span class="platform-popup-meta">${meta}</span>
+                <span class="platform-popup-meta">${aqiLabel}</span>
             `;
         },
     }));

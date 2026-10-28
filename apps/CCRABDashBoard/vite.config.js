@@ -9,7 +9,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       treeshake: false,
-      input: resolve(__dirname, "frontend/platform_frontend.js"),
+      input: [
+        resolve(__dirname, "frontend/platform_frontend.js"),
+        resolve(__dirname, "platforms_app/static/platforms_app/js/platforms_map.js"),
+      ],
       output: {
         preserveModules: true,
         preserveModulesRoot: resolve(__dirname),
