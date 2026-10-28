@@ -1,28 +1,27 @@
+{% extends 'base_platform.html' %}
 {% load static %}
 
-<!DOCTYPE html>
-<html lang="en" class="platforms-map-document">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>CCRAB Platforms Map</title>
-        <link rel="stylesheet" href="{% static 'css/bulma/css/versions/bulma-no-dark-mode.css' %}">
-        <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
-        <link rel="stylesheet" href="{% static 'platforms_app/css/platforms_map.css' %}">
-        <link rel="stylesheet" href="{% static 'platforms_app/js/leaflet/dist/leaflet.css' %}"
-              crossorigin="">
+{% block title %}CCRAB Platforms Map{% endblock %}
+{% block html_class %}platforms-map-document{% endblock %}
+{% block body_class %}platforms-map-page{% endblock %}
 
-        <script src="{% static 'platforms_app/js/leaflet/dist/leaflet.js' %}"></script>
-        <script type="module" src="{% static 'build/platforms_app/static/platforms_app/js/platforms_map.js' %}"></script>
-    </head>
-    <body class="platforms-map-page">
-    {% include "top_navbar_template.html" %}
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'platforms_app/css/platforms_map.css' %}">
+{% endblock %}
 
-    <div class="platforms-map-breadcrumb">
-        {% include "_catalog_breadcrumb.html" %}
-    </div>
+{% block page_scripts %}
+    <script src="{% static 'platforms_app/js/leaflet/dist/leaflet.js' %}"></script>
+    <script type="module" src="{% static 'build/platforms_app/static/platforms_app/js/platforms_map.js' %}"></script>
+{% endblock %}
 
-    <main class="platforms-map-shell" x-data="platformsMap()" x-cloak>
+{% block page_content %}
+    <main class="platforms-map-page-content" x-data="platformsMap()" x-cloak>
+        <section class="section platform-hero-section">
+            <div class="container">
+                {% include "_catalog_breadcrumb.html" %}
+            </div>
+        </section>
+        <div class="platforms-map-shell">
         <aside class="platforms-map-controls" aria-label="Platform map controls">
             <div class="platforms-map-controls-header">
                 <p class="heading">Platforms</p>
@@ -109,6 +108,6 @@
                 Loading platforms
             </div>
         </section>
+        </div>
     </main>
-    </body>
-</html>
+{% endblock %}

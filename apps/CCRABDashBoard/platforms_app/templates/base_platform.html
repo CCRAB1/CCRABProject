@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{% block html_class %}{% endblock %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,7 +19,9 @@
           crossorigin="">
     <link rel="stylesheet" href="{% static 'platforms_app/css/image_carousel.css' %}">
 
+    {% block page_scripts %}
     <script type="module" src="{% static 'build/frontend/platform_frontend.js' %}"></script>
+    {% endblock %}
 
 
     <title>{% block title %}Platform {% endblock %}</title>
@@ -34,11 +36,13 @@
             font-family: "Roboto Slab", Arial, sans-serif;
         }
     </style>
+    {% block extra_head %}{% endblock %}
 </head>
-    <body class="page-montserrat">
+    <body class="page-montserrat {% block body_class %}{% endblock %}">
 
     {% include "top_navbar_template.html" %}
 
+    {% block page_content %}
     <main
         class="platform-detail-page"
         data-platform-short-name="{{ short_name|default:'' }}"
@@ -68,6 +72,7 @@
         </section>
 
     </main>
+    {% endblock %}
 
     {% block extra_scripts %}{% endblock %}
 

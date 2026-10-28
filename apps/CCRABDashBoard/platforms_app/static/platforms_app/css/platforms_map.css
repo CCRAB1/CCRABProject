@@ -19,10 +19,15 @@
     flex: 0 0 auto;
 }
 
-.platforms-map-breadcrumb {
-    background: #f6f8fb;
+.platforms-map-page-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.platforms-map-page-content > .platform-hero-section {
     flex: 0 0 auto;
-    padding: 0.75rem 1.25rem 0;
 }
 
 .platforms-map-shell {
