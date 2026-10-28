@@ -168,3 +168,25 @@
         min-height: 58vh;
     }
 }
+
+.platform-aqi-marker {
+    background: transparent;
+    border: 0;
+}
+
+.platform-aqi-marker-value {
+    align-items: center;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 1px 5px rgb(0 0 0 / 30%);
+    box-sizing: border-box;
+    display: flex;
+    font-family: "Montserrat", Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    height: 36px;
+    justify-content: center;
+    line-height: 1;
+    white-space: nowrap;
+    width: 36px;
+}

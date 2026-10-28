@@ -292,12 +292,27 @@ document.addEventListener("alpine:init", () => {
             return record ? getAQIColorCode(Number(record.value))?.color || NO_DATA_COLOR : NO_DATA_COLOR;
         },
 
+        markerIcon(feature) {
+            const record = this.aqiByPlatformHandle[feature?.properties?.platform_handle];
+            const value = record ? Number(record.value).toFixed(0) : "—";
+            const color = this.markerColor(feature);
+            const textColor = ["#8F3F97", "#7E0023", NO_DATA_COLOR].includes(color)
+                ? "#ffffff" : "#151515";
+            return window.L.divIcon({
+                className: "platform-aqi-marker",
+                html: `<span class="platform-aqi-marker-value" style="background-color: ${color}; color: ${textColor};">${escapeHtml(value)}</span>`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18],
+                popupAnchor: [0, -18],
+            });
+        },
+
         updatePlatformMarker(platformHandle) {
             for (const feature of this.visiblePlatforms) {
                 if (feature?.properties?.platform_handle !== platformHandle) continue;
                 const layer = this.layerByFeatureKey[this.featureKey(feature)];
                 if (layer) {
-                    layer.setStyle({ fillColor: this.markerColor(feature) });
+                    layer.setIcon(this.markerIcon(feature));
                     layer.setPopupContent(this.popupContent(feature));
                 }
             }
@@ -356,13 +371,10 @@ document.addEventListener("alpine:init", () => {
                     features,
                 },
                 {
-                    pointToLayer: (feature, latLng) => window.L.circleMarker(latLng, {
-                        color: "#ffffff",
-                        fillColor: this.markerColor(feature),
-                        fillOpacity: 0.9,
-                        opacity: 1,
-                        radius: 8,
-                        weight: 2,
+                    pointToLayer: (feature, latLng) => window.L.marker(latLng, {
+                        icon: this.markerIcon(feature),
+                        title: this.platformName(feature),
+                        alt: this.platformName(feature),
                     }),
                     onEachFeature: (feature, layer) => {
                         layer.bindPopup(this.popupContent(feature));
