@@ -54,45 +54,7 @@ const lineStyles = [
     [10, 4, 2, 4],
 ];
 
-class graphSetupInfo {
-    constructor(id, yAxisID, xAxisID, timeSeriesIntervalSeconds, useEPABreakpoints) {
-        this.id = id;
-        this.yAxisID = yAxisID ?? null;
-        this.xAxisID = xAxisID ?? null;
-        this.timeSeriesIntervalSeconds = timeSeriesIntervalSeconds ?? null;
-        this.useEPABreakpoints = useEPABreakpoints ?? false;
-    }
-};
-
 export function registerGraphComponents(Alpine) {
-    if (!Alpine.store("graphInfo")) {
-        Alpine.store("graphInfo", {
-            graphInfo: [],
-
-            has(id) {
-                return this.graphInfo.find(nfo => nfo.id === id);
-            },
-
-            add_id(id) {
-                if (!this.has(id)) {
-                    console.log("Adding id: " + id + " to graphInfo.")
-                    var graphInfo = new graphSetupInfo(id)
-                    this.graphInfo.push(graphInfo);
-                }
-            },
-            remove(id) {
-                console.log("Removing id: " + id + " from graphInfo")
-                // Find the index of the object to remove.
-                let index = this.graphInfo.findIndex(nfo => nfo.id === id);
-
-                // If the object exists, remove exactly 1 item at that index
-                if (index !== -1) {
-                    this.graphInfo.splice(index, 1);
-                }
-                //let updatedNfo = this.graphInfo.filter(nfo => nfo.id === id);
-            }
-        })
-    }
     /*
     if (!Alpine.store("graph")) {
         Alpine.store("graph", {
@@ -173,9 +135,7 @@ export function registerGraphComponents(Alpine) {
                     console.warn("Invalid graph dataset payload", dataset);
                     return;
                 }
-                var graphInfo = Alpine.store("graphInfo").has(dataset.id);
                 var yAxisId = "y-" + dataset.id.replaceAll(" ", "-");
-                graphInfo.yAxisID = yAxisId;
                 console.debug("Adding dataset id: " + dataset.id + "axis: " + yAxisId);
                 var xAxisKey = "x-" + dataset.xAxis.key;
                 if (!(xAxisKey in chart.options.scales)) {
