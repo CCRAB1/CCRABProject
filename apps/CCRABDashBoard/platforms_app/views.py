@@ -29,6 +29,7 @@ from .serializers import (
     PlatformSourceConfigurationSerializer,
 )
 from .models import Multi_obs
+from .catalog_categories import group_catalog_platforms
 
 logger = logging.getLogger(__name__)
 
@@ -366,8 +367,9 @@ def PlatformCatalog(request):
     end_date = datetime.now(tz=timezone.utc)
     start_date = end_date - timedelta(days=1)
     platforms_datasets = _platforms_dataset_query(request.GET, request, start_date, end_date)
-
-
+    platforms_datasets["platform_categories"] = group_catalog_platforms(
+        platforms_datasets["platform_recs"]["features"]
+    )
 
     return render(
         request,

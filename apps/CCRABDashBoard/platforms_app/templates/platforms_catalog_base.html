@@ -26,9 +26,11 @@
 <section class="section" x-data="platformCatalog()">
     <div class="container">
         {% include "_catalog_breadcrumb.html" %}
-        <!-- CSS Grid wrapper -->
+        {% for category in platform_categories %}
+        <section class="mb-6" aria-labelledby="platform-category-{{ category.key }}">
+        <h2 id="platform-category-{{ category.key }}" class="title is-3 mb-4">{{ category.label }}</h2>
         <div class="platform-columns">
-            {% for platform_rec in platform_recs.features %}
+            {% for platform_rec in category.features %}
                 <a href="{% url 'platform_info' platform_rec.properties.short_name %}" class="card-link"
                     x-data="{
                         platformHandle: '{{ platform_rec.properties.platform_handle|escapejs }}',
@@ -154,8 +156,12 @@
                         </div>
                     </div>
                 </a>
+            {% empty %}
+                <p class="has-text-grey">No stations in this category.</p>
             {% endfor %}
         </div>
+        </section>
+        {% endfor %}
 
     </div>
 </section>
