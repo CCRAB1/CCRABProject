@@ -6,6 +6,7 @@ import { getAQIColorCode } from "./calculations.js";
 
 const DEFAULT_CENTER = [32.7765, -79.9311];
 const DEFAULT_ZOOM = 10;
+const REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 const AQI_SERIES_ID = "pm2.5_aqi 1";
 const NO_DATA_COLOR = "#7a8594";
 
@@ -100,6 +101,7 @@ document.addEventListener("alpine:init", () => {
         map: null,
         platformLayer: null,
         resizeObserver: null,
+        refreshTimer: null,
         searchTerm: "",
         showInactive: false,
         visiblePlatforms: [],
@@ -109,10 +111,28 @@ document.addEventListener("alpine:init", () => {
                 this.initializeMap();
                 this.observeMapSize();
                 this.loadPlatforms();
+                this.startRefreshTimer();
 
                 this.$watch("searchTerm", () => this.updateVisiblePlatforms());
                 this.$watch("showInactive", () => this.updateVisiblePlatforms());
             });
+        },
+
+        startRefreshTimer() {
+            if (this.refreshTimer !== null) {
+                window.clearInterval(this.refreshTimer);
+            }
+            this.refreshTimer = window.setInterval(() => {
+                if (!this.isLoading) {
+                    this.loadObservations();
+                }
+            }, REFRESH_INTERVAL_MS);
+        },
+
+        destroy() {
+            window.clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
+            this.resizeObserver?.disconnect();
         },
 
         get statusLabel() {
@@ -220,13 +240,14 @@ document.addEventListener("alpine:init", () => {
         },
 
         async loadObservations() {
+            if (this.isLoadingObservations) return;
+
             const endDate = DateTime.utc();
             const startDate = endDate.minus({ hours: 1 });
             const client = new CCRABRestClient({
                 baseUrl: window.location.origin,
                 accessToken: this.$refs.map?.dataset?.apiToken || null,
             });
-            this.aqiByPlatformHandle = {};
             this.observationErrorMessage = "";
             this.isLoadingObservations = true;
 
@@ -246,11 +267,15 @@ document.addEventListener("alpine:init", () => {
                         const record = await this.getObservationData(client, startDate, endDate, handle);
                         if (record) {
                             this.aqiByPlatformHandle[handle] = record;
-                            this.updatePlatformMarker(handle);
+                        } else {
+                            delete this.aqiByPlatformHandle[handle];
                         }
                     } catch (error) {
+                        delete this.aqiByPlatformHandle[handle];
                         console.warn("Platform map AQI data error", handle, error);
                         this.observationErrorMessage = "Some AQI readings could not be loaded. Gray markers have no recent AQI data.";
+                    } finally {
+                        this.updatePlatformMarker(handle);
                     }
                 }
             };
