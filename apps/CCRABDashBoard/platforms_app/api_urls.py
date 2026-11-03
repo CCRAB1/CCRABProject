@@ -1,19 +1,36 @@
 from django.urls import path
 
-from . import views
+from . import openapi, views
 
 urlpatterns = [
+    path("platforms/schema/", openapi.openapi_schema, name="platforms-openapi-schema"),
+    path("platforms/docs/", openapi.api_help, name="platforms-api-help"),
     path("platforms/", views.platform_collection_api, name="platform-list-api"),
-    path("platforms/<str:short_name>/", views.platform_detail_api, name="platform-detail-api"),
-
+    path(
+        "platforms/<str:short_name>/",
+        views.platform_detail_api,
+        name="platform-detail-api",
+    ),
     # Legacy aliases
-    path("v1/platforms/", views.platform_collection_web_data, name="platform-list-web-data"),
-
+    path(
+        "v1/platforms/",
+        views.platform_collection_web_data,
+        name="platform-list-web-data",
+    ),
     path("v1/platform_info/", views.PlatformViewSet.as_view(), name="platforminfo"),
-
-    path("v1/platform_configuration/", views.platform_configuration_api, name="platform-configuration-api"),
-
-    path("v1/system/platform_configuration/", views.platform_source_configuration, name="platform_configuration"),
-
-    path("v1/platform_data_request/", views.platform_data_request, name="platform_data_request")
+    path(
+        "v1/platform_configuration/",
+        views.platform_configuration_api,
+        name="platform-configuration-api",
+    ),
+    path(
+        "v1/system/platform_configuration/",
+        views.platform_source_configuration,
+        name="platform_configuration",
+    ),
+    path(
+        "v1/platform_data_request/",
+        views.platform_data_request,
+        name="platform_data_request",
+    ),
 ]

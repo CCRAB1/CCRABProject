@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CCRAB Platforms API reference</title>
+    <style>
+        body { margin: 0; color: #203538; background: #f5f8f7; font: 17px/1.6 system-ui, sans-serif; }
+        main { max-width: 1050px; margin: auto; padding: 2rem 1.2rem 5rem; }
+        a { color: #07665c; } h1, h2, h3 { line-height: 1.25; }
+        article, .intro { background: white; border: 1px solid #ceded9; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; }
+        code, pre { font-size: .9em; overflow-wrap: anywhere; }
+        pre { padding: 1rem; background: #edf3f1; overflow-x: auto; white-space: pre-wrap; }
+        table { border-collapse: collapse; width: 100%; } th, td { text-align: left; vertical-align: top; border-bottom: 1px solid #dce5e1; padding: .7rem .4rem; }
+        .table-scroll { overflow-x: auto; } .badge { font-size: .85em; font-weight: bold; color: #07665c; }
+    </style>
+</head>
+<body><main>
+    <nav aria-label="Breadcrumb"><a href="{% url 'home' %}">Data Hub</a> / API reference</nav>
+    <h1>CCRAB Platforms API</h1>
+    <p>Find monitoring platforms, inspect sensors, and request observations.</p>
+    <p><a href="{% url 'platforms-openapi-schema' %}">Download OpenAPI 3.0 schema (JSON)</a></p>
+    <section class="intro" aria-labelledby="getting-started">
+        <h2 id="getting-started">Getting started</h2>
+        <p>All paths below are relative to this site's origin. Responses use JSON. This reference covers the platforms_app API, including legacy aliases.</p>
+        <ol>
+            <li>For authenticated endpoints, POST your <code>username</code> and <code>password</code> as JSON to <code>{% url 'token_obtain_pair' %}</code>. Use the returned <code>access</code> token in <code>Authorization: Bearer &lt;access&gt;</code>. POST the <code>refresh</code> token to <code>{% url 'token_refresh' %}</code> to obtain a new access token.</li>
+            <li>GET <code>{% url 'platform-list-api' %}</code> to discover platform short names, platform handles, and sensor observation names and orders.</li>
+            <li>Request observations using the exact <code>platform_handle</code> and each sensor's <code>obs_standard_name</code> and <code>s_order</code>. URL-encode query values. Use UTC dates ending in <code>Z</code>, or encode the plus sign in positive timezone offsets as <code>%2B</code>.</li>
+        </ol>
+        <p>Public endpoints require no token. The ingestion configuration endpoint also requires membership in <code>private_api_access</code>. An invalid token can cause a 401 even on public DRF endpoints.</p>
+        <h3>Example observation request</h3>
+        <p>Replace the origin, platform handle and observation pair with values from your platform:</p>
+        <pre>curl --get 'https://YOUR_HOST{% url 'platform_data_request' %}' \
+  --data-urlencode 'platform_handle=YOUR_PLATFORM_HANDLE' \
+  --data-urlencode 'start_date=2026-01-01T00:00:00Z' \
+  --data-urlencode 'end_date=2026-01-02T00:00:00Z' \
+  --data-urlencode 'observations=YOUR_OBSERVATION_NAME 1'</pre>
+    </section>
+    <h2>Endpoints</h2>
+    <nav aria-label="Endpoints"><ul>{% for endpoint in endpoints %}<li><a href="#{{ endpoint.operationId }}">{{ endpoint.summary }}</a></li>{% endfor %}</ul></nav>
+    {% for endpoint in endpoints %}
+    <article id="{{ endpoint.operationId }}">
+        <span class="badge">GET · {% if endpoint.security %}Bearer token required{% else %}Public{% endif %}{% if endpoint.deprecated %} · Legacy{% endif %}</span>
+        <h3>{{ endpoint.summary }}</h3><code>{{ endpoint.path }}</code>
+        <p>{{ endpoint.description }}</p>
+        {% if endpoint.parameters %}
+        <div class="table-scroll"><table><caption>Request parameters</caption><thead><tr><th>Name</th><th>Location</th><th>Required</th><th>Description</th></tr></thead><tbody>
+            {% for param in endpoint.parameters %}<tr><td><code>{{ param.name }}</code></td><td>{{ param.in }}</td><td>{{ param.required|yesno:"Yes,No" }}</td><td>{{ param.description }}{% if param.example %}<br>Example: <code>{{ param.example }}</code>{% endif %}</td></tr>{% endfor %}
+        </tbody></table></div>
+        {% endif %}
+        <h4>Responses</h4><ul>{% for code, response in endpoint.responses.items %}<li><strong>{{ code }}</strong> — {{ response.description }}</li>{% endfor %}</ul>
+        <details><summary>Successful response schema</summary><pre>{{ endpoint.response_json }}</pre></details>
+    </article>
+    {% endfor %}
+    <section><h2>Response models</h2><p>Model references above resolve to these definitions. Platform responses use GeoJSON: metadata and sensors appear inside <code>properties</code>.</p><details><summary>View model definitions</summary><pre>{{ schemas_json }}</pre></details></section>
+</main></body></html>
