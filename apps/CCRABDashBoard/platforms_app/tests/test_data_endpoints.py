@@ -49,23 +49,6 @@ class PlatformDataEndpointTests(SimpleTestCase):
         self.assertEqual(response.status_code, 401)
 
     @patch("platforms_app.views._platform_detail_payload")
-    def test_platform_detail_web_data_is_public(self, payload_mock):
-        payload_mock.return_value = (
-            object(),
-            {"type": "Feature", "properties": {"short_name": "PA-01"}},
-        )
-
-        response = self.client.get(
-            reverse("platform-detail-web-data", kwargs={"short_name": "PA-01"})
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {"type": "Feature", "properties": {"short_name": "PA-01"}},
-        )
-
-    @patch("platforms_app.views._platform_detail_payload")
     def test_platform_configuration_api_matches_page_payload(self, payload_mock):
         payload = {
             "type": "Feature",

@@ -231,11 +231,6 @@ def platform_collection_web_data(request):
     return JsonResponse(payload, safe=False)
 
 
-def platform_detail_web_data(request, short_name):
-    _, payload = _platform_detail_payload(request.GET, request, short_name=short_name)
-    return JsonResponse(payload)
-
-
 def PlatformInfo(request, short_name=None):
     return render(
         request,
