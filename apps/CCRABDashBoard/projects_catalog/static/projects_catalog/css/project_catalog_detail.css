@@ -71,3 +71,19 @@
 #project-products-wrap [data-role="product-links"] li a {
   font-size: 1.0rem;
 }
+
+[x-cloak] { display: none !important; }
+#project-page { overflow-wrap: anywhere; }
+#project-page .column { min-width: 0; }
+#project-page .rich-text { white-space: pre-line; overflow-x: auto; }
+#project-page .rich-text pre { white-space: pre-wrap; }
+#project-page .rich-text table { max-width: 100%; }
+#project-page .project-hero img { object-fit: cover; }
+#project-page .tag { height: auto; white-space: normal; }
+.project-navigation { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.project-navigation .button { white-space: normal; height: auto; text-align: left; gap: .5rem; }
+@media (max-width: 768px) {
+    #project-page .title.is-2 { font-size: 1.8rem; }
+    #project-page .card-content { padding: 1.1rem; }
+    .project-navigation .button { width: 100%; }
+}

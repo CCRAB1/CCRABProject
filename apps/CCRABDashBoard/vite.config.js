@@ -10,6 +10,7 @@ export default defineConfig({
     rollupOptions: {
       treeshake: false,
       input: [
+        resolve(__dirname, "projects_catalog/static/projects_catalog/js/project_detail.js"),
         resolve(__dirname, "frontend/platform_frontend.js"),
         resolve(__dirname, "platforms_app/static/platforms_app/js/platforms_map.js"),
       ],
