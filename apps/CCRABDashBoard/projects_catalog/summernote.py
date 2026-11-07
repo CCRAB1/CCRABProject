@@ -3,6 +3,9 @@ from django_summernote.apps import DjangoSummernoteConfig
 
 
 class CatalogSummernoteConfig(DjangoSummernoteConfig):
+    # Match the attachment primary key in Summernote's bundled migrations.
+    default_auto_field = "django.db.models.AutoField"
+
     def update_config(self):
         super().update_config()
         # 0.8.20 ships only the minified Lite CSS and overwrites settings-level
