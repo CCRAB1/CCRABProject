@@ -156,6 +156,7 @@ class ProjectDetailAndProductsApiTests(TestCase):
         )
 
         payload = response.json()
+        self.assertIn("project_leads", payload)
         self.assertIn("partners", payload)
         self.assertIn("pictures", payload)
         self.assertIn("hosting_locations", payload)

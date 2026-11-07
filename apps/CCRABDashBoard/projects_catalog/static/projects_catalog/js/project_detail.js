@@ -36,7 +36,7 @@ export function safeUrl(value) {
 export function projectDetail() {
     return {
         projectEndpoint: '', loading: true, error: '', productsError: '', project: {}, categories: [],
-        photos: [], productTypes: [], keywords: [],
+        photos: [], leads: [], productTypes: [], keywords: [],
         get title() {
             return this.project.project_full_title || this.project.project_name || 'Untitled project';
         },
@@ -64,6 +64,7 @@ export function projectDetail() {
             const url = this.projectEndpoint;
             try {
                 this.project = await this.request(url);
+                this.leads = Array.isArray(this.project.project_leads) ? this.project.project_leads : [];
                 this.photos = [];
                 for (const picture of this.project.pictures || []) {
                     if (safeUrl(picture.picture_path)) this.photos.push(picture);

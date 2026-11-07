@@ -1,5 +1,7 @@
 from django.test import TestCase
 
+from projects_catalog.models import ProjectLead
+
 from projects_catalog.serializers import (
     HostingLocationSerializer,
     ProjectCatalogPageSerializer,
@@ -20,6 +22,25 @@ class CatalogSerializerTests(TestCase):
         self.category = create_product_category("Data")
         self.product_type_air = create_product_type("Air Quality")
         self.product_type_data = create_product_type("Data Products")
+
+    def test_project_serializer_exposes_multiple_leads(self):
+        lead = ProjectLead.objects.create(
+            project=self.project, name="Lead One", organization="Research Group",
+            email="one@example.com", url="https://example.com/one", role="Investigator",
+        )
+        second = ProjectLead.objects.create(project=self.project, name="Lead Two")
+
+        payload = ProjectCatalogPageSerializer(self.project).data
+
+        self.assertEqual(payload["project_leads"], [
+            {"id": lead.pk, "name": "Lead One", "organization": "Research Group",
+             "email": "one@example.com", "url": "https://example.com/one", "role": "Investigator"},
+            {"id": second.pk, "name": "Lead Two", "organization": None,
+             "email": None, "url": None, "role": None},
+        ])
+
+    def test_project_serializer_exposes_empty_leads(self):
+        self.assertEqual(ProjectCatalogPageSerializer(self.project).data["project_leads"], [])
 
     def test_hosting_location_serializer_exposes_database_field_names(self):
         location = create_hosting_location(

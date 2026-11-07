@@ -7,6 +7,7 @@ from .models import (
     ProductCategory,
     ProductType,
     ProjectCatalogPage,
+    ProjectLead,
     ProjectPartner,
     ProjectPicture,
 )
@@ -22,6 +23,12 @@ class ProductTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductType
         fields = ("id", "name", "description")
+
+
+class ProjectLeadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectLead
+        fields = ("id", "name", "organization", "email", "url", "role")
 
 
 class ProjectPartnerSerializer(serializers.ModelSerializer):
@@ -108,6 +115,7 @@ class HostingLocationSerializer(serializers.ModelSerializer):
 
 
 class ProjectCatalogPageSerializer(serializers.ModelSerializer):
+    project_leads = ProjectLeadSerializer(source="leads", many=True, read_only=True)
     partners = ProjectPartnerSerializer(many=True, read_only=True)
     pictures = ProjectPictureSerializer(many=True, read_only=True)
     hosting_locations = HostingLocationSerializer(many=True, read_only=True)
@@ -120,6 +128,7 @@ class ProjectCatalogPageSerializer(serializers.ModelSerializer):
             "project_name",
             "project_full_title",
             "project_lead",
+            "project_leads",
             "project_lead_email",
             "project_lead_phone",
             "neighborhood",

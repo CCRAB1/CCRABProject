@@ -37,7 +37,6 @@ class ProjectCatalogPageAdmin(GISModelAdmin):
     list_display = (
         "project_name",
         "slug",
-        "project_lead",
         "start_date",
         "end_date",
         "project_url",
@@ -48,8 +47,6 @@ class ProjectCatalogPageAdmin(GISModelAdmin):
         "project_name",
         "slug",
         "project_full_title",
-        "project_lead",
-        "project_lead_email",
         "project_description",
         "keywords",
     )
@@ -72,10 +69,6 @@ class ProjectCatalogPageAdmin(GISModelAdmin):
                     "project_url",
                 )
             },
-        ),
-        (
-            "Lead Contact",
-            {"fields": ("project_lead", "project_lead_email", "project_lead_phone")},
         ),
         (
             "Dates and Location",

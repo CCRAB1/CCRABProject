@@ -104,12 +104,19 @@
                 <div class="card mb-5">
                     <header class="card-header"><h2 class="card-header-title">Project team</h2></header>
                     <div class="card-content content">
-                        <h3 class="is-size-6">Project Lead</h3>
-                        <div class="rich-text project-lead" x-html="richText(project.project_lead || '—')"></div>
-                        <a x-show="project.project_lead_email"
-                           :href="'mailto:' + encodeURIComponent(project.project_lead_email || '')"
-                           x-text="project.project_lead_email"></a>
-                        <p x-show="project.project_lead_phone" x-text="project.project_lead_phone"></p>
+                        <h3 class="is-size-6">Project Leads</h3>
+                        <p x-show="!leads.length">—</p>
+                        <template x-for="lead in leads" :key="lead.id">
+                            <div class="mb-4">
+                                <div class="project-lead">
+                                    <div>
+                                        <a :href="'mailto:' + encodeURIComponent(lead.email || '')" x-text="lead.name"></a><span x-show="lead.role" x-text="', ' + lead.role"></span>
+                                    </div>
+                                </div>
+                                <p x-show="safeUrl(lead.organization)"><a :href="safeUrl(lead.url)" target="_blank"
+                                                              rel="noopener noreferrer" x-text="lead.organization"></a></p>
+                            </div>
+                        </template>
                         <h3 class="is-size-6">Partners</h3>
                         <p x-show="!project.partners?.length">—</p>
                         <ul>

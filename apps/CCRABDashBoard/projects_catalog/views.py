@@ -128,6 +128,7 @@ def _project_queryset():
     return (
         ProjectCatalogPage.objects
         .prefetch_related(
+            "leads",
             "partners",
             "pictures",
             "hosting_locations__product_types",
@@ -180,7 +181,8 @@ def _project_list_payload(query_params):
             | Q(project_full_title__icontains=keyword_query)
             | Q(project_description__icontains=keyword_query)
             | Q(project_impact__icontains=keyword_query)
-            | Q(project_lead__icontains=keyword_query)
+            | Q(leads__name__icontains=keyword_query)
+            | Q(leads__organization__icontains=keyword_query)
             | Q(keywords__icontains=keyword_query)
         )
 
@@ -223,6 +225,7 @@ def _project_list_payload(query_params):
                 "start_date": project.get("start_date"),
                 "end_date": project.get("end_date"),
                 "pictures": project.get("pictures") or [],
+                "project_leads": project.get("project_leads") or [],
                 "project_detail_url": reverse(
                     "project-detail",
                     kwargs={"code": _project_code_for_url(model_obj)},
