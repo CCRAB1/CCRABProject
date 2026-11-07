@@ -1,5 +1,13 @@
 from django.contrib import admin
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
+from django.core.exceptions import PermissionDenied
+from django.http import Http404
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.utils.html import format_html
+
+from .forms import ProjectCatalogEditorForm
+
 from django.contrib.gis.admin import GISModelAdmin  # requires GeoDjango; remove if not using
 
 from .models import (
@@ -8,6 +16,7 @@ from .models import (
     ProductCategory,
     ProductType,
     ProjectCatalogPage,
+    ProjectCatalogPageEditor,
     ProjectLead,
     ProjectPartner,
     ProjectPicture,
@@ -209,3 +218,50 @@ class LogEntryAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ProjectCatalogPageEditor)
+class ProjectCatalogPageEditorAdmin(admin.ModelAdmin):
+    form = ProjectCatalogEditorForm
+    list_display = ("project_name", "slug", "updated_at")
+    search_fields = ("project_name", "project_full_title", "slug")
+    ordering = ("project_name",)
+    readonly_fields = ("project_name", "page_editor")
+    fields = ("project_name", "page_editor", "project_description", "project_impact")
+    actions = None
+
+    @admin.display(description="Page editor")
+    def page_editor(self, obj):
+        return format_html(
+            '<a href="{}">Open editor in project page layout</a>',
+            reverse("projects_catalog_detail_editor", kwargs={"code": obj.slug or str(obj.pk)}),
+        )
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        # Open the editors in their actual sections of the project page.
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        project = self.get_object(request, admin.utils.unquote(object_id))
+        if project is None:
+            raise Http404("Project not found")
+        return redirect(
+            "projects_catalog_detail_editor", code=project.slug or str(project.pk)
+        )
+
+    def has_module_permission(self, request):
+        return self.has_change_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_change_permission(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.has_perm("projects_catalog.change_projectcatalogpage")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        obj.save(update_fields=["project_description", "project_impact", "updated_at"])

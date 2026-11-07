@@ -14,5 +14,6 @@ urlpatterns = [
         name="project-products-web-data",
     ),
     path("<slug:code>/resource/<slug:resource_slug>/", views.project_resource_detail_page, name="project-resource-detail"),
+    path("<slug:code>/edit/", views.projects_catalog_detail_editor, name="projects_catalog_detail_editor"),
     path("<slug:code>/", views.project_detail_page, name="project-detail"),
 ]

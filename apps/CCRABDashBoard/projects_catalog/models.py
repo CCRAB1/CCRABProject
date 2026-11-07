@@ -275,3 +275,13 @@ class HostingLocationProductType(models.Model):
 
     def __str__(self) -> str:
         return f"{self.hosting_location_id} -> {self.product_type_id}"
+
+
+class ProjectCatalogPageEditor(ProjectCatalogPage):
+    """Separate admin entry for editing existing project narratives."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Project Catalog Page Editor"
+        verbose_name_plural = "Project Catalog Pages Editor"
+        default_permissions = ()

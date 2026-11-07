@@ -4,7 +4,11 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic.base import RedirectView, TemplateView
 
+from projects_catalog.views import summernote_upload_disabled
+
 urlpatterns = [
+    path("summernote/upload_attachment/", summernote_upload_disabled, name="django_summernote-upload_attachment"),
+    path("summernote/", include("django_summernote.urls")),
     path("", TemplateView.as_view(template_name="index.html"), name="home"),
     path("admin/", admin.site.urls),
     path("projects_catalog_admin/", RedirectView.as_view(url="/admin/", permanent=False)),

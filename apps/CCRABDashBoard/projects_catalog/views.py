@@ -1,15 +1,18 @@
 import re
 from collections import OrderedDict
 
+from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
-from django.http import Http404, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.http import Http404, HttpResponseForbidden, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.text import slugify
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from .forms import ProjectCatalogEditorForm, ProjectLeadFormSet, ProjectPartnerFormSet, ProjectPhotoUploadForm
 from .models import ProductType, ProjectCatalogPage
 from .serializers import ProjectCatalogPageSerializer
 
@@ -492,3 +495,45 @@ def project_detail_page(request, code):
 
 def projects_map_page(request):
     return render(request, "projects_map.html")
+
+
+@login_required(login_url="admin:login")
+@permission_required("projects_catalog.change_projectcatalogpage", raise_exception=True)
+def projects_catalog_detail_editor(request, code):
+    project = _resolve_project(code)
+    data = request.POST if request.method == "POST" else None
+    form = ProjectCatalogEditorForm(data, instance=project)
+    lead_formset = ProjectLeadFormSet(data, instance=project, prefix="leads")
+    partner_formset = ProjectPartnerFormSet(data, instance=project, prefix="partners")
+    photo_form = ProjectPhotoUploadForm(data, request.FILES or None, prefix="photo")
+    if request.method == "POST":
+        # Validate every section so all errors appear together, without partial saves.
+        project_valid = form.is_valid()
+        leads_valid = lead_formset.is_valid()
+        partners_valid = partner_formset.is_valid()
+        photo_valid = photo_form.is_valid()
+        if project_valid and leads_valid and partners_valid and photo_valid:
+            with transaction.atomic():
+                edited_project = form.save(commit=False)
+                edited_project.save(update_fields=["project_description", "project_impact", "neighborhood", "start_date", "end_date", "updated_at"])
+                lead_formset.save()
+                partner_formset.save()
+                if photo_form.cleaned_data.get("picture_path"):
+                    photo = photo_form.save(commit=False)
+                    photo.project = edited_project
+                    photo.save()
+            return redirect(reverse("projects_catalog_detail_editor", kwargs={"code": code}) + "?saved=1")
+    return render(request, "projects_catalog_detail_editor.html", {
+        "project_code": code,
+        "form": form,
+        "lead_formset": lead_formset,
+        "partner_formset": partner_formset,
+        "photo_form": photo_form,
+        "saved": request.GET.get("saved") == "1" and request.method != "POST",
+        "has_errors": request.method == "POST",
+    })
+
+
+def summernote_upload_disabled(request):
+    # django-summernote 0.8.20 reverses this URL even with attachments disabled.
+    return HttpResponseForbidden("Attachments are disabled.")

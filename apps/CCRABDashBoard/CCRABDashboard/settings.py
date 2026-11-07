@@ -113,6 +113,7 @@ INSTALLED_APPS = [
     "rest_framework_gis",
     "platforms_app.apps.PlatformsAppConfig",
     "projects_catalog.apps.ProjectsCatalogConfig",
+    "projects_catalog.summernote.CatalogSummernoteConfig",
     "corsheaders"
 ]
 
@@ -259,5 +260,24 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+    },
+}
+
+# Iframe widgets isolate editor styles from the Bulma catalog layout.
+SUMMERNOTE_THEME = "lite"
+SUMMERNOTE_CONFIG = {
+    "iframe": True,
+    "disable_attachment": True,
+    "summernote": {
+        "width": "100%",
+        "height": 320,
+        "toolbar": [
+            ["style", ["style"]],
+            ["font", ["bold", "italic", "underline", "strikethrough", "clear"]],
+            ["para", ["ul", "ol"]],
+            ["table", ["table"]],
+            ["insert", ["link"]],
+            ["history", ["undo", "redo"]],
+        ],
     },
 }

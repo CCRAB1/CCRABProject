@@ -1,0 +1,172 @@
+{% extends "project_catalog_page_base.html" %}
+{% load static %}
+{% block title %}Project {{ project_code }}{% endblock %}
+{% block extra_head %}
+    {{ form.media }}
+    <script defer src="{% static 'projects_catalog/js/project_team_editor.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'projects_catalog/css/project_catalog_detail.css' %}">
+    <script type="module"
+            src="{% static 'build/projects_catalog/static/projects_catalog/js/project_detail.js' %}"></script>
+{% endblock %}
+{% block content %}
+    <div id="project-page" x-data="projectDetail" :aria-busy="loading"
+         data-project-code="{{ project_code }}" data-project-api-base="{% url 'project-list-web-data' %}">
+        <noscript><p class="notification is-warning">Enable JavaScript to view project details.</p></noscript>
+        <p x-show="loading" role="status">Loading project…</p>
+        <div x-cloak x-show="error" class="notification is-danger is-light" role="alert">
+            <p x-text="error"></p>
+            <button type="button" class="button mt-2" @click="load()" :disabled="loading">Try again</button>
+        </div>
+        <form method="post" enctype="multipart/form-data" id="project-editor-form" x-cloak x-show="!loading && !error" class="columns is-multiline is-variable is-6">
+            {% csrf_token %}
+            <main class="column is-8">
+                <h1 class="title is-2" x-text="title"></h1>
+                <div class="columns is-multiline is-mobile my-2" x-ignore>
+                    <div class="column is-12-mobile is-4-tablet">
+                        <div class="meta-tile">
+                            <label class="heading" for="{{ form.neighborhood.id_for_label }}">Neighborhood</label>
+                            {{ form.neighborhood }}
+                            <div class="has-text-danger" role="alert">{{ form.neighborhood.errors }}</div>
+                        </div>
+                    </div>
+                    <div class="column is-12-mobile is-4-tablet">
+                        <div class="meta-tile">
+                            <label class="heading" for="{{ form.start_date.id_for_label }}">Start Date</label>
+                            {{ form.start_date }}
+                            <div class="has-text-danger" role="alert">{{ form.start_date.errors }}</div>
+                        </div>
+                    </div>
+                    <div class="column is-12-mobile is-4-tablet">
+                        <div class="meta-tile">
+                            <label class="heading" for="{{ form.end_date.id_for_label }}">End Date</label>
+                            {{ form.end_date }}
+                            <div class="has-text-danger" role="alert">{{ form.end_date.errors }}</div>
+                        </div>
+                    </div>
+                </div>
+                <template x-if="photos.length">
+                    <div class="project-hero mb-4">
+                        <figure class="image is-16by9"><img :src="safeUrl(photos[0].picture_path)"
+                                                            :alt="photos[0].name || title"></figure>
+                    </div>
+                </template>
+                <div class="content" x-ignore>
+                    {% if saved %}<p class="notification is-success" role="status">Project changes saved.</p>{% endif %}
+                    {% if has_errors %}
+                        <p class="notification is-danger" role="alert">Please correct the errors below. No changes have been saved.</p>
+                    {% endif %}
+                    {{ form.non_field_errors }}
+                    <h2 class="title is-4 mb-2"><label for="{{ form.project_description.id_for_label }}">The Project</label></h2>
+                    {{ form.project_description.errors }}
+                    {{ form.project_description }}
+                    <h2 class="title is-4 mt-6 mb-2"><label for="{{ form.project_impact.id_for_label }}">The Impact</label></h2>
+                    {{ form.project_impact.errors }}
+                    {{ form.project_impact }}
+                </div>
+                <section class="mt-6" id="project-products-wrap" aria-labelledby="products-title">
+                    <h2 class="title is-4" id="products-title">Project products</h2>
+                    <div x-show="productsError" class="notification is-warning" role="alert"><p
+                            x-text="productsError"></p>
+                        <button type="button" class="button mt-2" @click="load()">Try again</button>
+                    </div>
+                    <p x-show="!productsError && !categories.length" class="has-text-grey">No products listed.</p>
+                    <div class="columns is-multiline">
+                        <template x-for="category in categories" :key="category.name">
+                            <div class="column is-12-mobile is-6-tablet">
+                                <article class="card product-card">
+                                    <div class="card-content content">
+                                        <h3 class="title is-5" x-text="category.name"></h3>
+                                        <template x-for="item in category.items" :key="item.id">
+                                            <div class="mb-4">
+                                                <div class="rich-text"
+                                                     x-html="richText(item.data_summary || item.data_type || 'Project resource')"></div>
+                                                <a x-show="safeUrl(item.resource_detail_url || item.url)"
+                                                   :href="safeUrl(item.resource_detail_url || item.url)">View
+                                                    resource</a>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </article>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+                <section class="mt-6"><h2 class="title is-4">Photos</h2>
+                    <div class="box" x-ignore>
+                        {{ photo_form.non_field_errors }}
+                        <div class="field">
+                            <label class="label" for="{{ photo_form.picture_path.id_for_label }}">{{ photo_form.picture_path.label }}</label>
+                            {{ photo_form.picture_path }}
+                            <p class="help">Choose a JPG, PNG, GIF, or WebP image. Upload it with Save changes.</p>
+                            <div class="has-text-danger" role="alert">{{ photo_form.picture_path.errors }}</div>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="{{ photo_form.name.id_for_label }}">{{ photo_form.name.label }}</label>
+                            {{ photo_form.name }}
+                            <div class="has-text-danger" role="alert">{{ photo_form.name.errors }}</div>
+                        </div>
+                        {% if has_errors %}<p class="help">If you selected a photo, select it again before saving.</p>{% endif %}
+                    </div>
+                    <div class="columns is-multiline">
+                        <template x-for="photo in photos" :key="photo.id">
+                            <div class="column is-12-mobile is-6-tablet">
+                                <figure class="card gallery-card">
+                                    <div class="card-image">
+                                        <div class="image is-4by3"><img :src="safeUrl(photo.picture_path)"
+                                                                        :alt="photo.name || title" loading="lazy"></div>
+                                    </div>
+                                    <figcaption class="card-content is-size-7" x-text="photo.name || ''"></figcaption>
+                                </figure>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+                <nav class="project-navigation mt-6" aria-label="Adjacent projects">
+                    <template x-if="project.previous_project"><a class="button is-link is-light"
+                                                                 :href="safeUrl(project.previous_project.project_detail_url)">←
+                        <span x-text="project.previous_project.project_full_title || project.previous_project.project_name"></span></a>
+                    </template>
+                    <template x-if="project.next_project"><a class="button is-link is-light"
+                                                             :href="safeUrl(project.next_project.project_detail_url)"><span
+                            x-text="project.next_project.project_full_title || project.next_project.project_name"></span>
+                        →</a></template>
+                </nav>
+            </main>
+            <aside class="column is-4" aria-label="Project details">
+                <div class="card mb-5">
+                    <header class="card-header"><h2 class="card-header-title">Project team</h2></header>
+                    <div class="card-content content" x-ignore>
+                        {% include "projects_catalog/_team_formset.html" with formset=lead_formset title="Project Leads" add_label="Add lead" %}
+                        {% include "projects_catalog/_team_formset.html" with formset=partner_formset title="Partners" add_label="Add partner" %}
+                    </div>
+                </div>
+                <div class="card">
+                    <header class="card-header"><h2 class="card-header-title">Details</h2></header>
+                    <div class="card-content content">
+                        <h3 class="is-size-6">Project URL</h3><a x-show="safeUrl(project.project_url)"
+                                                                 :href="safeUrl(project.project_url)" target="_blank"
+                                                                 rel="noopener noreferrer">Open project link</a><span
+                            x-show="!safeUrl(project.project_url)">—</span>
+                        <h3 class="is-size-6">Product Types</h3>
+                        <div class="tags">
+                            <template x-for="type in productTypes" :key="type"><span class="tag is-light"
+                                                                                     x-text="type"></span></template>
+                            <span x-show="!productTypes.length">—</span></div>
+                        <h3 class="is-size-6">Keywords</h3>
+                        <div class="tags">
+                            <template x-for="(keyword, index) in keywords" :key="index"><span class="tag is-light"
+                                                                                              x-text="keyword"></span>
+                            </template>
+                            <span x-show="!keywords.length">—</span></div>
+                    </div>
+                </div>
+            </aside>
+            <footer class="column is-12" x-ignore>
+                <div class="buttons mt-4">
+                    <button type="submit" class="button is-link">Save changes</button>
+                    <a class="button is-light" href="{% url 'project-detail' code=project_code %}">Cancel / View project</a>
+                </div>
+            </footer>
+        </form>
+    </div>
+{% endblock %}
