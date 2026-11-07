@@ -8,9 +8,16 @@ from .models import (
     ProductCategory,
     ProductType,
     ProjectCatalogPage,
+    ProjectLead,
     ProjectPartner,
     ProjectPicture,
 )
+
+
+class ProjectLeadInline(admin.TabularInline):
+    model = ProjectLead
+    extra = 0
+    fields = ("name", "organization", "email", "url", "role")
 
 
 class ProjectPartnerInline(admin.TabularInline):
@@ -50,7 +57,7 @@ class ProjectCatalogPageAdmin(GISModelAdmin):
     date_hierarchy = "start_date"
     readonly_fields = ("created_at", "updated_at")
     prepopulated_fields = {"slug": ("project_name",)}
-    inlines = (ProjectPartnerInline, ProjectPictureInline)
+    inlines = (ProjectLeadInline, ProjectPartnerInline, ProjectPictureInline)
 
     fieldsets = (
         (
@@ -76,6 +83,14 @@ class ProjectCatalogPageAdmin(GISModelAdmin):
         ),
         ("Metadata", {"fields": ("keywords", "created_at", "updated_at")}),
     )
+
+
+@admin.register(ProjectLead)
+class ProjectLeadAdmin(admin.ModelAdmin):
+    list_display = ("name", "organization", "email", "role", "project")
+    search_fields = ("name", "organization", "email", "role", "project__project_name")
+    autocomplete_fields = ("project",)
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(ProjectPartner)

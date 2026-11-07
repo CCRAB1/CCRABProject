@@ -98,6 +98,26 @@ class ProjectCatalogPage(TimestampedModel):
         super().save(*args, **kwargs)
 
 
+class ProjectLead(TimestampedModel):
+    project = models.ForeignKey(
+        ProjectCatalogPage,
+        on_delete=models.CASCADE,
+        related_name="leads",
+        db_column="project_id",
+    )
+    name = models.TextField()
+    organization = models.TextField(blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    url = models.URLField(max_length=512, blank=True, null=True)
+    role = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = '"projects"."project_leads"'
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class ProjectPartner(TimestampedModel):
     project = models.ForeignKey(
         ProjectCatalogPage,
