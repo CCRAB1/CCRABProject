@@ -2,6 +2,7 @@
 import re
 
 import bleach
+from bleach.css_sanitizer import CSSSanitizer
 from django import forms
 from django.utils.html import escape
 from django.utils import timezone
@@ -20,7 +21,8 @@ RICH_TEXT_TAGS = [
 
 def clean_rich_text(value):
     return bleach.clean(value or "", tags=RICH_TEXT_TAGS,
-                        attributes={"a": ["href", "title"]},
+                        attributes={"*": ["style"], "a": ["href", "title"]},
+                        css_sanitizer=CSSSanitizer(allowed_css_properties=["text-align", "margin-left"]),
                         protocols=["http", "https", "mailto"], strip=True)
 
 

@@ -8,11 +8,27 @@ export function richText(value, bullets = false) {
     const options = {
         ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li',
             'a', 'h2', 'h3', 'h4', 'blockquote', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
-        ALLOWED_ATTR: ['href', 'title'],
+        ALLOWED_ATTR: ['href', 'title', 'style'],
         ALLOW_DATA_ATTR: false,
         ALLOW_ARIA_ATTR: false,
     };
-    if (/<\/?[a-z][^>]*>/i.test(text)) return DOMPurify.sanitize(text, options);
+    if (/<\/?[a-z][^>]*>/i.test(text)) {
+        const fragment = DOMPurify.sanitize(text, {...options, RETURN_DOM_FRAGMENT: true});
+        // Keep only the paragraph controls exposed by Summernote. Filter styles
+        // before inserting the fragment into the live page.
+        for (const element of fragment.querySelectorAll('[style]')) {
+            const alignment = element.style.getPropertyValue('text-align');
+            const indent = element.style.getPropertyValue('margin-left');
+            element.removeAttribute('style');
+            if (['left', 'center', 'right', 'justify'].includes(alignment)) {
+                element.style.textAlign = alignment;
+            }
+            if (/^\d+(?:\.\d+)?px$/.test(indent)) element.style.marginLeft = indent;
+        }
+        const container = document.createElement('div');
+        container.append(fragment);
+        return container.innerHTML;
+    }
     const container = document.createElement(bullets ? 'ul' : 'div');
     for (const part of text.split(bullets ? /\r?\n/ : /\n\s*\n/)) {
         if (!part.trim()) continue;

@@ -22,7 +22,7 @@ dependencies = [
     "xlrd>=2.0.1",
     "pint>=0.25.3",
     "django-summernote>=0.8.20.0",
-    "bleach>=6.4.0",
+    "bleach[css]>=6.4.0",
     "pillow>=13.0.0",
 ]
 [tool.uv.sources]
