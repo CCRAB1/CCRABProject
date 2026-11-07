@@ -122,8 +122,9 @@
                         <ul>
                             <template x-for="partner in project.partners || []" :key="partner.id">
                                 <li><div class="rich-text partner-name" x-html="richText(partner.name)"></div>
-                                    <div class="rich-text partner-affiliation" x-show="partner.affiliation"
-                                         x-html="richText(partner.affiliation)"></div>
+                                    <a class="partner-url" x-show="safeUrl(partner.url)"
+                                       :href="safeUrl(partner.url)" target="_blank"
+                                       rel="noopener noreferrer" x-text="partner.url"></a>
                                 </li>
                             </template>
                         </ul>

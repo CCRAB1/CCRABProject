@@ -71,11 +71,11 @@ def create_hosting_location(
     return location
 
 
-def create_partner(project, name, affiliation):
+def create_partner(project, name, url):
     return ProjectPartner.objects.create(
         project=project,
         name=name,
-        affiliation=affiliation,
+        url=url,
     )
 
 

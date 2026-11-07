@@ -20,7 +20,7 @@ class ProjectTeamEditorTests(TestCase):
             "leads-0-email": "lead@example.com", "leads-0-url": "https://example.com/lead",
             "leads-0-role": "Researcher",
             "partners-TOTAL_FORMS": "1", "partners-INITIAL_FORMS": "0",
-            "partners-0-name": "Partner Name", "partners-0-affiliation": "Community",
+            "partners-0-name": "Partner Name", "partners-0-url": "https://example.com/partner",
         }
 
     def submit(self):
@@ -40,7 +40,7 @@ class ProjectTeamEditorTests(TestCase):
             self.assertEqual(getattr(lead, field), self.data[f"leads-0-{field}"])
         partner = self.project.partners.get()
         self.assertEqual(partner.name, "Partner Name")
-        self.assertEqual(partner.affiliation, "Community")
+        self.assertEqual(partner.url, "https://example.com/partner")
 
     def test_invalid_lead_prevents_all_saves_and_preserves_input(self):
         original = self.project.project_description
@@ -53,6 +53,19 @@ class ProjectTeamEditorTests(TestCase):
         self.assertFalse(self.project.partners.exists())
         self.assertIn("invalid-email", response.content.decode())
         self.assertIn("New impact", response.content.decode())
+
+    def test_invalid_partner_url_prevents_all_saves(self):
+        self.data["partners-0-url"] = "javascript:alert(1)"
+        response = self.submit()
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(self.project.leads.exists())
+        self.assertFalse(self.project.partners.exists())
+        self.assertIn("Enter a valid URL", response.content.decode())
+
+    def test_partner_url_is_optional(self):
+        self.data["partners-0-url"] = ""
+        self.assertEqual(self.submit().status_code, 302)
+        self.assertIsNone(self.project.partners.get().url)
 
     def test_edit_and_delete_existing_rows(self):
         lead = ProjectLead.objects.create(project=self.project, name="Old lead")

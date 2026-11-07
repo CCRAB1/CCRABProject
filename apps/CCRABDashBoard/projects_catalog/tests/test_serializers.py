@@ -90,7 +90,7 @@ class CatalogSerializerTests(TestCase):
         )
 
     def test_project_catalog_page_serializer_includes_nested_relations(self):
-        create_partner(self.project, "Partner Name", "Partner Org")
+        create_partner(self.project, "Partner Name", "https://example.com/partner")
         create_picture(
             self.project,
             name="Project Hero",
@@ -111,6 +111,8 @@ class CatalogSerializerTests(TestCase):
         self.assertEqual(payload["project_name"], self.project.project_name)
         self.assertEqual(len(payload["partners"]), 1)
         self.assertEqual(payload["partners"][0]["name"], "Partner Name")
+        self.assertEqual(payload["partners"][0]["url"], "https://example.com/partner")
+        self.assertNotIn("affiliation", payload["partners"][0])
         self.assertEqual(len(payload["pictures"]), 1)
         self.assertEqual(payload["pictures"][0]["name"], "Project Hero")
         self.assertEqual(len(payload["hosting_locations"]), 1)

@@ -126,7 +126,7 @@ class ProjectPartner(TimestampedModel):
         db_column="project_id",
     )
     name = models.TextField(blank=True, null=True)
-    affiliation = models.TextField(blank=True, null=True)
+    url = models.URLField(max_length=512, blank=True, null=True)
 
     class Meta:
         db_table = '"projects"."project_partners"'

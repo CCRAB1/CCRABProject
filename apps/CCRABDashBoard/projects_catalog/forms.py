@@ -104,7 +104,7 @@ ProjectLeadFormSet = forms.inlineformset_factory(
 ProjectPartnerFormSet = forms.inlineformset_factory(
     ProjectCatalogPage, ProjectPartner, form=ProjectTeamForm,
     formset=ProjectTeamFormSet,
-    fields=("name", "affiliation"), extra=0, can_delete=True,
+    fields=("name", "url"), extra=0, can_delete=True,
 )
 
 

@@ -14,7 +14,7 @@ const root = path.resolve(__dirname, '../../..');
     let failProducts = false;
     let description = '<p>Clean <strong>water</strong></p><script>window.attacked=1</script><a href="javascript:alert(1)" x-init="window.attacked=1" @click="window.attacked=1">unsafe</a>';
     let lead = '<strong>Project lead</strong><img src=x onerror="window.attacked=1"><a href="javascript:alert(1)" x-init="window.attacked=1">Contact</a>';
-    let partners = [{ id: 1, name: '<em>Community partner</em><script>window.attacked=1</script>', affiliation: '<p>Research <strong>institute</strong></p><a href="https://example.com" @click="window.attacked=1">Website</a>' }];
+    let partners = [{ id: 1, name: '<em>Community partner</em><script>window.attacked=1</script>', url: "https://example.com/partner" }];
     await page.route('http://catalog.test/**', async route => {
       const pathname = new URL(route.request().url()).pathname;
       if (pathname.startsWith('/static/')) {
@@ -41,8 +41,8 @@ const root = path.resolve(__dirname, '../../..');
     assert.equal(await page.locator('main .rich-text strong').textContent(), 'water');
     assert.equal(await page.locator('.project-lead strong').textContent(), 'Project lead');
     assert.equal(await page.locator('.partner-name em').textContent(), 'Community partner');
-    assert.equal(await page.locator('.partner-affiliation strong').textContent(), 'institute');
-    assert.equal(await page.locator('.partner-affiliation a').getAttribute('href'), 'https://example.com');
+    assert.equal(await page.locator('.partner-url').textContent(), 'https://example.com/partner');
+    assert.equal(await page.locator('.partner-url').getAttribute('href'), 'https://example.com/partner');
     await page.locator('.project-lead a').click();
     assert.equal(await page.evaluate(() => window.attacked), undefined);
     assert.equal(await page.locator('.rich-text [x-init], .rich-text [onclick], .rich-text script, .rich-text [href^="javascript:"]').count(), 0);
@@ -62,7 +62,7 @@ const root = path.resolve(__dirname, '../../..');
     failProject = false;
     failProducts = false;
     lead = 'Plain lead';
-    partners = [{ id: 1, name: 'Plain partner', affiliation: 'Plain affiliation' }];
+    partners = [{ id: 1, name: 'Plain partner', url: 'javascript:alert(1)' }];
     description = 'Plain paragraph one.\n\nPlain paragraph two.';
     await page.getByRole('button', { name: 'Try again', exact: true }).first().click();
     await page.getByText('Plain paragraph two.', { exact: true }).waitFor();
@@ -72,7 +72,8 @@ const root = path.resolve(__dirname, '../../..');
     assert.equal(await page.getByRole('link', { name: 'lead@example.com' }).getAttribute('href'), 'mailto:lead%40example.com');
     assert.equal(await page.getByRole('link', { name: 'https://example.com/lead' }).getAttribute('href'), 'https://example.com/lead');
     assert.equal(await page.locator('.partner-name').textContent(), 'Plain partner');
-    assert.equal(await page.locator('.partner-affiliation').textContent(), 'Plain affiliation');
+    assert.equal(await page.locator('.partner-url').isVisible(), false);
+    assert.equal(await page.locator('.partner-url').getAttribute('href'), null);
     assert.deepEqual(errors, []);
     console.log('Passed: rich text, XSS protection, plain text, dates, responsive widths, partial failure, retry.');
   } finally { await browser.close(); }

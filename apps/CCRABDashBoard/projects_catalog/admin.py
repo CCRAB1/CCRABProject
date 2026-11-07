@@ -32,7 +32,7 @@ class ProjectLeadInline(admin.TabularInline):
 class ProjectPartnerInline(admin.TabularInline):
     model = ProjectPartner
     extra = 0
-    fields = ("name", "affiliation")
+    fields = ("name", "url")
 
 
 class ProjectPictureInline(admin.TabularInline):
@@ -97,8 +97,8 @@ class ProjectLeadAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectPartner)
 class ProjectPartnerAdmin(admin.ModelAdmin):
-    list_display = ("name", "affiliation", "project", "created_at", "updated_at")
-    search_fields = ("name", "affiliation", "project__project_name")
+    list_display = ("name", "url", "project", "created_at", "updated_at")
+    search_fields = ("name", "url", "project__project_name")
     list_filter = ("created_at", "updated_at")
     autocomplete_fields = ("project",)
     readonly_fields = ("created_at", "updated_at")

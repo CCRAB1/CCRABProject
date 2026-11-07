@@ -39,7 +39,7 @@ class ProjectPartnerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectPartner
-        fields = ("id", "project_id", "name", "affiliation", "created_at", "updated_at")
+        fields = ("id", "project_id", "name", "url", "created_at", "updated_at")
         read_only_fields = ("created_at", "updated_at")
 
 

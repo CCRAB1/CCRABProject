@@ -50,8 +50,8 @@ class ProjectDetailAndProductsApiTests(TestCase):
             neighborhood="South Reserve",
         )
 
-        create_partner(self.project_two, "Partner One", "Org One")
-        create_partner(self.project_two, "Partner Two", "Org Two")
+        create_partner(self.project_two, "Partner One", "https://example.com/one")
+        create_partner(self.project_two, "Partner Two", "https://example.com/two")
         create_picture(
             self.project_two,
             name="Featured",
