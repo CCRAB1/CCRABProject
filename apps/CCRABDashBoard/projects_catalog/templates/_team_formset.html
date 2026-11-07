@@ -1,0 +1,12 @@
+<section class="mb-5" data-team-formset="{{ formset.prefix }}" aria-labelledby="{{ formset.prefix }}-heading">
+    <h3 id="{{ formset.prefix }}-heading" class="is-size-6">{{ title }}</h3>
+    {{ formset.management_form }}
+    <div role="alert">{{ formset.non_form_errors }}</div>
+    <div data-team-rows>
+        {% for row in formset %}
+            {% include "_team_row.html" %}
+        {% endfor %}
+    </div>
+    <template data-team-empty-row>{% include "_team_row.html" with row=formset.empty_form %}</template>
+    <button type="button" class="button is-small is-link is-light" data-team-add>{{ add_label }}</button>
+</section>

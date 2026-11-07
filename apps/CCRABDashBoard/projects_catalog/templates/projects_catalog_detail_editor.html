@@ -136,8 +136,8 @@
                 <div class="card mb-5">
                     <header class="card-header"><h2 class="card-header-title">Project team</h2></header>
                     <div class="card-content content" x-ignore>
-                        {% include "projects_catalog/_team_formset.html" with formset=lead_formset title="Project Leads" add_label="Add lead" %}
-                        {% include "projects_catalog/_team_formset.html" with formset=partner_formset title="Partners" add_label="Add partner" %}
+                        {% include "_team_formset.html" with formset=lead_formset title="Project Leads" add_label="Add lead" %}
+                        {% include "_team_formset.html" with formset=partner_formset title="Partners" add_label="Add partner" %}
                     </div>
                 </div>
                 <div class="card">
