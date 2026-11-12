@@ -1,0 +1,147 @@
+/*
+ * Colors sampled from the solid fills in the three quality icons.
+ * primary = icon background; accent/secondary = icon artwork;
+ * foreground = icon lettering. Colors are unchanged from the source PNGs.
+ *
+ * Django template: {% load static %}
+ * <link rel="stylesheet" href="{% static 'css/quality_palette.css' %}">
+ * Example: <section class="air_pollution_bg_primary air_pollution_text_foreground">
+ * Border utilities set only border-color; supply border width/style separately.
+ * Text utilities expose source colors; check contrast for your chosen pairing.
+ */
+
+:root {
+    --air_pollution_primary: #213b5a;
+    --air_pollution_accent: #4d90ae;
+    --air_pollution_foreground: #f6f4f0;
+    --soil_quality_primary: #6a7f6b;
+    --soil_quality_accent: #c0a75d;
+    --soil_quality_secondary: #213b5a;
+    --soil_quality_foreground: #f6f4f0;
+    --water_quality_primary: #4d90ae;
+    --water_quality_accent: #213b5a;
+    --water_quality_foreground: #f6f4f0;
+}
+
+/* airpollutionicon.png */
+.air_pollution_bg_primary {
+    background-color: var(--air_pollution_primary);
+}
+
+.air_pollution_text_primary {
+    color: var(--air_pollution_primary);
+}
+
+.air_pollution_border_primary {
+    border-color: var(--air_pollution_primary);
+}
+
+.air_pollution_bg_accent {
+    background-color: var(--air_pollution_accent);
+}
+
+.air_pollution_text_accent {
+    color: var(--air_pollution_accent);
+}
+
+.air_pollution_border_accent {
+    border-color: var(--air_pollution_accent);
+}
+
+.air_pollution_bg_foreground {
+    background-color: var(--air_pollution_foreground);
+}
+
+.air_pollution_text_foreground {
+    color: var(--air_pollution_foreground);
+}
+
+.air_pollution_border_foreground {
+    border-color: var(--air_pollution_foreground);
+}
+
+/* soilqualityicon.png */
+.soil_quality_bg_primary {
+    background-color: var(--soil_quality_primary);
+}
+
+.soil_quality_text_primary {
+    color: var(--soil_quality_primary);
+}
+
+.soil_quality_border_primary {
+    border-color: var(--soil_quality_primary);
+}
+
+.soil_quality_bg_accent {
+    background-color: var(--soil_quality_accent);
+}
+
+.soil_quality_text_accent {
+    color: var(--soil_quality_accent);
+}
+
+.soil_quality_border_accent {
+    border-color: var(--soil_quality_accent);
+}
+
+.soil_quality_bg_secondary {
+    background-color: var(--soil_quality_secondary);
+}
+
+.soil_quality_text_secondary {
+    color: var(--soil_quality_secondary);
+}
+
+.soil_quality_border_secondary {
+    border-color: var(--soil_quality_secondary);
+}
+
+.soil_quality_bg_foreground {
+    background-color: var(--soil_quality_foreground);
+}
+
+.soil_quality_text_foreground {
+    color: var(--soil_quality_foreground);
+}
+
+.soil_quality_border_foreground {
+    border-color: var(--soil_quality_foreground);
+}
+
+/* wqicon.png */
+.water_quality_bg_primary {
+    background-color: var(--water_quality_primary);
+}
+
+.water_quality_text_primary {
+    color: var(--water_quality_primary);
+}
+
+.water_quality_border_primary {
+    border-color: var(--water_quality_primary);
+}
+
+.water_quality_bg_accent {
+    background-color: var(--water_quality_accent);
+}
+
+.water_quality_text_accent {
+    color: var(--water_quality_accent);
+}
+
+.water_quality_border_accent {
+    border-color: var(--water_quality_accent);
+}
+
+.water_quality_bg_foreground {
+    background-color: var(--water_quality_foreground);
+}
+
+.water_quality_text_foreground {
+    color: var(--water_quality_foreground);
+}
+
+.water_quality_border_foreground {
+    border-color: var(--water_quality_foreground);
+}
