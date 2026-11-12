@@ -12,6 +12,7 @@ from django.contrib.gis.admin import GISModelAdmin  # requires GeoDjango; remove
 
 from .models import (
     HostingLocation,
+    Neighborhood,
     HostingLocationProductType,
     ProductCategory,
     ProductType,
@@ -59,7 +60,8 @@ class ProjectCatalogPageAdmin(GISModelAdmin):
         "project_description",
         "keywords",
     )
-    list_filter = ("start_date", "end_date", "created_at", "updated_at")
+    filter_horizontal = ("neighborhoods",)
+    list_filter = ("neighborhoods", "start_date", "end_date", "created_at", "updated_at")
     date_hierarchy = "start_date"
     readonly_fields = ("created_at", "updated_at")
     prepopulated_fields = {"slug": ("project_name",)}
@@ -81,10 +83,16 @@ class ProjectCatalogPageAdmin(GISModelAdmin):
         ),
         (
             "Dates and Location",
-            {"fields": ("start_date", "end_date", "neighborhood", "geom")},
+            {"fields": ("start_date", "end_date", "neighborhoods", "geom")},
         ),
         ("Metadata", {"fields": ("keywords", "created_at", "updated_at")}),
     )
+
+
+@admin.register(Neighborhood)
+class NeighborhoodAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)
 
 
 @admin.register(ProjectLead)

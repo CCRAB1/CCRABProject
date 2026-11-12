@@ -43,12 +43,12 @@ def editor_html(value, bullets=False):
 class ProjectCatalogEditorForm(forms.ModelForm):
     class Meta:
         model = ProjectCatalogPage
-        fields = ["project_description", "project_impact", "neighborhood", "start_date", "end_date"]
+        fields = ["project_description", "project_impact", "neighborhoods", "start_date", "end_date"]
         labels = {"project_description": "The Project", "project_impact": "The Impact"}
         widgets = {
             "project_description": SummernoteWidget(),
             "project_impact": SummernoteWidget(),
-            "neighborhood": forms.TextInput(attrs={"class": "input"}),
+            "neighborhoods": forms.CheckboxSelectMultiple(),
             "start_date": forms.DateTimeInput(format="%Y-%m-%d", attrs={"type": "date", "class": "input"}),
             "end_date": forms.DateTimeInput(format="%Y-%m-%d", attrs={"type": "date", "class": "input"}),
         }

@@ -3,6 +3,7 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from .models import (
     HostingLocation,
+    Neighborhood,
     HostingLocationProductType,
     ProductCategory,
     ProductType,
@@ -115,6 +116,9 @@ class HostingLocationSerializer(serializers.ModelSerializer):
 
 
 class ProjectCatalogPageSerializer(serializers.ModelSerializer):
+    neighborhoods = serializers.SlugRelatedField(
+        many=True, slug_field="name", queryset=Neighborhood.objects.all(), required=False,
+    )
     project_leads = ProjectLeadSerializer(source="leads", many=True, read_only=True)
     partners = ProjectPartnerSerializer(many=True, read_only=True)
     pictures = ProjectPictureSerializer(many=True, read_only=True)
@@ -131,7 +135,7 @@ class ProjectCatalogPageSerializer(serializers.ModelSerializer):
             "project_leads",
             "project_lead_email",
             "project_lead_phone",
-            "neighborhood",
+            "neighborhoods",
             "start_date",
             "end_date",
             "project_url",
@@ -149,6 +153,8 @@ class ProjectCatalogPageSerializer(serializers.ModelSerializer):
 
 
 class ProjectCatalogPageGeoSerializer(GeoFeatureModelSerializer):
+    neighborhoods = serializers.SlugRelatedField(many=True, slug_field="name", read_only=True)
+
     class Meta:
         model = ProjectCatalogPage
         geo_field = "geom"
@@ -159,7 +165,7 @@ class ProjectCatalogPageGeoSerializer(GeoFeatureModelSerializer):
             "project_full_title",
             "project_lead",
             "project_url",
-            "neighborhood",
+            "neighborhoods",
             "start_date",
             "end_date",
             "keywords",

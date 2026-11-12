@@ -13,7 +13,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .forms import ProjectCatalogEditorForm, ProjectLeadFormSet, ProjectPartnerFormSet, ProjectPhotoUploadForm
-from .models import ProductType, ProjectCatalogPage
+from .models import Neighborhood, ProductType, ProjectCatalogPage
 from .serializers import ProjectCatalogPageSerializer
 
 PAGE_SIZE = 12
@@ -131,6 +131,7 @@ def _project_queryset():
     return (
         ProjectCatalogPage.objects
         .prefetch_related(
+            "neighborhoods",
             "leads",
             "partners",
             "pictures",
@@ -195,11 +196,11 @@ def _project_list_payload(query_params):
         )
 
     if neighborhood:
-        queryset = queryset.filter(neighborhood__icontains=neighborhood)
+        queryset = queryset.filter(neighborhoods__name__iexact=neighborhood)
 
     if region:
         queryset = queryset.filter(
-            Q(neighborhood__icontains=region)
+            Q(neighborhoods__name__icontains=region)
             | Q(project_description__icontains=region)
             | Q(keywords__icontains=region)
         )
@@ -263,10 +264,9 @@ def _project_facets_payload():
 
     neighborhoods = []
     neighborhood_values = (
-        ProjectCatalogPage.objects.exclude(neighborhood__isnull=True)
-        .exclude(neighborhood__exact="")
-        .order_by("neighborhood")
-        .values_list("neighborhood", flat=True)
+        Neighborhood.objects.filter(projects__isnull=False)
+        .order_by("name")
+        .values_list("name", flat=True)
         .distinct()
     )
     for neighborhood_name in neighborhood_values:
@@ -444,8 +444,8 @@ def project_resource_detail_page(request, code, resource_slug):
             ]
 
     neighborhoods = []
-    if project.neighborhood:
-        neighborhoods.append(project.neighborhood)
+    for neighborhood in project.neighborhoods.all():
+        neighborhoods.append(neighborhood.name)
 
     context = {
         "project_code": _project_code_for_url(project),
@@ -515,7 +515,8 @@ def projects_catalog_detail_editor(request, code):
         if project_valid and leads_valid and partners_valid and photo_valid:
             with transaction.atomic():
                 edited_project = form.save(commit=False)
-                edited_project.save(update_fields=["project_description", "project_impact", "neighborhood", "start_date", "end_date", "updated_at"])
+                edited_project.save(update_fields=["project_description", "project_impact", "start_date", "end_date", "updated_at"])
+                form.save_m2m()
                 lead_formset.save()
                 partner_formset.save()
                 if photo_form.cleaned_data.get("picture_path"):

@@ -8,6 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
+from projects_catalog.models import Neighborhood
 from projects_catalog.forms import ProjectCatalogEditorForm
 from projects_catalog.tests.factories import create_project
 from projects_catalog.views import projects_catalog_detail_editor
@@ -22,9 +23,11 @@ class MetadataPhotoEditorTests(TestCase):
         self.addCleanup(settings.disable)
         self.project = create_project("Metadata Photos")
         self.url = reverse("projects_catalog_detail_editor", args=[self.project.slug])
+        self.river = Neighborhood.objects.create(name="River District")
+        self.uptown = Neighborhood.objects.create(name="Uptown")
         self.data = {
             "project_description": "<p>Description</p>", "project_impact": "<p>Impact</p>",
-            "neighborhood": "River District", "start_date": "2026-01-12", "end_date": "2026-11-07",
+            "neighborhoods": [str(self.river.pk), str(self.uptown.pk)], "start_date": "2026-01-12", "end_date": "2026-11-07",
             "leads-TOTAL_FORMS": "0", "leads-INITIAL_FORMS": "0",
             "partners-TOTAL_FORMS": "0", "partners-INITIAL_FORMS": "0",
         }
@@ -44,7 +47,7 @@ class MetadataPhotoEditorTests(TestCase):
         self.data.update({"photo-picture_path": self.upload(), "photo-name": "River monitoring"})
         self.assertEqual(self.submit().status_code, 302)
         self.project.refresh_from_db()
-        self.assertEqual(self.project.neighborhood, "River District")
+        self.assertQuerySetEqual(self.project.neighborhoods.all(), ["River District", "Uptown"], transform=str)
         self.assertEqual(self.project.start_date.date().isoformat(), "2026-01-12")
         self.assertEqual(self.project.end_date.date().isoformat(), "2026-11-07")
         photo = self.project.pictures.get()
@@ -63,14 +66,14 @@ class MetadataPhotoEditorTests(TestCase):
         self.assertIn("End Date must be on or after Start Date", response.content.decode())
         self.assertFalse(self.project.pictures.exists())
         self.project.refresh_from_db()
-        self.assertNotEqual(self.project.neighborhood, "River District")
+        self.assertFalse(self.project.neighborhoods.filter(pk=self.river.pk).exists())
 
     def test_fake_image_rejected_without_partial_saves(self):
         self.data["photo-picture_path"] = SimpleUploadedFile("fake.png", b"not an image", content_type="image/png")
         self.assertEqual(self.submit().status_code, 200)
         self.assertFalse(self.project.pictures.exists())
         self.project.refresh_from_db()
-        self.assertNotEqual(self.project.neighborhood, "River District")
+        self.assertFalse(self.project.neighborhoods.filter(pk=self.river.pk).exists())
 
     def test_no_upload_keeps_existing_photos(self):
         photo = self.project.pictures.create(name="Existing", picture_path="existing.png")
@@ -80,10 +83,10 @@ class MetadataPhotoEditorTests(TestCase):
         self.assertEqual(self.project.pictures.count(), 1)
 
     def test_optional_metadata_can_be_cleared(self):
-        self.data.update({"neighborhood": "", "start_date": "", "end_date": ""})
+        self.data.update({"neighborhoods": [], "start_date": "", "end_date": ""})
         self.assertEqual(self.submit().status_code, 302)
         self.project.refresh_from_db()
-        self.assertFalse(self.project.neighborhood)
+        self.assertFalse(self.project.neighborhoods.exists())
         self.assertIsNone(self.project.start_date)
         self.assertIsNone(self.project.end_date)
 
@@ -100,4 +103,4 @@ class MetadataPhotoEditorTests(TestCase):
         form = ProjectCatalogEditorForm(instance=self.project)
         self.assertIn('type="date"', str(form["start_date"]))
         self.assertIn('value="2026-01-12"', str(form["start_date"]))
-        self.assertEqual(form.initial["neighborhood"], self.project.neighborhood)
+        self.assertEqual(form.initial["neighborhoods"], list(self.project.neighborhoods.all()))

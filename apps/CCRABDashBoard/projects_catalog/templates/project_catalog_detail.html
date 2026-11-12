@@ -20,8 +20,8 @@
                 <h1 class="title is-2" x-text="title"></h1>
                 <div class="columns is-multiline is-mobile my-2">
                     <div class="column is-12-mobile is-4-tablet">
-                        <div class="meta-tile"><p class="heading">Neighborhood</p>
-                            <p x-text="project.neighborhood || '—'"></p></div>
+                        <div class="meta-tile"><p class="heading">Neighborhoods</p>
+                            <p x-text="(project.neighborhoods || []).join(', ') || '—'"></p></div>
                     </div>
                     <div class="column is-12-mobile is-4-tablet">
                         <div class="meta-tile"><p class="heading">Start Date</p>

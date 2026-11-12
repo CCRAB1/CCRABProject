@@ -38,6 +38,24 @@ class TimestampedModel(models.Model):
         abstract = True
 
 
+class Neighborhood(models.Model):
+    name = models.TextField(unique=True)
+
+    class Meta:
+        db_table = '"projects"."neighborhoods"'
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(models.functions.Lower("name"), name="unique_neighborhood_name_ci"),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        super().clean()
+        self.name = self.name.strip()
+
+
 class ProjectCatalogPage(TimestampedModel):
     project_name = models.TextField()
     slug = models.SlugField(max_length=255, unique=True, blank=True)
@@ -46,7 +64,10 @@ class ProjectCatalogPage(TimestampedModel):
     project_lead_email = models.TextField(blank=True, null=True)
     project_lead_phone = models.TextField(blank=True, null=True)
 
-    neighborhood = models.TextField(blank=True, null=True)
+    neighborhoods = models.ManyToManyField(
+        Neighborhood, blank=True, related_name="projects",
+        db_table='"projects"."project_catalog_page_neighborhoods"',
+    )
     start_date = models.DateTimeField(blank=True, null=True)
     end_date = models.DateTimeField(blank=True, null=True)
 

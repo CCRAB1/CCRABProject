@@ -163,7 +163,7 @@ class ProjectListAndFacetsApiTests(TestCase):
     def test_project_list_filters_by_neighborhood(self):
         response = self.client.get(
             reverse("project-list-api"),
-            {"neighborhood": "down"},
+            {"neighborhood": "downtown"},
         )
 
         payload = response.json()

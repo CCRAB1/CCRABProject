@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from projects_catalog.models import (
     HostingLocation,
+    Neighborhood,
     HostingLocationProductType,
     ProductCategory,
     ProductType,
@@ -32,7 +33,15 @@ def create_project(name, **overrides):
     }
     for key, value in overrides.items():
         payload[key] = value
-    return ProjectCatalogPage.objects.create(**payload)
+    names = payload.pop("neighborhoods", None)
+    legacy_name = payload.pop("neighborhood")
+    if names is None:
+        names = [legacy_name] if legacy_name else []
+    project = ProjectCatalogPage.objects.create(**payload)
+    for name in names:
+        neighborhood, _ = Neighborhood.objects.get_or_create(name=name)
+        project.neighborhoods.add(neighborhood)
+    return project
 
 
 def create_product_type(name, description=""):

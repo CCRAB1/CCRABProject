@@ -44,10 +44,9 @@ class ProjectEditorTests(TestCase):
             self.assertIn(text, html)
         self.assertEqual(html.count('<iframe'), 2)
 
-    @patch("projects_catalog.views.transaction.atomic")
-    @patch.object(ProjectCatalogPage, "save")
     @patch("projects_catalog.views._resolve_project")
-    def test_save_only_updates_narrative_fields(self, resolve, save, atomic):
+    def test_save_keeps_project_name_unchanged(self, resolve):
+        self.project = ProjectCatalogPage.objects.create(project_name="Example", slug="example")
         resolve.return_value = self.project
         response = projects_catalog_detail_editor(self.request("post", {
             "project_description": '<p onclick="bad()">Updated <b>project</b></p>',
@@ -59,7 +58,9 @@ class ProjectEditorTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.project.project_description, "<p>Updated <b>project</b></p>")
         self.assertEqual(self.project.project_name, "Example")
-        save.assert_called_once_with(update_fields=["project_description", "project_impact", "neighborhood", "start_date", "end_date", "updated_at"])
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.project_name, "Example")
+        self.assertEqual(self.project.project_description, "<p>Updated <b>project</b></p>")
 
     def test_plain_text_keeps_paragraphs_and_impact_bullets(self):
         self.assertEqual(editor_html("One\n\nTwo"), "<p>One</p><p>Two</p>")
