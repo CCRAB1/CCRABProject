@@ -122,7 +122,7 @@
                         <ul>
                             <template x-for="partner in project.partners || []" :key="partner.id">
                                 <li>
-                                    <a class="partner-url" x-show="safeUrl(partner.url)"
+                                    <a class="partner-url" x-show="partner.name"
                                        :href="safeUrl(partner.url)" target="_blank"
                                        rel="noopener noreferrer" x-text="partner.name"></a>
                                 </li>
