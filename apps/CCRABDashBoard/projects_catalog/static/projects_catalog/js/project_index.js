@@ -201,7 +201,7 @@
             a.textContent = projectTitle;
 
             title.appendChild(a);
-
+            /*
             if (theme) {
                 const badge = document.createElement("span");
                 // Use a contrasting palette color for the label on each card.
@@ -212,6 +212,7 @@
                 badge.textContent = theme.label;
                 content.appendChild(badge);
             }
+            */
             content.appendChild(duration);
             content.appendChild(title);
 
