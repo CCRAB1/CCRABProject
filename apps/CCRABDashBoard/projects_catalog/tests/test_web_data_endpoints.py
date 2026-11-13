@@ -25,6 +25,7 @@ class ProjectWebDataEndpointTests(TestCase):
                 "\n\nSecond paragraph for detail payload."
             ),
             neighborhood="Uptown",
+            keywords=["Water Quality"],
         )
         create_picture(
             self.project,
@@ -46,6 +47,8 @@ class ProjectWebDataEndpointTests(TestCase):
         payload = response.json()
         self.assertIn("results", payload)
         self.assertGreaterEqual(payload.get("count", 0), 1)
+        project = next(item for item in payload["results"] if item["id"] == self.project.pk)
+        self.assertEqual(project["keywords"], ["Water Quality"])
 
     def test_project_facets_web_data_is_public(self):
         response = self.client.get(reverse("project-facets-web-data"))

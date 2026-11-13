@@ -123,6 +123,27 @@
         return null;
     }
 
+    function qualityTheme(keywords) {
+        const values = Array.isArray(keywords) ? keywords :
+            (typeof keywords === "string" ? keywords.split(",") : []);
+        const themes = {
+            "air": {prefix: "air_pollution", label: "Air quality"},
+            "air_quality": {prefix: "air_pollution", label: "Air quality"},
+            "air_pollution": {prefix: "air_pollution", label: "Air quality"},
+            "soil": {prefix: "soil_quality", label: "Soil quality"},
+            "soil_quality": {prefix: "soil_quality", label: "Soil quality"},
+            "water": {prefix: "water_quality", label: "Water quality"},
+            "water_quality": {prefix: "water_quality", label: "Water quality"},
+        };
+        // Use the first recognized keyword for projects covering multiple topics.
+        for (const keyword of values) {
+            if (typeof keyword !== "string") continue;
+            const normalized = keyword.trim().toLowerCase().replace(/[\s_-]+/g, "_");
+            if (Object.hasOwn(themes, normalized)) return themes[normalized];
+        }
+        return null;
+    }
+
     function renderCards(items) {
         clearChildren(gridEl);
 
@@ -140,6 +161,10 @@
 
             const card = document.createElement("div");
             card.className = "card";
+            const theme = qualityTheme(p.keywords);
+            if (theme) {
+                card.classList.add("project-quality-card", `${theme.prefix}_border_primary`);
+            }
 
             if (picture?.picture_path) {
                 const cardImage = document.createElement("div");
@@ -170,6 +195,15 @@
 
             title.appendChild(a);
 
+            if (theme) {
+                const badge = document.createElement("span");
+                // Navy/off-white for air and water; gold/navy for soil.
+                const background = theme.prefix === "air_pollution" ? "primary" : "accent";
+                const foreground = theme.prefix === "soil_quality" ? "secondary" : "foreground";
+                badge.className = `project-quality-label ${theme.prefix}_bg_${background} ${theme.prefix}_text_${foreground}`;
+                badge.textContent = theme.label;
+                content.appendChild(badge);
+            }
             content.appendChild(duration);
             content.appendChild(title);
 

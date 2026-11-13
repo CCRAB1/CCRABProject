@@ -229,6 +229,7 @@ def _project_list_payload(query_params):
                 "start_date": project.get("start_date"),
                 "end_date": project.get("end_date"),
                 "pictures": project.get("pictures") or [],
+                "keywords": _normalized_keywords(project.get("keywords")),
                 "project_leads": project.get("project_leads") or [],
                 "project_detail_url": reverse(
                     "project-detail",

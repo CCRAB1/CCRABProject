@@ -3,6 +3,11 @@
 
 {% block title %}Projects{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/quality_palette.css' %}">
+<link rel="stylesheet" href="{% static 'projects_catalog/css/project_index.css' %}">
+{% endblock %}
+
 {% block content %}
 <div
   id="projects-page"
