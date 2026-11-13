@@ -121,10 +121,10 @@
                         <p x-show="!project.partners?.length">—</p>
                         <ul>
                             <template x-for="partner in project.partners || []" :key="partner.id">
-                                <li><div class="rich-text partner-name" x-html="richText(partner.name)"></div>
+                                <li>
                                     <a class="partner-url" x-show="safeUrl(partner.url)"
                                        :href="safeUrl(partner.url)" target="_blank"
-                                       rel="noopener noreferrer" x-text="partner.url"></a>
+                                       rel="noopener noreferrer" x-text="partner.name"></a>
                                 </li>
                             </template>
                         </ul>
