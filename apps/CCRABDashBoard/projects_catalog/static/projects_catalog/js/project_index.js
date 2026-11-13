@@ -163,27 +163,34 @@
             card.className = "card";
             const theme = qualityTheme(p.keywords);
             if (theme) {
-                card.classList.add("project-quality-card", `${theme.prefix}_border_primary`);
+                card.classList.add(
+                    "project-quality-card",
+                    `${theme.prefix}_border_primary`,
+                    `${theme.prefix}_bg_primary`,
+                );
             }
 
+            // Reserve the same image area even when a project has no picture.
+            const cardImage = document.createElement("div");
+            cardImage.className = "card-image";
+            const figure = document.createElement("figure");
+            figure.className = "image is-4by3";
             if (picture?.picture_path) {
-                const cardImage = document.createElement("div");
-                cardImage.className = "card-image";
-                const figure = document.createElement("figure");
-                figure.className = "image is-4by3";
                 const img = document.createElement("img");
                 img.src = picture.picture_path;
                 img.alt = picture.name || projectTitle || "Project image";
                 figure.appendChild(img);
-                cardImage.appendChild(figure);
-                card.appendChild(cardImage);
+            } else {
+                figure.setAttribute("aria-hidden", "true");
             }
+            cardImage.appendChild(figure);
+            card.appendChild(cardImage);
 
             const content = document.createElement("div");
             content.className = "card-content";
 
             const duration = document.createElement("p");
-            duration.className = "is-size-7 has-text-grey mb-2";
+            duration.className = theme ? "is-size-7 mb-2" : "is-size-7 has-text-grey mb-2";
             duration.textContent = formatDateRange(p);
 
             const title = document.createElement("p");
@@ -197,9 +204,10 @@
 
             if (theme) {
                 const badge = document.createElement("span");
-                // Navy/off-white for air and water; gold/navy for soil.
-                const background = theme.prefix === "air_pollution" ? "primary" : "accent";
-                const foreground = theme.prefix === "soil_quality" ? "secondary" : "foreground";
+                // Use a contrasting palette color for the label on each card.
+                const background = theme.prefix === "air_pollution" ? "foreground" : "accent";
+                const foreground = theme.prefix === "air_pollution" ? "primary" :
+                    (theme.prefix === "soil_quality" ? "secondary" : "foreground");
                 badge.className = `project-quality-label ${theme.prefix}_bg_${background} ${theme.prefix}_text_${foreground}`;
                 badge.textContent = theme.label;
                 content.appendChild(badge);
