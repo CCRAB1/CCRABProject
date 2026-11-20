@@ -131,7 +131,7 @@ services:
 
   nginx:
     <<: *prod_env
-    image: nginx:1.27-alpine
+    image: nginx:1.31-alpine
     restart: unless-stopped
     environment:
       NGINX_AIRFLOW_SERVER_NAME: ${NGINX_AIRFLOW_SERVER_NAME:-airflow.localhost}
