@@ -1,11 +1,11 @@
 <fieldset class="box mb-3" data-team-row>
-    <legend class="is-size-7">Team row</legend>
+    <legend class="is-size-7">{{ row_label|default:"Team row" }}</legend>
     {{ row.non_field_errors }}
     {% for hidden in row.hidden_fields %}{{ hidden }}{{ hidden.errors }}{% endfor %}
     {% for field in row.visible_fields %}
         <div class="field">
             {% if field.name == "DELETE" %}
-                <label class="checkbox">{{ field }} Remove this row</label>
+                <label class="checkbox">{{ field }} {{ delete_label|default:"Remove this row" }}</label>
             {% else %}
                 <label class="label is-size-7" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 <div class="control">{{ field }}</div>

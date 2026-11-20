@@ -12,7 +12,7 @@ from django.utils.text import slugify
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .forms import ProjectCatalogEditorForm, ProjectLeadFormSet, ProjectPartnerFormSet, ProjectPhotoUploadForm
+from .forms import ProjectCatalogEditorForm, ProjectLeadFormSet, ProjectPartnerFormSet, ProjectPhotoUploadForm, ProjectHostingLocationFormSet
 from .models import Neighborhood, ProductType, ProjectCatalogPage
 from .serializers import ProjectCatalogPageSerializer
 
@@ -507,19 +507,22 @@ def projects_catalog_detail_editor(request, code):
     lead_formset = ProjectLeadFormSet(data, instance=project, prefix="leads")
     partner_formset = ProjectPartnerFormSet(data, instance=project, prefix="partners")
     photo_form = ProjectPhotoUploadForm(data, request.FILES or None, prefix="photo")
+    hosting_formset = ProjectHostingLocationFormSet(data, instance=project, prefix="hosting_locations")
     if request.method == "POST":
         # Validate every section so all errors appear together, without partial saves.
         project_valid = form.is_valid()
         leads_valid = lead_formset.is_valid()
         partners_valid = partner_formset.is_valid()
         photo_valid = photo_form.is_valid()
-        if project_valid and leads_valid and partners_valid and photo_valid:
+        hosting_valid = hosting_formset.is_valid()
+        if project_valid and leads_valid and partners_valid and photo_valid and hosting_valid:
             with transaction.atomic():
                 edited_project = form.save(commit=False)
                 edited_project.save(update_fields=["project_description", "project_impact", "start_date", "end_date", "updated_at"])
                 form.save_m2m()
                 lead_formset.save()
                 partner_formset.save()
+                hosting_formset.save()
                 if photo_form.cleaned_data.get("picture_path"):
                     photo = photo_form.save(commit=False)
                     photo.project = edited_project
@@ -531,6 +534,7 @@ def projects_catalog_detail_editor(request, code):
         "lead_formset": lead_formset,
         "partner_formset": partner_formset,
         "photo_form": photo_form,
+        "hosting_formset": hosting_formset,
         "saved": request.GET.get("saved") == "1" and request.method != "POST",
         "has_errors": request.method == "POST",
     })

@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.core.validators import FileExtensionValidator
 from django_summernote.widgets import SummernoteWidget
 
-from .models import ProjectCatalogPage, ProjectLead, ProjectPartner, ProjectPicture
+from .models import ProjectCatalogPage, ProjectLead, ProjectPartner, ProjectPicture, HostingLocation
 
 
 RICH_TEXT_TAGS = [
@@ -128,3 +128,35 @@ class ProjectPhotoUploadForm(forms.ModelForm):
         if cleaned.get("name") and not cleaned.get("picture_path") and "picture_path" not in self.errors:
             self.add_error("picture_path", "Choose a photo to upload with this caption.")
         return cleaned
+
+
+class ProjectHostingLocationForm(forms.ModelForm):
+    url = forms.URLField(required=False, label="Resource URL", widget=forms.URLInput(attrs={"class": "input"}))
+
+    class Meta:
+        model = HostingLocation
+        fields = ("data_type", "data_summary", "url", "product_category", "product_types")
+        labels = {"data_type": "Data type", "data_summary": "Summary", "product_category": "Category", "product_types": "Product Types"}
+        widgets = {
+            "data_type": forms.TextInput(attrs={"class": "input"}),
+            "data_summary": forms.Textarea(attrs={"class": "textarea", "rows": 4}),
+            "product_category": forms.Select(attrs={"class": "input"}),
+            "product_types": forms.CheckboxSelectMultiple(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["product_category"].queryset = self.fields["product_category"].queryset.order_by("name")
+        self.fields["product_types"].queryset = self.fields["product_types"].queryset.order_by("name")
+        self.fields["product_types"].required = False
+
+    def clean_data_summary(self):
+        return clean_rich_text(self.cleaned_data["data_summary"])
+
+
+ProjectHostingLocationFormSet = forms.inlineformset_factory(
+    ProjectCatalogPage, HostingLocation, form=ProjectHostingLocationForm,
+    formset=ProjectTeamFormSet,
+    fields=("data_type", "data_summary", "url", "product_category", "product_types"),
+    extra=0, can_delete=True,
+)

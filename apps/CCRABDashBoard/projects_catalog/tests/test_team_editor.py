@@ -20,6 +20,7 @@ class ProjectTeamEditorTests(TestCase):
             "leads-0-email": "lead@example.com", "leads-0-url": "https://example.com/lead",
             "leads-0-role": "Researcher",
             "partners-TOTAL_FORMS": "1", "partners-INITIAL_FORMS": "0",
+            "hosting_locations-TOTAL_FORMS": "0", "hosting_locations-INITIAL_FORMS": "0",
             "partners-0-name": "Partner Name", "partners-0-url": "https://example.com/partner",
         }
 

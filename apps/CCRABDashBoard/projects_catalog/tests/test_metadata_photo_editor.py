@@ -30,6 +30,7 @@ class MetadataPhotoEditorTests(TestCase):
             "neighborhoods": [str(self.river.pk), str(self.uptown.pk)], "start_date": "2026-01-12", "end_date": "2026-11-07",
             "leads-TOTAL_FORMS": "0", "leads-INITIAL_FORMS": "0",
             "partners-TOTAL_FORMS": "0", "partners-INITIAL_FORMS": "0",
+            "hosting_locations-TOTAL_FORMS": "0", "hosting_locations-INITIAL_FORMS": "0",
         }
 
     def upload(self):

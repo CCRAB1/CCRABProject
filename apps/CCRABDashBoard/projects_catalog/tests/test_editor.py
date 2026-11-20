@@ -40,7 +40,7 @@ class ProjectEditorTests(TestCase):
         resolve.return_value = self.project
         response = projects_catalog_detail_editor(self.request(), "example")
         html = response.content.decode()
-        for text in ["id_project_description", "id_project_impact", "Save changes", "Project team", "Project products", "csrfmiddlewaretoken"]:
+        for text in ["id_project_description", "id_project_impact", "Save changes", "Project team", "Project Products", "csrfmiddlewaretoken"]:
             self.assertIn(text, html)
         self.assertEqual(html.count('<iframe'), 2)
 
@@ -54,6 +54,7 @@ class ProjectEditorTests(TestCase):
             "project_name": "Unwanted change",
             "leads-TOTAL_FORMS": "0", "leads-INITIAL_FORMS": "0",
             "partners-TOTAL_FORMS": "0", "partners-INITIAL_FORMS": "0",
+            "hosting_locations-TOTAL_FORMS": "0", "hosting_locations-INITIAL_FORMS": "0",
         }), "example")
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.project.project_description, "<p>Updated <b>project</b></p>")

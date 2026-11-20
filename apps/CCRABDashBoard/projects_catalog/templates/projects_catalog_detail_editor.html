@@ -63,33 +63,10 @@
                     {{ form.project_impact.errors }}
                     {{ form.project_impact }}
                 </div>
-                <section class="mt-6" id="project-products-wrap" aria-labelledby="products-title">
-                    <h2 class="title is-4" id="products-title">Project products</h2>
-                    <div x-show="productsError" class="notification is-warning" role="alert"><p
-                            x-text="productsError"></p>
-                        <button type="button" class="button mt-2" @click="load()">Try again</button>
-                    </div>
-                    <p x-show="!productsError && !categories.length" class="has-text-grey">No products listed.</p>
-                    <div class="columns is-multiline">
-                        <template x-for="category in categories" :key="category.name">
-                            <div class="column is-12-mobile is-6-tablet">
-                                <article class="card product-card">
-                                    <div class="card-content content">
-                                        <h3 class="title is-5" x-text="category.name"></h3>
-                                        <template x-for="item in category.items" :key="item.id">
-                                            <div class="mb-4">
-                                                <div class="rich-text"
-                                                     x-html="richText(item.data_summary || item.data_type || 'Project resource')"></div>
-                                                <a x-show="safeUrl(item.resource_detail_url || item.url)"
-                                                   :href="safeUrl(item.resource_detail_url || item.url)">View
-                                                    resource</a>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </article>
-                            </div>
-                        </template>
-                    </div>
+                <section class="mt-6" id="project-products-wrap" aria-labelledby="project-products-title" x-ignore>
+                    <h2 class="title is-4" id="project-products-title">Project Products</h2>
+                    <p class="help mb-3">Add products or check Delete product to remove them when you save changes.</p>
+                    {% include "_team_formset.html" with formset=hosting_formset title="Products" add_label="Add product" row_label="Project product" delete_label="Delete product" %}
                 </section>
                 <section class="mt-6"><h2 class="title is-4">Photos</h2>
                     <div class="box" x-ignore>
